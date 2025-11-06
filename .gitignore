@@ -1,0 +1,85 @@
+# Root level .gitignore for the monorepo
+# This file contains patterns that apply to the entire project
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Environment files (root level)
+.env
+.env.local
+.env.*.local
+
+# Node modules (if any at root level)
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tgz
+*.tar.gz
+
+# Documentation build
+docs/_build/
+docs/build/
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Docker
+.dockerignore
+
+# Backup files
+*.bak
+*.backup
+
+# Windows
+*.lnk
+
+# Linux
+*~
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Project specific
+# Add any project-wide patterns here
