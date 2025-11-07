@@ -105,19 +105,19 @@ export default function SettingsPage() {
     two_factor_enabled: false
   });
 
-  // Check if user is super admin
+  // Check if user is super admin or organization admin
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
       return;
     }
-    if (!authLoading && user && user.role !== 'super_admin') {
+    if (!authLoading && user && user.role !== 'super_admin' && user.role !== 'organization_admin') {
       router.push('/dashboard');
     }
   }, [user, router, authLoading]);
 
   useEffect(() => {
-    if (!authLoading && user?.role === 'super_admin') {
+    if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
       loadSettings();
     }
   }, [user, authLoading]);
@@ -200,8 +200,8 @@ export default function SettingsPage() {
     );
   }
 
-  // Don't render if not super admin
-  if (!user || user.role !== 'super_admin') {
+  // Don't render if not super admin or organization admin
+  if (!user || (user.role !== 'super_admin' && user.role !== 'organization_admin')) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -220,8 +220,14 @@ export default function SettingsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
-          <p className="text-gray-600">Manage platform configuration and preferences</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {user?.role === 'super_admin' ? 'System Settings' : 'Organization Settings'}
+          </h1>
+          <p className="text-gray-600">
+            {user?.role === 'super_admin' 
+              ? 'Manage platform configuration and preferences'
+              : 'Manage your organization settings and preferences'}
+          </p>
         </div>
         <button
           onClick={handleSave}

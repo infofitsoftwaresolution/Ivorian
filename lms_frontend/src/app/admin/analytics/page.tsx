@@ -100,19 +100,19 @@ export default function AnalyticsPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState('');
 
-  // Check if user is super admin
+  // Check if user is super admin or organization admin
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
       return;
     }
-    if (!authLoading && user && user.role !== 'super_admin') {
+    if (!authLoading && user && user.role !== 'super_admin' && user.role !== 'organization_admin') {
       router.push('/dashboard');
     }
   }, [user, router, authLoading]);
 
   useEffect(() => {
-    if (!authLoading && user?.role === 'super_admin') {
+    if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
       loadAnalytics();
     }
   }, [user, authLoading, timePeriod]);
@@ -125,17 +125,18 @@ export default function AnalyticsPage() {
       // TODO: Replace with actual API call
       // const response = await apiClient.getPlatformAnalytics({ period: timePeriod });
       
-      // Mock data for now
+      // Mock data - different for super admin vs organization admin
+      const isSuperAdmin = user?.role === 'super_admin';
       const mockData: AnalyticsData = {
         overview: {
-          total_users: 12500,
-          total_courses: 342,
-          total_organizations: 28,
-          total_revenue: 245000,
-          active_users: 8900,
-          total_enrollments: 45600,
-          user_growth: 12.5,
-          revenue_growth: 8.3
+          total_users: isSuperAdmin ? 12500 : 450,
+          total_courses: isSuperAdmin ? 342 : 28,
+          total_organizations: isSuperAdmin ? 28 : 1,
+          total_revenue: isSuperAdmin ? 245000 : 12500,
+          active_users: isSuperAdmin ? 8900 : 320,
+          total_enrollments: isSuperAdmin ? 45600 : 1800,
+          user_growth: isSuperAdmin ? 12.5 : 8.2,
+          revenue_growth: isSuperAdmin ? 8.3 : 5.1
         },
         user_growth: {
           labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -149,24 +150,39 @@ export default function AnalyticsPage() {
           labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
           data: [38000, 42000, 45000, 41000, 48000, 52000]
         },
-        user_distribution: {
-          labels: ['Students', 'Tutors', 'Org Admins', 'Super Admins'],
-          data: [11000, 1200, 280, 20]
-        },
-        top_courses: [
-          { id: 1, title: 'Introduction to Web Development', enrollments: 1250, revenue: 12500 },
-          { id: 2, title: 'Data Science Fundamentals', enrollments: 980, revenue: 9800 },
-          { id: 3, title: 'Digital Marketing Mastery', enrollments: 850, revenue: 8500 },
-          { id: 4, title: 'Python Programming Basics', enrollments: 720, revenue: 7200 },
-          { id: 5, title: 'UI/UX Design Principles', enrollments: 650, revenue: 6500 }
-        ],
-        top_organizations: [
-          { id: 1, name: 'Tech Academy', users: 2500, courses: 45 },
-          { id: 2, name: 'Business School Pro', users: 1800, courses: 32 },
-          { id: 3, name: 'Creative Arts Institute', users: 1200, courses: 28 },
-          { id: 4, name: 'Science Learning Hub', users: 950, courses: 22 },
-          { id: 5, name: 'Language Center', users: 750, courses: 18 }
-        ]
+        user_distribution: isSuperAdmin 
+          ? {
+              labels: ['Students', 'Tutors', 'Org Admins', 'Super Admins'],
+              data: [11000, 1200, 280, 20]
+            }
+          : {
+              labels: ['Students', 'Tutors', 'Org Admins'],
+              data: [380, 45, 5]
+            },
+        top_courses: isSuperAdmin
+          ? [
+              { id: 1, title: 'Introduction to Web Development', enrollments: 1250, revenue: 12500 },
+              { id: 2, title: 'Data Science Fundamentals', enrollments: 980, revenue: 9800 },
+              { id: 3, title: 'Digital Marketing Mastery', enrollments: 850, revenue: 8500 },
+              { id: 4, title: 'Python Programming Basics', enrollments: 720, revenue: 7200 },
+              { id: 5, title: 'UI/UX Design Principles', enrollments: 650, revenue: 6500 }
+            ]
+          : [
+              { id: 1, title: 'Introduction to Web Development', enrollments: 180, revenue: 1800 },
+              { id: 2, title: 'Data Science Fundamentals', enrollments: 145, revenue: 1450 },
+              { id: 3, title: 'Digital Marketing Mastery', enrollments: 120, revenue: 1200 },
+              { id: 4, title: 'Python Programming Basics', enrollments: 95, revenue: 950 },
+              { id: 5, title: 'UI/UX Design Principles', enrollments: 75, revenue: 750 }
+            ],
+        top_organizations: isSuperAdmin
+          ? [
+              { id: 1, name: 'Tech Academy', users: 2500, courses: 45 },
+              { id: 2, name: 'Business School Pro', users: 1800, courses: 32 },
+              { id: 3, name: 'Creative Arts Institute', users: 1200, courses: 28 },
+              { id: 4, name: 'Science Learning Hub', users: 950, courses: 22 },
+              { id: 5, name: 'Language Center', users: 750, courses: 18 }
+            ]
+          : [] // Organization admins don't see top organizations
       };
 
       setAnalyticsData(mockData);
@@ -286,8 +302,8 @@ export default function AnalyticsPage() {
     );
   }
 
-  // Don't render if not super admin
-  if (!user || user.role !== 'super_admin') {
+  // Don't render if not super admin or organization admin
+  if (!user || (user.role !== 'super_admin' && user.role !== 'organization_admin')) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -316,8 +332,14 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-          <p className="text-gray-600">Platform insights and performance metrics</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {user?.role === 'super_admin' ? 'System Analytics' : 'Analytics Dashboard'}
+          </h1>
+          <p className="text-gray-600">
+            {user?.role === 'super_admin' 
+              ? 'Platform insights and performance metrics'
+              : 'Organization insights and performance metrics'}
+          </p>
         </div>
         <div className="flex items-center space-x-3">
           <div className="relative w-48">
@@ -498,7 +520,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Top Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={`grid grid-cols-1 ${user?.role === 'super_admin' ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-6`}>
         {/* Top Courses */}
         <div className="bg-white shadow rounded-lg">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -538,7 +560,8 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Top Organizations */}
+        {/* Top Organizations - Only show for super admin */}
+        {user?.role === 'super_admin' && (
         <div className="bg-white shadow rounded-lg">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Top Organizations</h3>
@@ -576,6 +599,7 @@ export default function AnalyticsPage() {
             </table>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

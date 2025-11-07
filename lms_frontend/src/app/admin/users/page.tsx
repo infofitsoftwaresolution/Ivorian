@@ -60,7 +60,7 @@ export default function UsersPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalUsers, setTotalUsers] = useState(0);
 
-  // Check if user is super admin
+  // Check if user is super admin or organization admin
   useEffect(() => {
     console.log('UsersPage: Auth check - authLoading:', authLoading, 'user:', user);
     if (!authLoading && !user) {
@@ -68,7 +68,7 @@ export default function UsersPage() {
       router.push('/login');
       return;
     }
-    if (!authLoading && user && user.role !== 'super_admin') {
+    if (!authLoading && user && user.role !== 'super_admin' && user.role !== 'organization_admin') {
       console.log('UsersPage: Redirecting - user:', user, 'role:', user?.role);
       router.push('/dashboard');
     }
@@ -76,7 +76,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     console.log('UsersPage: Data loading check - authLoading:', authLoading, 'user role:', user?.role);
-    if (!authLoading && user?.role === 'super_admin') {
+    if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
       console.log('UsersPage: Starting data load...');
       loadUsers();
     }
@@ -88,7 +88,7 @@ export default function UsersPage() {
       setLoading(true);
       setError('');
       
-      const params: any = {
+      const params: Record<string, string | number | boolean> = {
         page: currentPage,
         size: 20
       };
@@ -103,6 +103,11 @@ export default function UsersPage() {
 
       if (filterStatus !== 'all') {
         params.is_active = filterStatus === 'active';
+      }
+
+      // For organization_admin, filter by their organization
+      if (user?.role === 'organization_admin' && user.organization_id) {
+        params.organization_id = user.organization_id;
       }
 
       const response = await apiClient.getUsers(params);
@@ -168,8 +173,8 @@ export default function UsersPage() {
     );
   }
 
-  // Don't render if not super admin
-  if (!user || user.role !== 'super_admin') {
+  // Don't render if not super admin or organization admin
+  if (!user || (user.role !== 'super_admin' && user.role !== 'organization_admin')) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -188,8 +193,14 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-gray-600">Manage all users on the platform</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {user?.role === 'super_admin' ? 'All Users' : 'Organization Users'}
+          </h1>
+          <p className="text-gray-600">
+            {user?.role === 'super_admin' 
+              ? 'Manage all users on the platform'
+              : 'Manage users in your organization'}
+          </p>
         </div>
         <button
           onClick={() => router.push('/admin/users/create')}

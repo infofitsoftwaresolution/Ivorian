@@ -57,9 +57,9 @@ export default function TutorsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
-  // Check if user is organization admin and redirect if not
+  // Check if user is organization admin or super admin
   useEffect(() => {
-    if (!isLoading && user && user.role !== 'organization_admin' && !isRedirecting) {
+    if (!isLoading && user && user.role !== 'organization_admin' && user.role !== 'super_admin' && !isRedirecting) {
       setIsRedirecting(true);
       router.push('/dashboard');
     }
@@ -84,6 +84,11 @@ export default function TutorsPage() {
         params.is_active = statusFilter === 'active';
       }
 
+      // For organization_admin, filter by their organization
+      if (user?.role === 'organization_admin' && user.organization_id) {
+        params.organization_id = user.organization_id;
+      }
+
       const response = await apiClient.getTutors(params);
       const data: TutorsResponse = response.data;
 
@@ -101,7 +106,7 @@ export default function TutorsPage() {
 
   // Fetch tutors when page, search, or filter changes
   useEffect(() => {
-    if (user?.role === 'organization_admin') {
+    if (user && (user.role === 'organization_admin' || user.role === 'super_admin')) {
       fetchTutors();
     }
   }, [currentPage, searchTerm, statusFilter, user]);
@@ -131,8 +136,8 @@ export default function TutorsPage() {
     );
   }
 
-  // Don't render if redirecting or not organization admin
-  if (isRedirecting || (user && user.role !== 'organization_admin')) {
+  // Don't render if redirecting or not organization admin or super admin
+  if (isRedirecting || (user && user.role !== 'organization_admin' && user.role !== 'super_admin')) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -151,8 +156,14 @@ export default function TutorsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tutors</h1>
-          <p className="text-gray-600">Manage tutors in your organization</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {user?.role === 'super_admin' ? 'All Tutors' : 'Tutors'}
+          </h1>
+          <p className="text-gray-600">
+            {user?.role === 'super_admin' 
+              ? 'Manage all tutors on the platform'
+              : 'Manage tutors in your organization'}
+          </p>
         </div>
         <button
           onClick={() => router.push('/admin/tutors/create')}
