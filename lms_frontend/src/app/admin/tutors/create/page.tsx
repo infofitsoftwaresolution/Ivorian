@@ -138,36 +138,56 @@ export default function CreateTutor() {
     } catch (err: any) {
       console.error('Error creating tutor:', err);
       console.log('Error object:', JSON.stringify(err, null, 2));
+      console.log('Error details:', err.details);
       
       // Handle specific error cases
       let errorMessage = 'Failed to create tutor';
       
-      // Check for nested error message in details
-      const actualErrorMessage = err.details?.error?.message || err.message;
-      console.log('Actual error message:', actualErrorMessage); // Debug log
+      // Check for ApiError with detailed message
+      if (err instanceof Error && err.message && err.message !== `HTTP ${err.status}`) {
+        errorMessage = err.message;
+      } else if (err.message && !err.message.startsWith('HTTP')) {
+        errorMessage = err.message;
+      } else if (err.details) {
+        // Try to extract detailed error from FastAPI validation errors
+        if (err.details.detail) {
+          if (Array.isArray(err.details.detail)) {
+            errorMessage = err.details.detail.map((e: any) => {
+              if (typeof e === 'string') return e;
+              if (e.msg) return `${e.loc?.join('.') || 'Field'}: ${e.msg}`;
+              return JSON.stringify(e);
+            }).join(', ');
+          } else if (typeof err.details.detail === 'string') {
+            errorMessage = err.details.detail;
+          }
+        } else if (err.details.message) {
+          errorMessage = err.details.message;
+        } else if (err.details.error) {
+          errorMessage = typeof err.details.error === 'string' 
+            ? err.details.error 
+            : err.details.error.message || JSON.stringify(err.details.error);
+        }
+      }
       
-      if (actualErrorMessage) {
-        console.log('Processing error message:', actualErrorMessage); // Debug log
-        
-        if (actualErrorMessage.includes('422: User with this email already exists') || 
-            actualErrorMessage.includes('already exists')) {
-          errorMessage = 'A user with this email address already exists. Please use a different email address.';
-        } else if (actualErrorMessage.includes('422')) {
-          errorMessage = 'Please check your input and try again.';
-        } else if (actualErrorMessage.includes('500')) {
+      // Handle specific error cases
+      if (errorMessage.includes('already exists') || errorMessage.includes('duplicate')) {
+        errorMessage = 'A user with this email address already exists. Please use a different email address.';
+      } else if (errorMessage.includes('422') || errorMessage.includes('validation')) {
+        // Keep the detailed validation message
+        if (!errorMessage.includes(':')) {
+          errorMessage = 'Please check your input and try again. ' + errorMessage;
+        }
+      } else if (errorMessage.includes('500')) {
           // If it's a 500 error, it might be a response issue but the tutor was created
           // Check if we can detect success from the error details
           if (err.details?.error?.message?.includes('greenlet_spawn') || 
-              actualErrorMessage.includes('greenlet_spawn')) {
+              errorMessage.includes('greenlet_spawn')) {
             // This is likely a response serialization issue, but the tutor was created
             setSuccess('Tutor created successfully! Redirecting to tutors list...');
             return; // Don't show error, show success instead
           } else {
             errorMessage = 'Tutor was created successfully, but there was an issue with the response. Please check the tutors list.';
           }
-        } else {
-          errorMessage = actualErrorMessage;
-        }
       }
       
       setError(errorMessage);

@@ -168,11 +168,44 @@ class ApiClient {
 
       // Handle other errors
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        let errorData: any = {};
+        try {
+          const text = await response.text();
+          if (text) {
+            errorData = JSON.parse(text);
+          }
+        } catch {
+          // If response is not JSON, use empty object
+        }
+        
+        // Extract detailed error message
+        let errorMessage = `HTTP ${response.status}`;
+        if (errorData.detail) {
+          // Handle both string and array detail formats
+          if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail.map((err: any) => {
+              if (typeof err === 'string') return err;
+              if (err.msg) return err.msg;
+              if (err.loc && err.msg) return `${err.loc.join('.')}: ${err.msg}`;
+              return JSON.stringify(err);
+            }).join(', ');
+          } else if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail;
+          } else {
+            errorMessage = JSON.stringify(errorData.detail);
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = typeof errorData.error === 'string' 
+            ? errorData.error 
+            : errorData.error.message || JSON.stringify(errorData.error);
+        }
+        
         throw new ApiError({
-          message: errorData.detail || `HTTP ${response.status}`,
+          message: errorMessage,
           status: response.status,
-          code: errorData.code,
+          code: errorData.code || `HTTP_${response.status}`,
           details: errorData,
         });
       }
@@ -520,10 +553,34 @@ class ApiClient {
     });
   }
 
-  // Assessment Methods (for future implementation)
+  // Assessment Methods
   async getAssessments(params?: any): Promise<ApiResponse> {
     const queryString = params ? `?${new URLSearchParams(params).toString()}` : '';
     return this.request(`/api/v1/assessments${queryString}`);
+  }
+
+  async getAssessment(id: number): Promise<ApiResponse> {
+    return this.request(`/api/v1/assessments/${id}`);
+  }
+
+  async createAssessment(data: any): Promise<ApiResponse> {
+    return this.request('/api/v1/assessments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAssessment(id: number, data: any): Promise<ApiResponse> {
+    return this.request(`/api/v1/assessments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAssessment(id: number): Promise<ApiResponse> {
+    return this.request(`/api/v1/assessments/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   // Analytics Methods (for future implementation)
