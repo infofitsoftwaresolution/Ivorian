@@ -108,6 +108,12 @@ export default function Sidebar({ user, isOpen, isCollapsed = false, onClose, on
           current: pathname.startsWith('/admin/students')
         },
         {
+          name: 'Courses',
+          href: '/admin/courses',
+          icon: BookOpenIcon,
+          current: pathname.startsWith('/admin/courses')
+        },
+        {
           name: 'System Analytics',
           href: '/admin/analytics',
           icon: ChartBarIcon,
