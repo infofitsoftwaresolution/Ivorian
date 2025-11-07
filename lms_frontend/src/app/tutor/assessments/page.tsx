@@ -132,10 +132,21 @@ export default function TutorAssessmentsPage() {
       }
     } catch (error: unknown) {
       console.error('Error loading assessments:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : undefined;
-      setError(errorMessage || 'Failed to load assessments. Please try again.');
+      
+      // Check if it's a 404 (API endpoint not implemented yet)
+      if (error && typeof error === 'object' && 'status' in error && (error as { status?: number }).status === 404) {
+        // API endpoint not available yet - show empty state instead of error
+        setAssessments([]);
+        setTotalPages(1);
+        setTotalAssessments(0);
+        setError(''); // Clear error to show empty state message instead
+      } else {
+        // Other errors - show error message
+        const errorMessage = error && typeof error === 'object' && 'message' in error
+          ? (error as { message?: string }).message
+          : undefined;
+        setError(errorMessage || 'Failed to load assessments. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

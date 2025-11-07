@@ -104,9 +104,49 @@ export function useAuth(): UseAuthReturn {
     } catch (error: any) {
       console.error('useAuth: Login error:', error);
       setState(prev => ({ ...prev, isLoading: false }));
+      
+      // Extract error message from various possible locations
+      let errorMessage = 'Login failed. Please check your credentials and try again.';
+      
+      if (error instanceof Error) {
+        // Check if error message contains useful information
+        if (error.message && !error.message.startsWith('HTTP')) {
+          errorMessage = error.message;
+        } else if (error.message && (error.message.includes('Incorrect') || error.message.includes('invalid') || error.message.includes('401'))) {
+          errorMessage = 'Incorrect email or password. Please try again.';
+        }
+      }
+      
+      // Check error details
+      if (error.details) {
+        if (error.details.detail) {
+          if (typeof error.details.detail === 'string') {
+            errorMessage = error.details.detail;
+          } else if (Array.isArray(error.details.detail)) {
+            errorMessage = error.details.detail.map((e: any) => {
+              if (typeof e === 'string') return e;
+              if (e.msg) return e.msg;
+              return JSON.stringify(e);
+            }).join(', ');
+          }
+        } else if (error.details.message) {
+          errorMessage = error.details.message;
+        }
+      }
+      
+      // Check for common login error patterns
+      if (error.message) {
+        const msg = error.message.toString();
+        if (msg.includes('Incorrect') || msg.includes('invalid') || msg.includes('401') || msg.includes('Unauthorized')) {
+          errorMessage = 'Incorrect email or password. Please check your credentials and try again.';
+        } else if (!msg.startsWith('HTTP') && msg !== `HTTP ${error.status}`) {
+          errorMessage = msg;
+        }
+      }
+      
       return {
         success: false,
-        error: error.message || 'Login failed',
+        error: errorMessage,
       };
     }
   }, []);
