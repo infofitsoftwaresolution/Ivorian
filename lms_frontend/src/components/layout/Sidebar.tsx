@@ -102,6 +102,12 @@ export default function Sidebar({ user, isOpen, isCollapsed = false, onClose, on
           current: pathname.startsWith('/admin/users')
         },
         {
+          name: 'Students',
+          href: '/admin/students',
+          icon: UserGroupIcon,
+          current: pathname.startsWith('/admin/students')
+        },
+        {
           name: 'System Analytics',
           href: '/admin/analytics',
           icon: ChartBarIcon,
