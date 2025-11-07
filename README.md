@@ -22,6 +22,7 @@ infofitlabs/
 ## 🛠️ Technology Stack
 
 ### Backend (lms_backend/)
+
 - **Framework**: Python FastAPI
 - **Database**: PostgreSQL with SQLAlchemy
 - **Cache**: Redis
@@ -30,6 +31,7 @@ infofitlabs/
 - **Testing**: pytest, pytest-asyncio
 
 ### Frontend (lms_frontend/)
+
 - **Framework**: Next.js 14 with React 19
 - **Styling**: Tailwind CSS
 - **State Management**: Zustand
@@ -40,6 +42,7 @@ infofitlabs/
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Python 3.11+
 - Node.js 18+
 - PostgreSQL 15+
@@ -47,6 +50,7 @@ infofitlabs/
 - Docker (optional)
 
 ### Backend Setup
+
 ```bash
 cd lms_backend
 
@@ -67,10 +71,21 @@ cp .env.example .env
 # Edit .env with your configuration
 
 # Run the application
+# Windows: Set PYTHONPATH to fix ModuleNotFoundError with uvicorn --reload
+set PYTHONPATH=%CD%
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# macOS/Linux: Set PYTHONPATH to fix ModuleNotFoundError with uvicorn --reload
+export PYTHONPATH=$(pwd)
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# OR use the provided startup script:
+# Windows: start_backend.bat
+# macOS/Linux: ./start_backend.sh (if created)
 ```
 
 ### Frontend Setup
+
 ```bash
 cd lms_frontend
 
@@ -97,6 +112,7 @@ npm run dev
 ## 🎯 Features
 
 ### Core Features
+
 - **User Management**: Multi-role system (Super Admin, Org Admin, Instructor, Student, TA)
 - **Course Management**: Create, manage, and enroll in courses
 - **Content Management**: Rich text editor, file uploads, video lessons
@@ -104,12 +120,14 @@ npm run dev
 - **Progress Tracking**: Real-time analytics and reporting
 
 ### AI Features
+
 - **Content Generation**: AI-powered question generation and content summarization
 - **Personalization**: Adaptive learning paths and content recommendations
 - **Analytics**: Predictive analytics and performance insights
 - **Tutor Matching**: AI-driven instructor-student matching
 
 ### Gamification
+
 - **Achievement System**: Badges, certificates, and milestones
 - **Points & Rewards**: Gamified learning experience
 - **Leaderboards**: Competitive learning environment
@@ -118,6 +136,7 @@ npm run dev
 ## 🔧 Development
 
 ### Project Structure
+
 ```
 lms_backend/
 ├── app/
@@ -144,6 +163,7 @@ lms_frontend/
 ```
 
 ### Development Workflow
+
 1. Create feature branch from `develop`
 2. Make changes in both frontend and backend
 3. Write tests for new features
@@ -156,10 +176,12 @@ lms_frontend/
 ## 🚀 Deployment
 
 ### Staging Environment
+
 - Automatically deployed from `main` branch
 - URL: `https://staging.infofitlabs.com`
 
 ### Production Environment
+
 - Manually deployed from `main` branch
 - URL: `https://app.infofitlabs.com`
 
@@ -189,11 +211,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**InfoFit Labs** - Transforming Education with AI 
-
-
-
-
+**InfoFit Labs** - Transforming Education with AI
 
 demo organization profile
 admin@infofitlabs.com
