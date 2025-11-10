@@ -1,3 +1,7 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   AcademicCapIcon, 
   UserGroupIcon, 
@@ -8,7 +12,9 @@ import {
   ClockIcon,
   UsersIcon,
   CalendarIcon,
-  VideoCameraIcon
+  VideoCameraIcon,
+  MagnifyingGlassIcon,
+  ArrowRightIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import HeroCarousel from '@/components/HeroCarousel';
@@ -197,13 +203,86 @@ const stats = [
   { label: "Success Rate", value: "95%", icon: StarIcon }
 ];
 
+const testimonials = [
+  {
+    id: 1,
+    name: "Jessica Martinez",
+    role: "Software Developer",
+    avatar: "/avatars/jessica.jpg",
+    rating: 5,
+    text: "InfoFit Labs transformed my career! The courses are comprehensive and the instructors are amazing. I landed my dream job after completing the Web Development Bootcamp.",
+    company: "Tech Corp"
+  },
+  {
+    id: 2,
+    name: "David Kim",
+    role: "Data Scientist",
+    avatar: "/avatars/david.jpg",
+    rating: 5,
+    text: "The Machine Learning course exceeded my expectations. The hands-on projects and expert guidance helped me master complex concepts. Highly recommended!",
+    company: "Data Analytics Inc"
+  },
+  {
+    id: 3,
+    name: "Sophie Anderson",
+    role: "UX Designer",
+    avatar: "/avatars/sophie.jpg",
+    rating: 5,
+    text: "As a beginner, I was nervous about learning design. But the UI/UX course made everything so clear and practical. I&apos;m now working on real projects!",
+    company: "Design Studio"
+  }
+];
+
+const howItWorks = [
+  {
+    step: 1,
+    title: "Choose Your Course",
+    description: "Browse our extensive catalog and find the perfect course for your goals",
+    icon: PlayCircleIcon,
+    color: "from-blue-500 to-cyan-500"
+  },
+  {
+    step: 2,
+    title: "Learn at Your Pace",
+    description: "Access video lessons, assignments, and resources anytime, anywhere",
+    icon: ClockIcon,
+    color: "from-purple-500 to-pink-500"
+  },
+  {
+    step: 3,
+    title: "Practice & Apply",
+    description: "Complete hands-on projects and get feedback from expert instructors",
+    icon: RocketLaunchIcon,
+    color: "from-green-500 to-emerald-500"
+  },
+  {
+    step: 4,
+    title: "Get Certified",
+    description: "Earn certificates to showcase your new skills and advance your career",
+    icon: AcademicCapIcon,
+    color: "from-orange-500 to-red-500"
+  }
+];
+
 export default function HomePage() {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+
   const formatDate = (dateString: string) => {
     // Use a consistent date format to avoid hydration issues
     const date = new Date(dateString);
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/courses?search=${encodeURIComponent(searchQuery)}`);
+    } else {
+      router.push('/courses');
+    }
   };
 
   return (
@@ -217,15 +296,36 @@ export default function HomePage() {
       {/* Search Bar Section */}
       <section className="py-8 bg-gradient-to-r from-blue-50 to-indigo-50">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative">
+          <form onSubmit={handleSearch} className="relative">
+            <MagnifyingGlassIcon className="absolute left-6 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400" />
             <input
               type="text"
               placeholder="What do you want to learn?"
-              className="w-full px-6 py-4 text-lg border-2 border-blue-200 rounded-full focus:border-blue-500 focus:outline-none shadow-lg bg-white"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-14 pr-32 py-4 text-lg border-2 border-blue-200 rounded-full focus:border-blue-500 focus:outline-none shadow-lg bg-white"
             />
-            <button className="absolute right-2 top-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-2 rounded-full hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 font-semibold shadow-md">
+            <button 
+              type="submit"
+              className="absolute right-2 top-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-2 rounded-full hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 font-semibold shadow-md hover:shadow-lg"
+            >
               Search
             </button>
+          </form>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <span className="text-sm text-gray-600">Popular:</span>
+            {['React', 'Python', 'Design', 'Marketing'].map((tag) => (
+              <button
+                key={tag}
+                onClick={() => {
+                  setSearchQuery(tag);
+                  router.push(`/courses?search=${encodeURIComponent(tag)}`);
+                }}
+                className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-full hover:bg-blue-50 hover:border-blue-300 transition-colors"
+              >
+                {tag}
+              </button>
+            ))}
           </div>
         </div>
       </section>
@@ -291,9 +391,9 @@ export default function HomePage() {
                     </div>
                     <Link 
                       href={`/sessions/${session.id}`}
-                      className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 text-sm rounded-full hover:from-blue-600 hover:to-purple-700 transition-all duration-300 font-semibold shadow-md"
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 text-sm rounded-full hover:from-blue-600 hover:to-purple-700 transition-all duration-300 font-semibold shadow-md hover:shadow-lg inline-flex items-center"
                     >
-                      Join Session
+                      Join Session <ArrowRightIcon className="w-4 h-4 ml-1" />
                     </Link>
                   </div>
                 </div>
@@ -343,12 +443,17 @@ export default function HomePage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredCourses.map((course) => (
-              <div key={course.id} className="group cursor-pointer">
+              <Link key={course.id} href={`/courses/${course.id}`} className="group block">
                 <div className="relative overflow-hidden rounded-xl mb-3 shadow-lg hover:shadow-xl transition-all duration-300">
                   <div className="aspect-video bg-gradient-to-br from-green-100 via-blue-100 to-purple-100 flex items-center justify-center">
                     <PlayCircleIcon className="w-12 h-12 text-green-600 group-hover:text-blue-600 transition-colors" />
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
+                  <div className="absolute top-3 right-3">
+                    <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-gray-800 text-xs font-semibold rounded-full">
+                      {course.category}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
@@ -374,7 +479,7 @@ export default function HomePage() {
                     </span>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
           
@@ -385,6 +490,55 @@ export default function HomePage() {
             >
               View All Courses
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Instructors Section */}
+      <section className="py-16 bg-gradient-to-br from-white to-purple-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              👨‍🏫 Expert Instructors
+            </h2>
+            <p className="text-lg text-gray-600">
+              Learn from industry leaders and certified professionals
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {famousTutors.map((tutor) => (
+              <div key={tutor.id} className="group p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <UserGroupIcon className="w-10 h-10 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1 text-center">{tutor.name}</h3>
+                <p className="text-sm text-blue-600 font-semibold mb-3 text-center">{tutor.title}</p>
+                <div className="flex items-center justify-center mb-3">
+                  <StarIcon className="w-4 h-4 text-yellow-400 fill-current" />
+                  <span className="text-sm font-medium ml-1">{tutor.rating}</span>
+                  <span className="text-sm text-gray-500 ml-1">({tutor.students.toLocaleString()} students)</span>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {tutor.expertise.slice(0, 2).map((skill, index) => (
+                    <span 
+                      key={index}
+                      className="px-2 py-1 bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 text-xs font-medium rounded-full border border-blue-200"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-4 text-center">
+                  <Link 
+                    href={`/instructors/${tutor.id}`}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-semibold inline-flex items-center"
+                  >
+                    View Profile <ArrowRightIcon className="w-4 h-4 ml-1" />
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -403,14 +557,18 @@ export default function HomePage() {
           
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {[
-              { name: 'Development', icon: '💻', count: '1,200+ courses', color: 'from-blue-500 to-cyan-500' },
-              { name: 'Business', icon: '📊', count: '800+ courses', color: 'from-green-500 to-emerald-500' },
-              { name: 'Design', icon: '🎨', count: '600+ courses', color: 'from-purple-500 to-pink-500' },
-              { name: 'Marketing', icon: '📈', count: '500+ courses', color: 'from-orange-500 to-red-500' },
-              { name: 'Data Science', icon: '📊', count: '400+ courses', color: 'from-indigo-500 to-purple-500' },
-              { name: 'Personal Development', icon: '🚀', count: '300+ courses', color: 'from-yellow-500 to-orange-500' },
+              { name: 'Development', icon: '💻', count: '1,200+ courses', color: 'from-blue-500 to-cyan-500', href: '/courses?category=Programming' },
+              { name: 'Business', icon: '📊', count: '800+ courses', color: 'from-green-500 to-emerald-500', href: '/courses' },
+              { name: 'Design', icon: '🎨', count: '600+ courses', color: 'from-purple-500 to-pink-500', href: '/courses?category=Design' },
+              { name: 'Marketing', icon: '📈', count: '500+ courses', color: 'from-orange-500 to-red-500', href: '/courses?category=Marketing' },
+              { name: 'Data Science', icon: '📊', count: '400+ courses', color: 'from-indigo-500 to-purple-500', href: '/courses?category=Data Science' },
+              { name: 'Personal Development', icon: '🚀', count: '300+ courses', color: 'from-yellow-500 to-orange-500', href: '/courses' },
             ].map((category, index) => (
-              <div key={index} className="group cursor-pointer p-6 bg-white rounded-xl hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-gray-100">
+              <Link 
+                key={index} 
+                href={category.href}
+                className="group p-6 bg-white rounded-xl hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-gray-100"
+              >
                 <div className={`text-4xl mb-4 p-3 bg-gradient-to-r ${category.color} rounded-lg w-fit mx-auto`}>
                   {category.icon}
                 </div>
@@ -418,6 +576,80 @@ export default function HomePage() {
                   {category.name}
                 </h3>
                 <p className="text-sm text-gray-600 text-center">{category.count}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-16 bg-gradient-to-br from-white to-blue-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              🎓 How It Works
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Start your learning journey in just a few simple steps
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {howItWorks.map((item, index) => (
+              <div key={index} className="relative">
+                <div className="text-center p-8 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                  <div className={`w-20 h-20 bg-gradient-to-r ${item.color} rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg`}>
+                    <item.icon className="w-10 h-10 text-white" />
+                  </div>
+                  <div className="absolute -top-4 -right-4 w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
+                    {item.step}
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-3">{item.title}</h3>
+                  <p className="text-gray-600 leading-relaxed">{item.description}</p>
+                </div>
+                {index < howItWorks.length - 1 && (
+                  <div className="hidden lg:block absolute top-1/2 -right-4 transform -translate-y-1/2">
+                    <ArrowRightIcon className="w-8 h-8 text-gray-300" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-16 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              💬 What Our Students Say
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Join thousands of satisfied learners who have transformed their careers
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial) => (
+              <div key={testimonial.id} className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                <div className="flex items-center mb-4">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <StarIcon key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-600 mb-6 leading-relaxed italic">
+                  &quot;{testimonial.text}&quot;
+                </p>
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 rounded-full flex items-center justify-center mr-4">
+                    <UserGroupIcon className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900">{testimonial.name}</h4>
+                    <p className="text-sm text-gray-600">{testimonial.role} at {testimonial.company}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
