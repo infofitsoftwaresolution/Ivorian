@@ -2,6 +2,8 @@
 
 A comprehensive Learning Management System built with Python FastAPI and Next.js, featuring AI-powered content generation, gamification, and advanced analytics.
 
+> **CI/CD Test**: Automated deployment is now active! 🚀
+
 ## 🚀 Project Overview
 
 InfoFit Labs is a modern, AI-integrated Learning Management System designed to cater to organizations, individual tutors, and students. The platform combines cutting-edge AI technology with gamification elements to create an engaging learning experience.
