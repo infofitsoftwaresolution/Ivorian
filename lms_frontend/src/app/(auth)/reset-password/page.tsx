@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 const resetPasswordSchema = z.object({
@@ -20,7 +20,7 @@ const resetPasswordSchema = z.object({
 
 type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const { resetPassword } = useAuth();
   const router = useRouter();
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -169,5 +169,23 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <div className="w-full max-w-md">
+          <div className="card shadow-xl">
+            <div className="card-header text-center">
+              <h1 className="card-title">Loading...</h1>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
