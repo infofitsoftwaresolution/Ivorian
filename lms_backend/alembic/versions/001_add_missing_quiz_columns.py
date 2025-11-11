@@ -17,40 +17,132 @@ depends_on = None
 
 
 def upgrade():
-    """Add missing columns to quizzes table"""
+    """Add missing columns to quizzes table (SAFE: Only adds columns, never deletes data)"""
     
+    # SAFETY: Check and add columns only if they don't exist to prevent errors
     # Add instructions column
-    op.add_column('quizzes', sa.Column('instructions', sa.Text(), nullable=True))
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'instructions') THEN
+                ALTER TABLE quizzes ADD COLUMN instructions TEXT;
+            END IF;
+        END $$;
+    """)
     
     # Create enum type first (if it doesn't exist)
     quizstatus_enum = sa.Enum('DRAFT', 'PUBLISHED', 'ARCHIVED', name='quizstatus')
     quizstatus_enum.create(op.get_bind(), checkfirst=True)
     
-    # Add status column (enum)
-    op.add_column('quizzes', sa.Column('status', quizstatus_enum, nullable=True))
+    # Add status column (enum) - only if it doesn't exist
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'status') THEN
+                ALTER TABLE quizzes ADD COLUMN status quizstatus;
+            END IF;
+        END $$;
+    """)
     
     # Add shuffle_questions column
-    op.add_column('quizzes', sa.Column('shuffle_questions', sa.Boolean(), nullable=True))
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'shuffle_questions') THEN
+                ALTER TABLE quizzes ADD COLUMN shuffle_questions BOOLEAN;
+            END IF;
+        END $$;
+    """)
     
     # Add show_correct_answers column
-    op.add_column('quizzes', sa.Column('show_correct_answers', sa.Boolean(), nullable=True))
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'show_correct_answers') THEN
+                ALTER TABLE quizzes ADD COLUMN show_correct_answers BOOLEAN;
+            END IF;
+        END $$;
+    """)
     
     # Add show_results_immediately column
-    op.add_column('quizzes', sa.Column('show_results_immediately', sa.Boolean(), nullable=True))
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'show_results_immediately') THEN
+                ALTER TABLE quizzes ADD COLUMN show_results_immediately BOOLEAN;
+            END IF;
+        END $$;
+    """)
     
     # Add scoring columns
-    op.add_column('quizzes', sa.Column('total_points', sa.Float(), nullable=True))
-    op.add_column('quizzes', sa.Column('points_per_question', sa.Float(), nullable=True))
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'total_points') THEN
+                ALTER TABLE quizzes ADD COLUMN total_points DOUBLE PRECISION;
+            END IF;
+        END $$;
+    """)
+    
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'points_per_question') THEN
+                ALTER TABLE quizzes ADD COLUMN points_per_question DOUBLE PRECISION;
+            END IF;
+        END $$;
+    """)
     
     # Add statistics columns
-    op.add_column('quizzes', sa.Column('total_questions', sa.Integer(), nullable=True))
-    op.add_column('quizzes', sa.Column('total_submissions', sa.Integer(), nullable=True))
-    op.add_column('quizzes', sa.Column('average_score', sa.Float(), nullable=True))
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'total_questions') THEN
+                ALTER TABLE quizzes ADD COLUMN total_questions INTEGER;
+            END IF;
+        END $$;
+    """)
+    
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'total_submissions') THEN
+                ALTER TABLE quizzes ADD COLUMN total_submissions INTEGER;
+            END IF;
+        END $$;
+    """)
+    
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'average_score') THEN
+                ALTER TABLE quizzes ADD COLUMN average_score DOUBLE PRECISION;
+            END IF;
+        END $$;
+    """)
     
     # Add published_at column
-    op.add_column('quizzes', sa.Column('published_at', sa.DateTime(timezone=True), nullable=True))
+    op.execute("""
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                          WHERE table_name = 'quizzes' AND column_name = 'published_at') THEN
+                ALTER TABLE quizzes ADD COLUMN published_at TIMESTAMPTZ;
+            END IF;
+        END $$;
+    """)
     
-    # Set default values for existing records
+    # SAFETY: Set default values ONLY for NULL values (never overwrite existing data)
     op.execute("UPDATE quizzes SET status = 'DRAFT' WHERE status IS NULL")
     op.execute("UPDATE quizzes SET shuffle_questions = false WHERE shuffle_questions IS NULL")
     op.execute("UPDATE quizzes SET show_correct_answers = true WHERE show_correct_answers IS NULL")

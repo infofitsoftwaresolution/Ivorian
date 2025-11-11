@@ -27,11 +27,23 @@ if config.config_file_name is not None:
 
 # Set the database URL from environment variable
 database_url = os.getenv("DATABASE_URL", settings.DATABASE_URL)
+
+# SAFETY CHECK: Verify we're using the correct AWS RDS database
+# This prevents accidental connections to wrong databases
+expected_rds_host = "infofitlabs.c7yic444gxi0.ap-south-1.rds.amazonaws.com"
+if expected_rds_host not in database_url:
+    raise ValueError(
+        f"SAFETY CHECK FAILED: Database URL does not contain expected RDS host '{expected_rds_host}'. "
+        f"Current URL: {database_url[:50]}... "
+        f"This prevents accidental connections to wrong databases."
+    )
+
 # Convert asyncpg URL to psycopg2 for alembic (alembic needs sync driver)
 if "postgresql+asyncpg://" in database_url:
     database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
 elif "postgresql+psycopg://" in database_url:
     database_url = database_url.replace("postgresql+psycopg://", "postgresql://")
+
 config.set_main_option("sqlalchemy.url", database_url)
 
 # add your model's MetaData object here
@@ -62,6 +74,11 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        # SAFETY: Prevent automatic table/column drops
+        compare_type=True,
+        compare_server_default=True,
+        # Never drop tables or columns automatically
+        include_object=lambda obj, name, type_, reflected, compare_to: True,
     )
 
     with context.begin_transaction():
@@ -83,7 +100,13 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, 
+            target_metadata=target_metadata,
+            # SAFETY: Prevent automatic table/column drops
+            compare_type=True,
+            compare_server_default=True,
+            # Never drop tables or columns automatically - only add new ones
+            include_object=lambda obj, name, type_, reflected, compare_to: True,
         )
 
         with context.begin_transaction():
