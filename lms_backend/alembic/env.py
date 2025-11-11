@@ -44,7 +44,11 @@ if "postgresql+asyncpg://" in database_url:
 elif "postgresql+psycopg://" in database_url:
     database_url = database_url.replace("postgresql+psycopg://", "postgresql://")
 
-config.set_main_option("sqlalchemy.url", database_url)
+# Escape % characters for ConfigParser (it uses % for variable interpolation)
+# Double the % to escape it
+database_url_escaped = database_url.replace("%", "%%")
+
+config.set_main_option("sqlalchemy.url", database_url_escaped)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
