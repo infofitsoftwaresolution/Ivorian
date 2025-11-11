@@ -27,6 +27,11 @@ if config.config_file_name is not None:
 
 # Set the database URL from environment variable
 database_url = os.getenv("DATABASE_URL", settings.DATABASE_URL)
+# Convert asyncpg URL to psycopg2 for alembic (alembic needs sync driver)
+if "postgresql+asyncpg://" in database_url:
+    database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
+elif "postgresql+psycopg://" in database_url:
+    database_url = database_url.replace("postgresql+psycopg://", "postgresql://")
 config.set_main_option("sqlalchemy.url", database_url)
 
 # add your model's MetaData object here
