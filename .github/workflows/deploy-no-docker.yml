@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  EC2_HOST: 15.206.84.110
+  EC2_HOST: 65.2.122.123
   EC2_USER: ec2-user
   DEPLOY_PATH: /home/ec2-user/lms-app
 
@@ -75,7 +75,7 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://15.206.84.110:8000' }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://65.2.122.123:8000' }}
 
   deploy:
     name: Deploy to EC2
@@ -89,74 +89,29 @@ jobs:
 
       - name: Configure SSH
         run: |
-          mkdir -p ~/.ssh || true
+          mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
-          # Configure SSH to be more resilient
-          cat >> ~/.ssh/config << EOF
-          Host ${{ env.EC2_HOST }}
-            StrictHostKeyChecking no
-            UserKnownHostsFile ~/.ssh/known_hosts
-            ServerAliveInterval 60
-            ServerAliveCountMax 3
-            ConnectTimeout 10
-          EOF
-          chmod 600 ~/.ssh/config
-
-      - name: Test SSH Connection
-        run: |
-          echo "Testing SSH connection to EC2..."
-          ssh -i ~/.ssh/deploy_key \
-            -o ConnectTimeout=30 \
-            -o ServerAliveInterval=10 \
-            -o ServerAliveCountMax=3 \
-            -o StrictHostKeyChecking=no \
-            -v \
-            ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "echo 'SSH connection successful'" || echo "SSH test failed"
+          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         run: |
-          # Retry SSH connection up to 3 times with longer timeout
-          for i in 1 2 3; do
-            echo "Attempt $i to connect to EC2..."
-            if ssh -i ~/.ssh/deploy_key \
-              -o ConnectTimeout=30 \
-              -o ServerAliveInterval=10 \
-              -o ServerAliveCountMax=3 \
-              -o StrictHostKeyChecking=no \
-              -o BatchMode=yes \
-              ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
-              set -e &&
-              cd ${{ env.DEPLOY_PATH }} &&
-              git fetch origin &&
-              git reset --hard origin/main &&
-              chmod +x deploy/deploy-no-docker.sh &&
-              ./deploy/deploy-no-docker.sh
-            "; then
-              echo "Deployment successful!"
-              exit 0
-            else
-              if [ $i -eq 3 ]; then
-                echo "All connection attempts failed"
-                echo "Please check:"
-                echo "1. EC2 instance is running"
-                echo "2. Security group allows SSH from GitHub Actions IPs"
-                echo "3. SSH service is running on EC2"
-                exit 1
-              fi
-              echo "Connection failed, retrying in 10 seconds..."
-              sleep 10
-            fi
-          done
+          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
+            set -e &&
+            cd ${{ env.DEPLOY_PATH }} &&
+            git fetch origin &&
+            git reset --hard origin/main &&
+            chmod +x deploy/deploy-no-docker.sh &&
+            ./deploy/deploy-no-docker.sh
+          "
 
       - name: Health Check
         run: |
           sleep 15
           echo "Checking backend health..."
-          curl -f --connect-timeout 10 http://${{ env.EC2_HOST }}:8000/health || exit 1
+          curl -f http://${{ env.EC2_HOST }}:8000/health || exit 1
           echo "Checking frontend..."
-          curl -f --connect-timeout 10 http://${{ env.EC2_HOST }}:3000 || exit 1
+          curl -f http://${{ env.EC2_HOST }}:3000 || exit 1
           echo "✅ All services are healthy!"
 
       - name: Notify deployment status

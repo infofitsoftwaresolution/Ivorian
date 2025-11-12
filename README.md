@@ -2,8 +2,7 @@
 
 A comprehensive Learning Management System built with Python FastAPI and Next.js, featuring AI-powered content generation, gamification, and advanced analytics.
 
-> **CI/CD Test**: Automated deployment is now active! 🚀  
-> **Latest**: AWS SES email service integrated with retry logic for reliable deployments
+> **CI/CD Test**: Automated deployment is now active! 🚀
 
 ## 🚀 Project Overview
 

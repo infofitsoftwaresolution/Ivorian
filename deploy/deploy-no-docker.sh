@@ -16,7 +16,7 @@ if [ -f .env ]; then
 fi
 
 # Ensure AWS S3 and Email settings in .env file (if not already set)
-echo "🔧 Checking configuration..."
+echo "🔧 Checking AWS S3 and Email configuration..."
 if [ -f lms_backend/.env ]; then
     # Check if AWS_REGION is set, if not add it
     if ! grep -q "^AWS_REGION=" lms_backend/.env 2>/dev/null; then
@@ -49,7 +49,7 @@ else
     echo "AWS_S3_BUCKET=infofitlabs-lms-videos" >> lms_backend/.env
     echo "EMAILS_FROM_EMAIL=infofitsoftware@gmail.com" >> lms_backend/.env
     echo "EMAILS_FROM_NAME=InfoFit LMS" >> lms_backend/.env
-    echo "✅ Created .env file with configuration"
+    echo "✅ Created .env file with AWS S3 and Email settings"
 fi
 
 # Pull latest code
@@ -70,7 +70,6 @@ pip install -r requirements.txt
 
 # Run database migrations
 echo "📊 Running database migrations..."
-source venv/bin/activate
 alembic upgrade head || echo "⚠️  Migrations failed - check database connection"
 
 # Restart backend service
