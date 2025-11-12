@@ -124,8 +124,9 @@ rm -rf node_modules/.cache
 echo "📦 Installing frontend dependencies..."
 npm install
 
-# Build frontend with memory limit
+# Build frontend with memory limit and API URL
 echo "🏗️  Building frontend..."
+export NEXT_PUBLIC_API_URL="http://15.206.84.110:8000"
 NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 # Create symlinks for standalone mode
