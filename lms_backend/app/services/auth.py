@@ -1,6 +1,8 @@
 """
 Authentication service for user management
 """
+import secrets
+import string
 from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,6 +13,8 @@ from app.models.organization import Organization
 from app.schemas.auth import UserRegister, UserLogin, TokenData, OrganizationRegister
 from app.core.security import verify_password, get_password_hash, create_tokens, verify_token
 from app.core.config import settings
+from app.services.email_service import email_service
+from app.core.logging import app_logger
 
 
 class AuthService:
@@ -104,6 +108,9 @@ class AuthService:
                 detail="User account is disabled"
             )
         
+        # Check if password change is required
+        password_change_required = user.password_change_required or False
+        
         # Create tokens
         tokens = create_tokens(str(user.id))
         
@@ -114,9 +121,11 @@ class AuthService:
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "role": user.role,
-                "organization_id": user.organization_id
+                "organization_id": user.organization_id,
+                "password_change_required": password_change_required
             },
-            "tokens": tokens
+            "tokens": tokens,
+            "password_change_required": password_change_required
         }
     
     async def get_current_user(self, token: str) -> Optional[User]:
@@ -213,8 +222,11 @@ class AuthService:
         await self.db.commit()
         await self.db.refresh(organization)
         
+        # Generate temporary password
+        temp_password = self._generate_temp_password()
+        hashed_password = get_password_hash(temp_password)
+        
         # Create admin user for the organization
-        hashed_password = get_password_hash(org_data.admin_password)
         admin_user = User(
             email=org_data.admin_email,
             hashed_password=hashed_password,
@@ -222,12 +234,26 @@ class AuthService:
             last_name=org_data.admin_last_name,
             role="organization_admin",
             organization_id=organization.id,
-            is_active=True
+            is_active=True,
+            password_change_required=True  # Require password change on first login
         )
         
         self.db.add(admin_user)
         await self.db.commit()
         await self.db.refresh(admin_user)
+        
+        # Send welcome email with credentials
+        login_url = f"{settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else 'http://localhost:3000'}/login"
+        email_sent = await email_service.send_welcome_email_organization(
+            email=admin_user.email,
+            first_name=admin_user.first_name or "Admin",
+            organization_name=organization.name,
+            temp_password=temp_password,
+            login_url=login_url
+        )
+        
+        if not email_sent:
+            app_logger.warning(f"⚠️  Failed to send welcome email to {admin_user.email}")
         
         # Create tokens for admin user
         tokens = create_tokens(str(admin_user.id))
@@ -248,5 +274,13 @@ class AuthService:
                 "role": admin_user.role,
                 "organization_id": admin_user.organization_id
             },
-            "tokens": tokens
+            "tokens": tokens,
+            "temp_password": temp_password,  # Return temp password (for testing, remove in production)
+            "email_sent": email_sent
         }
+    
+    def _generate_temp_password(self, length: int = 12) -> str:
+        """Generate a secure temporary password"""
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        password = ''.join(secrets.choice(alphabet) for i in range(length))
+        return password

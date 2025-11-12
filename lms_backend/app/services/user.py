@@ -14,8 +14,13 @@ from app.models.organization import Organization
 from app.models.rbac import Role
 from app.schemas.user import UserCreate, UserUpdate, UserAdminUpdate, UserFilter, UserStats
 from app.core.security import get_password_hash, verify_password
+from app.core.config import settings
 from app.services.rbac import RBACService
+from app.services.email_service import email_service
 from app.core.errors import ResourceNotFoundError, ValidationError, AuthorizationError
+from app.core.logging import app_logger
+import secrets
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +44,18 @@ class UserService:
                 if not organization:
                     raise ValidationError(f"Organization with ID {user_data.organization_id} does not exist")
             
-            # Hash password
-            hashed_password = get_password_hash(user_data.password)
+            # Generate temporary password if user is being created by admin (student/tutor)
+            # Check if password is provided (for manual creation) or generate temp password
+            temp_password = None
+            if hasattr(user_data, 'password') and user_data.password:
+                # Password provided - use it (for manual registration)
+                hashed_password = get_password_hash(user_data.password)
+                password_change_required = False
+            else:
+                # No password provided - generate temp password (for admin-created users)
+                temp_password = UserService._generate_temp_password()
+                hashed_password = get_password_hash(temp_password)
+                password_change_required = True
             
             # Create user
             user = User(
@@ -57,12 +72,46 @@ class UserService:
                 organization_id=user_data.organization_id,
                 status="active" if not user_data.organization_id else "pending",
                 is_active=True,
-                is_verified=False
+                is_verified=False,
+                password_change_required=password_change_required
             )
             
             db.add(user)
             await db.commit()
             await db.refresh(user)
+            
+            # Send welcome email if temp password was generated (admin-created user)
+            if password_change_required and user_data.organization_id:
+                # Get organization name
+                from app.models.organization import Organization
+                org_result = await db.execute(select(Organization).where(Organization.id == user_data.organization_id))
+                organization = org_result.scalar_one_or_none()
+                organization_name = organization.name if organization else "the organization"
+                
+                # Determine email type based on role
+                login_url = f"{settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else 'http://localhost:3000'}/login"
+                
+                if user.role == "student":
+                    email_sent = await email_service.send_welcome_email_student(
+                        email=user.email,
+                        first_name=user.first_name or "Student",
+                        organization_name=organization_name,
+                        temp_password=temp_password,
+                        login_url=login_url
+                    )
+                elif user.role == "tutor":
+                    email_sent = await email_service.send_welcome_email_tutor(
+                        email=user.email,
+                        first_name=user.first_name or "Tutor",
+                        organization_name=organization_name,
+                        temp_password=temp_password,
+                        login_url=login_url
+                    )
+                else:
+                    email_sent = False
+                
+                if not email_sent:
+                    app_logger.warning(f"⚠️  Failed to send welcome email to {user.email}")
             
             # Assign roles
             if user_data.roles:
@@ -316,6 +365,7 @@ class UserService:
             # Hash new password
             hashed_password = get_password_hash(new_password)
             user.hashed_password = hashed_password
+            user.password_change_required = False  # Clear password change requirement
             user.updated_at = datetime.utcnow()
             
             await db.commit()
@@ -360,6 +410,13 @@ class UserService:
             await db.rollback()
             logger.error(f"Error assigning roles to user: {str(e)}")
             raise
+    
+    @staticmethod
+    def _generate_temp_password(length: int = 12) -> str:
+        """Generate a secure temporary password"""
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        password = ''.join(secrets.choice(alphabet) for i in range(length))
+        return password
     
     @staticmethod
     async def get_user_stats(db: AsyncSession, current_user: User) -> UserStats:
@@ -448,10 +505,20 @@ class UserService:
             if existing_user:
                 raise ValidationError("User with this email already exists")
             
+            # Generate temporary password
+            temp_password = UserService._generate_temp_password()
+            hashed_password = get_password_hash(temp_password)
+            
+            # Get organization name for email
+            from app.models.organization import Organization
+            org_result = await db.execute(select(Organization).where(Organization.id == organization_id))
+            organization = org_result.scalar_one_or_none()
+            organization_name = organization.name if organization else "the organization"
+            
             # Create new tutor user
             tutor = User(
                 email=tutor_data["email"],
-                hashed_password=get_password_hash(tutor_data["password"]),
+                hashed_password=hashed_password,
                 first_name=tutor_data["first_name"],
                 last_name=tutor_data["last_name"],
                 phone=tutor_data.get("phone"),
@@ -460,12 +527,26 @@ class UserService:
                 organization_id=organization_id,
                 is_active=tutor_data.get("is_active", True),
                 status="active",
-                is_verified=False
+                is_verified=False,
+                password_change_required=True  # Require password change on first login
             )
             
             db.add(tutor)
             await db.commit()
             await db.refresh(tutor)
+            
+            # Send welcome email with credentials
+            login_url = f"{settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else 'http://localhost:3000'}/login"
+            email_sent = await email_service.send_welcome_email_tutor(
+                email=tutor.email,
+                first_name=tutor.first_name or "Tutor",
+                organization_name=organization_name,
+                temp_password=temp_password,
+                login_url=login_url
+            )
+            
+            if not email_sent:
+                app_logger.warning(f"⚠️  Failed to send welcome email to {tutor.email}")
             
             logger.info(f"Tutor created: {tutor.email} (ID: {tutor.id}) for organization {organization_id}")
             return tutor

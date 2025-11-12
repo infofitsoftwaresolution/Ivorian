@@ -32,6 +32,7 @@ class User(Base):
     is_superuser = Column(Boolean, default=False)
     role = Column(String(50), default="student")  # student, instructor, admin, superuser
     organization_id = Column(Integer, ForeignKey("organizations.id"))
+    password_change_required = Column(Boolean, default=False)  # Require password change on first login
     preferences = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
