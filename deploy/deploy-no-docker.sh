@@ -41,6 +41,12 @@ if [ -f lms_backend/.env ]; then
         echo "EMAILS_FROM_NAME=InfoFit LMS" >> lms_backend/.env
         echo "✅ Added EMAILS_FROM_NAME to .env"
     fi
+    
+    # Check if BACKEND_CORS_ORIGINS is set, if not add it
+    if ! grep -q "^BACKEND_CORS_ORIGINS=" lms_backend/.env 2>/dev/null; then
+        echo 'BACKEND_CORS_ORIGINS=["http://15.206.84.110","http://15.206.84.110:3000","http://15.206.84.110:8000","http://localhost:3000"]' >> lms_backend/.env
+        echo "✅ Added BACKEND_CORS_ORIGINS to .env"
+    fi
 else
     # Create .env file if it doesn't exist
     echo "Creating lms_backend/.env file..."
@@ -49,6 +55,7 @@ else
     echo "AWS_S3_BUCKET=infofitlabs-lms-videos" >> lms_backend/.env
     echo "EMAILS_FROM_EMAIL=infofitsoftware@gmail.com" >> lms_backend/.env
     echo "EMAILS_FROM_NAME=InfoFit LMS" >> lms_backend/.env
+    echo 'BACKEND_CORS_ORIGINS=["http://15.206.84.110","http://15.206.84.110:3000","http://15.206.84.110:8000","http://localhost:3000"]' >> lms_backend/.env
     echo "✅ Created .env file with AWS S3 and Email settings"
 fi
 

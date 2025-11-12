@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  EC2_HOST: 65.2.122.123
+  EC2_HOST: 15.206.84.110
   EC2_USER: ec2-user
   DEPLOY_PATH: /home/ec2-user/lms-app
 
@@ -75,7 +75,7 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://65.2.122.123:8000' }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://15.206.84.110:8000' }}
 
   deploy:
     name: Deploy to EC2
