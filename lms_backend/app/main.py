@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.database import init_db, close_db, get_db
 from app.core.logging import app_logger
 from app.core.errors import setup_exception_handlers
-from app.api.v1 import auth, rbac, courses, users, upload, analytics
+from app.api.v1 import auth, rbac, courses, users, upload, analytics, organizations
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
 # from app.api.v1 import assessments, ai  # TODO: Uncomment when implemented
@@ -180,6 +180,12 @@ app.include_router(
     analytics.router,
     prefix=f"{settings.API_V1_STR}/analytics",
     tags=["Analytics"]
+)
+
+app.include_router(
+    organizations.router,
+    prefix=f"{settings.API_V1_STR}/organizations",
+    tags=["Organizations"]
 )
 
 
