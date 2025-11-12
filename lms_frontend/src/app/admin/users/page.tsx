@@ -111,13 +111,32 @@ export default function UsersPage() {
       }
 
       const response = await apiClient.getUsers(params);
-      const data: UsersResponse = response.data;
-
-      setUsers(data.users || []);
-      setTotalPages(data.pages || 1);
-      setTotalUsers(data.total || 0);
       
-      console.log('UsersPage: Data loaded successfully', data);
+      // Handle different response structures
+      let usersData: User[] = [];
+      let total = 0;
+      let pages = 1;
+      
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          usersData = response.data;
+          total = response.data.length;
+        } else if (response.data.users && Array.isArray(response.data.users)) {
+          usersData = response.data.users;
+          total = response.data.total || response.data.users.length;
+          pages = response.data.pages || 1;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          usersData = response.data.data;
+          total = response.data.total || response.data.data.length;
+          pages = response.data.pages || 1;
+        }
+      }
+
+      setUsers(usersData);
+      setTotalPages(pages);
+      setTotalUsers(total);
+      
+      console.log('UsersPage: Data loaded successfully', { users: usersData, total, pages });
     } catch (error: any) {
       console.error('Error loading users:', error);
       setError(error?.response?.data?.detail || 'Failed to load users. Please try again.');

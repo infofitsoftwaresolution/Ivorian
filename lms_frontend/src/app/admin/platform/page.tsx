@@ -16,7 +16,8 @@ import {
   PlusIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon
+  TrashIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
@@ -229,69 +230,113 @@ export default function PlatformDashboard() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Platform-Specific Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 overflow-hidden shadow-lg rounded-lg text-white">
             <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <BuildingOfficeIcon className="h-6 w-6 text-gray-400" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-indigo-100 text-sm font-medium">Total Organizations</p>
+                  <p className="text-3xl font-bold mt-1">{stats.total_organizations}</p>
+                  <p className="text-indigo-200 text-xs mt-2">
+                    {stats.active_organizations} active
+                  </p>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Organizations</dt>
-                    <dd className="text-lg font-medium text-gray-900">{stats.total_organizations}</dd>
-                  </dl>
-                </div>
+                <BuildingOfficeIcon className="h-12 w-12 text-indigo-200 opacity-50" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 overflow-hidden shadow-lg rounded-lg text-white">
             <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <UsersIcon className="h-6 w-6 text-gray-400" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100 text-sm font-medium">Active Organizations</p>
+                  <p className="text-3xl font-bold mt-1">{stats.active_organizations}</p>
+                  <p className="text-green-200 text-xs mt-2">
+                    {stats.new_organizations_this_month} new this month
+                  </p>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Users</dt>
-                    <dd className="text-lg font-medium text-gray-900">{stats.total_users.toLocaleString()}</dd>
-                  </dl>
-                </div>
+                <UsersIcon className="h-12 w-12 text-green-200 opacity-50" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 overflow-hidden shadow-lg rounded-lg text-white">
             <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <BookOpenIcon className="h-6 w-6 text-gray-400" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium">Platform Users</p>
+                  <p className="text-3xl font-bold mt-1">{stats.total_users.toLocaleString()}</p>
+                  <p className="text-purple-200 text-xs mt-2">
+                    Across all organizations
+                  </p>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Courses</dt>
-                    <dd className="text-lg font-medium text-gray-900">{stats.total_courses}</dd>
-                  </dl>
-                </div>
+                <UsersIcon className="h-12 w-12 text-purple-200 opacity-50" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-gradient-to-br from-amber-500 to-amber-600 overflow-hidden shadow-lg rounded-lg text-white">
             <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <CurrencyDollarIcon className="h-6 w-6 text-gray-400" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-amber-100 text-sm font-medium">Platform Revenue</p>
+                  <p className="text-3xl font-bold mt-1">${stats.total_revenue.toLocaleString()}</p>
+                  <p className="text-amber-200 text-xs mt-2">
+                    Total platform earnings
+                  </p>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
-                    <dd className="text-lg font-medium text-gray-900">${stats.total_revenue.toLocaleString()}</dd>
-                  </dl>
-                </div>
+                <CurrencyDollarIcon className="h-12 w-12 text-amber-200 opacity-50" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Platform Growth Metrics */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">New Organizations</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.new_organizations_this_month}</p>
+                <p className="text-xs text-gray-500 mt-1">This month</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <PlusIcon className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Courses</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total_courses}</p>
+                <p className="text-xs text-gray-500 mt-1">Platform-wide</p>
+              </div>
+              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+                <BookOpenIcon className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Growth Rate</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {stats.new_organizations_this_month > 0 
+                    ? `${Math.round((stats.new_organizations_this_month / Math.max(stats.total_organizations, 1)) * 100)}%`
+                    : '0%'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Monthly growth</p>
+              </div>
+              <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <ChartBarIcon className="h-6 w-6 text-purple-600" />
               </div>
             </div>
           </div>

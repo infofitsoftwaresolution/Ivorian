@@ -105,11 +105,30 @@ export default function StudentsPage() {
       }
 
       const response = await apiClient.getUsers(params);
-      const data: StudentsResponse = response.data;
+      
+      // Handle different response structures
+      let studentsData: Student[] = [];
+      let total = 0;
+      let pages = 1;
+      
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          studentsData = response.data.filter((s: any) => s.role === 'student');
+          total = studentsData.length;
+        } else if (response.data.users && Array.isArray(response.data.users)) {
+          studentsData = response.data.users.filter((s: any) => s.role === 'student');
+          total = response.data.total || studentsData.length;
+          pages = response.data.pages || 1;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          studentsData = response.data.data.filter((s: any) => s.role === 'student');
+          total = response.data.total || studentsData.length;
+          pages = response.data.pages || 1;
+        }
+      }
 
-      setStudents(data.users || []);
-      setTotalPages(data.pages || 1);
-      setTotalStudents(data.total || 0);
+      setStudents(studentsData);
+      setTotalPages(pages);
+      setTotalStudents(total);
     } catch (error: unknown) {
       console.error('Error loading students:', error);
       const errorMessage = error && typeof error === 'object' && 'response' in error

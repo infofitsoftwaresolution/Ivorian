@@ -138,8 +138,8 @@ export default function CreateOrganization() {
       // Refresh user authentication state
       await refreshUser();
       
-      // Redirect to platform overview
-      router.push('/admin/platform');
+      // Redirect to organizations list page which will refresh data
+      router.push('/admin/organizations');
 
     } catch (err: any) {
       console.error('Error creating organization:', err);

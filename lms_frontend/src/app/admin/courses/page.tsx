@@ -104,30 +104,33 @@ export default function CoursesPage() {
       // For organization_admin, filter by their organization
       if (user?.role === 'organization_admin' && user.organization_id) {
         params.organization_id = user.organization_id;
-      } else if (filterOrganization !== 'all') {
-        params.organization_id = filterOrganization;
       }
 
       const response = await apiClient.getCourses(params);
       
       // Handle different response structures
       let coursesData: Course[] = [];
-      if (Array.isArray(response.data)) {
-        coursesData = response.data;
-      } else if (response.data?.courses && Array.isArray(response.data.courses)) {
-        coursesData = response.data.courses;
-        const data = response.data as CoursesResponse;
-        setTotalPages(data.pages || 1);
-        setTotalCourses(data.total || coursesData.length);
-      } else {
-        coursesData = [];
+      let total = 0;
+      let pages = 1;
+      
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          coursesData = response.data;
+          total = response.data.length;
+        } else if (response.data.courses && Array.isArray(response.data.courses)) {
+          coursesData = response.data.courses;
+          total = response.data.total || response.data.courses.length;
+          pages = response.data.pages || 1;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          coursesData = response.data.data;
+          total = response.data.total || response.data.data.length;
+          pages = response.data.pages || 1;
+        }
       }
 
       setCourses(coursesData);
-      if (!response.data?.pages) {
-        setTotalPages(1);
-        setTotalCourses(coursesData.length);
-      }
+      setTotalPages(pages);
+      setTotalCourses(total);
     } catch (error: unknown) {
       console.error('Error loading courses:', error);
       const errorMessage = error && typeof error === 'object' && 'response' in error
