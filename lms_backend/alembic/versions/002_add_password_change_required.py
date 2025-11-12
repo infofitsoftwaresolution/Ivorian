@@ -1,7 +1,7 @@
 """Add password_change_required column to users table
 
 Revision ID: 002
-Revises: 001
+Revises: b5fb0e8fa8b1
 Create Date: 2025-11-12 08:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '002'
-down_revision = '001'
+down_revision = 'b5fb0e8fa8b1'
 branch_labels = None
 depends_on = None
 
