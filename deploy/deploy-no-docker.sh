@@ -15,6 +15,29 @@ if [ -f .env ]; then
     export $(cat .env | grep -v '^#' | xargs)
 fi
 
+# Ensure AWS S3 settings in .env file (if not already set)
+echo "🔧 Checking AWS S3 configuration..."
+if [ -f lms_backend/.env ]; then
+    # Check if AWS_REGION is set, if not add it
+    if ! grep -q "^AWS_REGION=" lms_backend/.env 2>/dev/null; then
+        echo "AWS_REGION=ap-south-1" >> lms_backend/.env
+        echo "✅ Added AWS_REGION to .env"
+    fi
+    
+    # Check if AWS_S3_BUCKET is set, if not add it
+    if ! grep -q "^AWS_S3_BUCKET=" lms_backend/.env 2>/dev/null; then
+        echo "AWS_S3_BUCKET=infofitlabs-lms-videos" >> lms_backend/.env
+        echo "✅ Added AWS_S3_BUCKET to .env"
+    fi
+else
+    # Create .env file if it doesn't exist
+    echo "Creating lms_backend/.env file..."
+    touch lms_backend/.env
+    echo "AWS_REGION=ap-south-1" >> lms_backend/.env
+    echo "AWS_S3_BUCKET=infofitlabs-lms-videos" >> lms_backend/.env
+    echo "✅ Created .env file with AWS S3 settings"
+fi
+
 # Pull latest code
 echo "📥 Pulling latest code..."
 git pull origin main
