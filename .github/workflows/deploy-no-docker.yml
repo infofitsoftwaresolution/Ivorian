@@ -89,10 +89,11 @@ jobs:
 
       - name: Configure SSH
         run: |
-          mkdir -p ~/.ssh
+          mkdir -p ~/.ssh || true
+          chmod 700 ~/.ssh || true
           echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy to EC2
         run: |
