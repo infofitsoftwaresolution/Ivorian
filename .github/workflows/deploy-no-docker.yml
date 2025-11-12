@@ -93,17 +93,45 @@ jobs:
           echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          # Configure SSH to be more resilient
+          cat >> ~/.ssh/config << EOF
+          Host ${{ env.EC2_HOST }}
+            StrictHostKeyChecking no
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ServerAliveInterval 60
+            ServerAliveCountMax 3
+            ConnectTimeout 10
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Deploy to EC2
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
-            set -e &&
-            cd ${{ env.DEPLOY_PATH }} &&
-            git fetch origin &&
-            git reset --hard origin/main &&
-            chmod +x deploy/deploy-no-docker.sh &&
-            ./deploy/deploy-no-docker.sh
-          "
+          # Retry SSH connection up to 3 times
+          for i in 1 2 3; do
+            echo "Attempt $i to connect to EC2..."
+            if ssh -i ~/.ssh/deploy_key \
+              -o ConnectTimeout=10 \
+              -o ServerAliveInterval=60 \
+              -o ServerAliveCountMax=3 \
+              ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
+              set -e &&
+              cd ${{ env.DEPLOY_PATH }} &&
+              git fetch origin &&
+              git reset --hard origin/main &&
+              chmod +x deploy/deploy-no-docker.sh &&
+              ./deploy/deploy-no-docker.sh
+            "; then
+              echo "Deployment successful!"
+              exit 0
+            else
+              if [ $i -eq 3 ]; then
+                echo "All connection attempts failed"
+                exit 1
+              fi
+              echo "Connection failed, retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
 
       - name: Health Check
         run: |
