@@ -316,13 +316,40 @@ export default function ProfilePage() {
                     </span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="absolute bottom-0 right-0 p-2 bg-indigo-600 rounded-full text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                  title="Change avatar"
-                >
+                <label className="absolute bottom-0 right-0 p-2 bg-indigo-600 rounded-full text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      try {
+                        setError('');
+                        setSuccessMessage('');
+                        const response = await apiClient.uploadAvatar(file, (progress) => {
+                          console.log(`Upload progress: ${progress}%`);
+                        });
+                        
+                        if (response.data?.url) {
+                          setProfileData({ ...profileData, avatar_url: response.data.url });
+                          await apiClient.updateUserProfile({ avatar_url: response.data.url });
+                          await refreshUser();
+                          setSuccessMessage('Avatar updated successfully!');
+                          setTimeout(() => setSuccessMessage(''), 3000);
+                        }
+                      } catch (error: unknown) {
+                        console.error('Error uploading avatar:', error);
+                        const errorMessage = error && typeof error === 'object' && 'response' in error
+                          ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                          : undefined;
+                        setError(errorMessage || 'Failed to upload avatar. Please try again.');
+                      }
+                    }}
+                  />
                   <CameraIcon className="h-4 w-4" />
-                </button>
+                </label>
               </div>
               <div>
                 <h3 className="text-lg font-medium text-gray-900">

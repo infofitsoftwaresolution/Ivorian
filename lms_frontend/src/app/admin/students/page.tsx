@@ -56,6 +56,7 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [filterOrganization, setFilterOrganization] = useState('all');
+  const [organizationsList, setOrganizationsList] = useState<Array<{id: number, name: string}>>([]);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -95,8 +96,12 @@ export default function StudentsPage() {
       // For organization_admin, filter by their organization
       if (user?.role === 'organization_admin' && user.organization_id) {
         params.organization_id = user.organization_id;
-      } else if (filterOrganization !== 'all') {
-        params.organization_id = filterOrganization;
+      } else if (filterOrganization !== 'all' && user?.role === 'super_admin') {
+        // Find organization ID by name
+        const org = organizationsList.find(o => o.name === filterOrganization);
+        if (org) {
+          params.organization_id = org.id;
+        }
       }
 
       const response = await apiClient.getUsers(params);
@@ -119,9 +124,26 @@ export default function StudentsPage() {
   useEffect(() => {
     if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
       loadStudents();
+      if (user?.role === 'super_admin') {
+        loadOrganizations();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, currentPage, searchTerm, filterStatus, filterOrganization]);
+
+  const loadOrganizations = async () => {
+    try {
+      const response = await apiClient.getOrganizations();
+      const orgsData = response.data?.organizations || response.data || [];
+      const orgsList = Array.isArray(orgsData) ? orgsData.map((org: any) => ({
+        id: org.id,
+        name: org.name || 'Unnamed Organization'
+      })) : [];
+      setOrganizationsList(orgsList);
+    } catch (error) {
+      console.error('Error loading organizations:', error);
+    }
+  };
 
   const handleViewStudent = (studentId: number) => {
     router.push(`/admin/students/${studentId}`);
@@ -134,21 +156,26 @@ export default function StudentsPage() {
   const handleDeleteStudent = async (studentId: number) => {
     if (confirm('Are you sure you want to delete this student? This action cannot be undone.')) {
       try {
-        // TODO: Implement delete API call
-        // await apiClient.deleteUser(studentId);
-        // loadStudents();
-        console.log('Delete student:', studentId);
-        alert('Delete functionality will be implemented soon.');
-      } catch (error) {
+        setLoading(true);
+        await apiClient.deleteUser(studentId);
+        await loadStudents();
+      } catch (error: unknown) {
         console.error('Error deleting student:', error);
-        alert('Failed to delete student. Please try again.');
+        const errorMessage = error && typeof error === 'object' && 'response' in error
+          ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : undefined;
+        setError(errorMessage || 'Failed to delete student. Please try again.');
+        alert(errorMessage || 'Failed to delete student. Please try again.');
+      } finally {
+        setLoading(false);
       }
     }
   };
 
-  // Get unique organizations for filter
-  const organizations = ['all', ...Array.from(new Set(students.map(s => s.organization_name).filter(Boolean)))];
-  const uniqueOrganizations = organizations.filter((org, index, self) => self.indexOf(org) === index);
+  // Get unique organizations for filter - use loaded organizations list
+  const uniqueOrganizations = user?.role === 'super_admin' 
+    ? ['all', ...organizationsList.map(org => org.name)]
+    : ['all', ...Array.from(new Set(students.map(s => s.organization_name).filter(Boolean)))];
 
   // Show loading while checking authentication or loading data
   if (authLoading || loading) {

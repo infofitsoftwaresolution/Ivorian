@@ -223,3 +223,55 @@ svg {
   height: 1em;
   vertical-align: middle;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  /* Ensure tables are scrollable on mobile */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Stack grid columns on mobile */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Adjust padding on mobile */
+  .container-padding {
+    @apply px-4;
+  }
+  
+  /* Make buttons full width on mobile */
+  .btn-mobile-full {
+    @apply w-full;
+  }
+  
+  /* Adjust card spacing on mobile */
+  .card {
+    @apply mb-4;
+  }
+  
+  /* Hide less important columns on mobile tables */
+  @media (max-width: 640px) {
+    .table-mobile-hide {
+      display: none;
+    }
+  }
+}
+
+/* Ensure inputs are visible on all devices */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    @apply bg-white text-gray-900 border-gray-300;
+  }
+}

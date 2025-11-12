@@ -138,14 +138,15 @@ export default function UsersPage() {
   const handleDeleteUser = async (userId: number) => {
     if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
-        // TODO: Implement delete API call
-        // await apiClient.deleteUser(userId);
-        // loadUsers();
-        console.log('Delete user:', userId);
-        alert('Delete functionality will be implemented soon.');
-      } catch (error) {
+        setLoading(true);
+        await apiClient.deleteUser(userId);
+        await loadUsers();
+      } catch (error: any) {
         console.error('Error deleting user:', error);
-        alert('Failed to delete user. Please try again.');
+        setError(error?.response?.data?.detail || 'Failed to delete user. Please try again.');
+        alert(error?.response?.data?.detail || 'Failed to delete user. Please try again.');
+      } finally {
+        setLoading(false);
       }
     }
   };

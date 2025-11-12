@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
+import { apiClient } from '@/lib/api/client';
 
 interface Organization {
   id: number;
@@ -71,62 +72,30 @@ export default function OrganizationsPage() {
       console.log('OrganizationsPage: Loading organizations...');
       setLoading(true);
       
-      // Add a small delay to simulate API call
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Fetch real data from API
+      const response = await apiClient.getOrganizations();
+      const orgsData = response.data?.organizations || response.data || [];
       
-      // TODO: Replace with actual API call
-      // const response = await apiClient.getOrganizations();
-      
-      // Mock data for now
-      const mockOrganizations: Organization[] = [
-        {
-          id: 1,
-          name: "Tech Academy",
-          description: "Leading technology education provider",
-          website: "https://techacademy.com",
-          contact_email: "admin@techacademy.com",
-          contact_phone: "+1-555-0123",
-          industry: "Technology",
-          size: "51-200",
-          is_active: true,
-          created_at: "2024-01-15",
-          user_count: 1250,
-          course_count: 45
-        },
-        {
-          id: 2,
-          name: "Business School Pro",
-          description: "Professional business education",
-          website: "https://businesschoolpro.com",
-          contact_email: "contact@businesschoolpro.com",
-          contact_phone: "+1-555-0456",
-          industry: "Business",
-          size: "11-50",
-          is_active: true,
-          created_at: "2024-02-20",
-          user_count: 850,
-          course_count: 32
-        },
-        {
-          id: 3,
-          name: "Creative Arts Institute",
-          description: "Digital arts and design education",
-          website: "https://creativearts.edu",
-          contact_email: "info@creativearts.edu",
-          contact_phone: "+1-555-0789",
-          industry: "Arts",
-          size: "1-10",
-          is_active: false,
-          created_at: "2024-03-10",
-          user_count: 120,
-          course_count: 8
-        }
-      ];
+      const processedOrgs: Organization[] = Array.isArray(orgsData) ? orgsData.map((org: any) => ({
+        id: org.id,
+        name: org.name || 'Unnamed Organization',
+        description: org.description || '',
+        website: org.website || '',
+        contact_email: org.contact_email || org.email || '',
+        contact_phone: org.contact_phone || org.phone || '',
+        industry: org.industry || 'General',
+        size: org.size || 'Unknown',
+        is_active: org.is_active !== false,
+        created_at: org.created_at || new Date().toISOString(),
+        user_count: org.user_count || 0,
+        course_count: org.course_count || 0
+      })) : [];
 
-      setOrganizations(mockOrganizations);
-      console.log('OrganizationsPage: Data loaded successfully');
+      setOrganizations(processedOrgs);
+      console.log('OrganizationsPage: Data loaded successfully', processedOrgs);
     } catch (error) {
       console.error('Error loading organizations:', error);
+      setOrganizations([]);
     } finally {
       setLoading(false);
       console.log('OrganizationsPage: Loading completed');
@@ -145,12 +114,18 @@ export default function OrganizationsPage() {
     router.push(`/admin/organizations/${orgId}/edit`);
   };
 
-  const handleDeleteOrganization = (orgId: number) => {
-    // TODO: Implement delete functionality
-    console.log('Delete organization:', orgId);
+  const handleDeleteOrganization = async (orgId: number) => {
     if (confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
-      // await apiClient.deleteOrganization(orgId);
-      // loadOrganizations();
+      try {
+        setLoading(true);
+        await apiClient.deleteOrganization(orgId.toString());
+        await loadOrganizations();
+      } catch (error: any) {
+        console.error('Error deleting organization:', error);
+        alert(error?.response?.data?.detail || 'Failed to delete organization. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
