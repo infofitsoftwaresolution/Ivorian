@@ -1,8 +1,8 @@
 """
 Configuration settings for the LMS application
 """
-from typing import List, Optional
-from pydantic import Field, validator
+from typing import List, Optional, Any
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -22,16 +22,24 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Modern AI-Integrated LMS"
     
-    # CORS
-    BACKEND_CORS_ORIGINS: List[str] = Field(
+    # CORS - Use Any to prevent automatic JSON parsing, then convert in validator
+    BACKEND_CORS_ORIGINS: Any = Field(
         default=["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"],
         env="BACKEND_CORS_ORIGINS"
     )
     
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
-    def assemble_cors_origins(cls, v):
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> List[str]:
+        """Parse CORS origins from various formats"""
+        default_origins = ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
+        
         if v is None:
-            return ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
+            return default_origins
+        
+        if isinstance(v, list):
+            return v
+        
         if isinstance(v, str):
             # Remove surrounding quotes if present
             v = v.strip().strip('"').strip("'")
@@ -39,16 +47,17 @@ class Settings(BaseSettings):
             if v.startswith("[") and v.endswith("]"):
                 import json
                 try:
-                    return json.loads(v)
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return parsed
                 except:
                     # If JSON parsing fails, try comma-separated
                     v = v.strip("[]")
             # Handle comma-separated string
             origins = [i.strip().strip('"').strip("'") for i in v.split(",") if i.strip()]
-            return origins if origins else ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
-        elif isinstance(v, list):
-            return v
-        return ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
+            return origins if origins else default_origins
+        
+        return default_origins
     
     # Security
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
