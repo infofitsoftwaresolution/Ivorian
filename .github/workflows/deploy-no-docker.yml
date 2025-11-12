@@ -154,9 +154,9 @@ jobs:
         run: |
           sleep 15
           echo "Checking backend health..."
-          curl -f http://${{ env.EC2_HOST }}:8000/health || exit 1
+          curl -f --connect-timeout 10 http://${{ env.EC2_HOST }}:8000/health || exit 1
           echo "Checking frontend..."
-          curl -f http://${{ env.EC2_HOST }}:3000 || exit 1
+          curl -f --connect-timeout 10 http://${{ env.EC2_HOST }}:3000 || exit 1
           echo "✅ All services are healthy!"
 
       - name: Notify deployment status
