@@ -20,6 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
+import { apiClient } from '@/lib/api/client';
 
 interface Organization {
   id: number;
@@ -84,56 +85,65 @@ export default function PlatformDashboard() {
     try {
       setLoading(true);
       
-      // Add a small delay to simulate API call and prevent race conditions
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // TODO: Replace with actual API calls
-      // const orgsResponse = await apiClient.getOrganizations();
-      // const statsResponse = await apiClient.getPlatformStats();
-      
-      // Mock data for now
-      const mockOrganizations: Organization[] = [
-        {
-          id: 1,
-          name: "Tech Academy",
-          description: "Leading technology education provider",
-          website: "https://techacademy.com",
-          contact_email: "admin@techacademy.com",
-          industry: "Technology",
-          size: "51-200",
-          is_active: true,
-          created_at: "2024-01-15",
-          user_count: 1250,
-          course_count: 45
-        },
-        {
-          id: 2,
-          name: "Business School Pro",
-          description: "Professional business education",
-          website: "https://businesschoolpro.com",
-          contact_email: "contact@businesschoolpro.com",
-          industry: "Business",
-          size: "11-50",
-          is_active: true,
-          created_at: "2024-02-20",
-          user_count: 850,
-          course_count: 32
-        }
-      ];
+      // Fetch real data from API
+      const [orgsResponse, statsResponse, coursesResponse, usersResponse] = await Promise.all([
+        apiClient.getOrganizations().catch(() => ({ data: { organizations: [] } })),
+        apiClient.getPlatformStats().catch(() => ({ data: {} })),
+        apiClient.getCourses().catch(() => ({ data: { courses: [] } })),
+        apiClient.getUsers({ size: 1 }).catch(() => ({ data: { total: 0 } }))
+      ]);
 
-      const mockStats: PlatformStats = {
-        total_organizations: 2,
-        total_users: 2100,
-        total_courses: 77,
-        total_revenue: 125000,
-        active_organizations: 2,
-        new_organizations_this_month: 1
+      // Process organizations
+      const orgsData = orgsResponse.data?.organizations || orgsResponse.data || [];
+      const processedOrgs: Organization[] = Array.isArray(orgsData) ? orgsData.map((org: any) => ({
+        id: org.id,
+        name: org.name || 'Unnamed Organization',
+        description: org.description || '',
+        website: org.website || '',
+        contact_email: org.contact_email || org.email || '',
+        industry: org.industry || 'General',
+        size: org.size || 'Unknown',
+        is_active: org.is_active !== false,
+        created_at: org.created_at || new Date().toISOString(),
+        user_count: org.user_count || 0,
+        course_count: org.course_count || 0
+      })) : [];
+
+      // Process stats
+      const statsData = statsResponse.data || {};
+      const coursesData = coursesResponse.data?.courses || coursesResponse.data || [];
+      const totalCourses = Array.isArray(coursesData) ? coursesData.length : 0;
+      const totalUsers = usersResponse.data?.total || 0;
+      const activeOrgs = processedOrgs.filter(org => org.is_active).length;
+      const thisMonth = new Date().getMonth();
+      const newOrgsThisMonth = processedOrgs.filter(org => {
+        const createdDate = new Date(org.created_at);
+        return createdDate.getMonth() === thisMonth;
+      }).length;
+
+      const calculatedStats: PlatformStats = {
+        total_organizations: statsData.total_organizations || processedOrgs.length,
+        total_users: statsData.total_users || totalUsers,
+        total_courses: statsData.total_courses || totalCourses,
+        total_revenue: statsData.total_revenue || 0,
+        active_organizations: statsData.active_organizations || activeOrgs,
+        new_organizations_this_month: statsData.new_organizations_this_month || newOrgsThisMonth
       };
 
-      setOrganizations(mockOrganizations);
-      setStats(mockStats);
+      setOrganizations(processedOrgs);
+      setStats(calculatedStats);
     } catch (error) {
       console.error('Error loading platform data:', error);
+      // Set empty data on error
+      setOrganizations([]);
+      setStats({
+        total_organizations: 0,
+        total_users: 0,
+        total_courses: 0,
+        total_revenue: 0,
+        active_organizations: 0,
+        new_organizations_this_month: 0
+      });
     } finally {
       setLoading(false);
     }

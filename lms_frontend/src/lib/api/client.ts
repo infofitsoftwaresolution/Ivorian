@@ -583,9 +583,108 @@ class ApiClient {
     });
   }
 
-  // Analytics Methods (for future implementation)
+  // Analytics Methods
   async getUserAnalytics(): Promise<ApiResponse> {
     return this.request('/api/v1/analytics/user/progress');
+  }
+
+  async getPlatformStats(): Promise<ApiResponse> {
+    return this.request('/api/v1/analytics/platform/stats');
+  }
+
+  // User Management Methods
+  async deleteUser(userId: number): Promise<ApiResponse> {
+    return this.request(`/api/v1/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateUser(userId: number, data: any): Promise<ApiResponse> {
+    return this.request(`/api/v1/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getUserProfile(): Promise<ApiResponse> {
+    return this.request('/api/v1/users/me');
+  }
+
+  async updateUserProfile(data: any): Promise<ApiResponse> {
+    return this.request('/api/v1/users/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async uploadAvatar(file: File, onProgress?: (progress: number) => void): Promise<ApiResponse<{ url: string }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', 'avatars');
+
+    const accessToken = TokenManager.getAccessToken();
+    const url = `${this.baseURL}/api/v1/upload/file`;
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            onProgress(progress);
+          }
+        });
+      }
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            resolve({
+              data: { url: data.url },
+              status: xhr.status,
+            });
+          } catch (error) {
+            reject(new ApiError({
+              message: 'Failed to parse response',
+              status: xhr.status,
+              code: 'PARSE_ERROR',
+            }));
+          }
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            reject(new ApiError({
+              message: errorData.detail || `HTTP ${xhr.status}`,
+              status: xhr.status,
+              code: `HTTP_${xhr.status}`,
+              details: errorData,
+            }));
+          } catch {
+            reject(new ApiError({
+              message: `HTTP ${xhr.status}`,
+              status: xhr.status,
+              code: `HTTP_${xhr.status}`,
+            }));
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new ApiError({
+          message: 'Network error',
+          status: 0,
+          code: 'NETWORK_ERROR',
+        }));
+      });
+
+      xhr.open('POST', url);
+      if (accessToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+      }
+      xhr.send(formData);
+    });
   }
 
   // File Upload Methods
