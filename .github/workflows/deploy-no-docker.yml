@@ -99,7 +99,8 @@ jobs:
           ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
             set -e &&
             cd ${{ env.DEPLOY_PATH }} &&
-            git pull origin main &&
+            git fetch origin &&
+            git reset --hard origin/main &&
             chmod +x deploy/deploy-no-docker.sh &&
             ./deploy/deploy-no-docker.sh
           "
