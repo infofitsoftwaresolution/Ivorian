@@ -30,11 +30,21 @@ class Settings(BaseSettings):
     
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v):
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
+        import json
+        if isinstance(v, list):
             return v
-        raise ValueError(v)
+        elif isinstance(v, str):
+            # Handle JSON array format: ["url1","url2"]
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, try comma-separated
+                    return [i.strip().strip('"').strip("'") for i in v.strip("[]").split(",") if i.strip()]
+            # Handle comma-separated format: url1,url2
+            else:
+                return [i.strip() for i in v.split(",") if i.strip()]
+        raise ValueError(f"Invalid CORS origins format: {v}")
     
     # Security
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
