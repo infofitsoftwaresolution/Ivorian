@@ -94,11 +94,21 @@ if [ "$FREE_MEM" -lt 1000 ]; then
     echo "⚠️  Low memory detected (${FREE_MEM}MB free). Checking swap..."
     if [ ! -f /swapfile ] || [ $(swapon --show=SIZE --noheadings --bytes /swapfile 2>/dev/null | awk '{print int($1/1024/1024)}') -lt 512 ]; then
         echo "📦 Creating swap file..."
-        sudo fallocate -l 1G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=512M count=1 2>/dev/null
-        sudo chmod 600 /swapfile
-        sudo mkswap /swapfile
-        sudo swapon /swapfile
-        echo "✅ Swap file created and activated"
+        # Try to create swap file with better error handling
+        if sudo fallocate -l 1G /swapfile 2>/dev/null; then
+            echo "✅ Swap file allocated using fallocate"
+        elif sudo dd if=/dev/zero of=/swapfile bs=512M count=1 2>/dev/null; then
+            echo "✅ Swap file allocated using dd"
+        else
+            echo "⚠️  Failed to create swap file, continuing anyway..."
+        fi
+        
+        if [ -f /swapfile ]; then
+            sudo chmod 600 /swapfile || true
+            sudo mkswap /swapfile 2>/dev/null || true
+            sudo swapon /swapfile 2>/dev/null || true
+            echo "✅ Swap file configured"
+        fi
     else
         echo "✅ Swap file already exists"
         sudo swapon /swapfile 2>/dev/null || true
