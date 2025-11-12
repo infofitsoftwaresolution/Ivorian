@@ -37,12 +37,23 @@ if [ -f lms_backend/.env ]; then
         echo "EMAILS_FROM_NAME=InfoFit LMS" >> lms_backend/.env
         echo "✅ Added EMAIL configuration placeholders to .env (please update EMAILS_FROM_EMAIL)"
     fi
+    
+    # Fix BACKEND_CORS_ORIGINS format if it's malformed
+    if grep -q "^BACKEND_CORS_ORIGINS=\[" lms_backend/.env 2>/dev/null; then
+        # Replace JSON array format with comma-separated format
+        sed -i 's/^BACKEND_CORS_ORIGINS=\[.*\]/BACKEND_CORS_ORIGINS="http:\/\/15.206.84.110,http:\/\/15.206.84.110:3000,http:\/\/15.206.84.110:8000,http:\/\/localhost:3000"/' lms_backend/.env
+        echo "✅ Fixed BACKEND_CORS_ORIGINS format"
+    elif ! grep -q "^BACKEND_CORS_ORIGINS=" lms_backend/.env 2>/dev/null; then
+        echo 'BACKEND_CORS_ORIGINS="http://15.206.84.110,http://15.206.84.110:3000,http://15.206.84.110:8000,http://localhost:3000"' >> lms_backend/.env
+        echo "✅ Added BACKEND_CORS_ORIGINS to .env"
+    fi
 else
     # Create .env file if it doesn't exist
     echo "Creating lms_backend/.env file..."
     touch lms_backend/.env
     echo "AWS_REGION=ap-south-1" >> lms_backend/.env
     echo "AWS_S3_BUCKET=infofitlabs-lms-videos" >> lms_backend/.env
+    echo 'BACKEND_CORS_ORIGINS="http://15.206.84.110,http://15.206.84.110:3000,http://15.206.84.110:8000,http://localhost:3000"' >> lms_backend/.env
     echo "# Email Configuration (AWS SES)" >> lms_backend/.env
     echo "EMAILS_FROM_EMAIL=" >> lms_backend/.env
     echo "EMAILS_FROM_NAME=InfoFit LMS" >> lms_backend/.env
@@ -76,6 +87,11 @@ sudo systemctl restart lms-backend
 # Frontend deployment
 echo "⚛️  Deploying frontend..."
 cd ../lms_frontend
+
+# Clear Next.js cache
+echo "🧹 Clearing Next.js cache..."
+rm -rf .next
+rm -rf node_modules/.cache
 
 # Install/update dependencies
 echo "📦 Installing frontend dependencies..."

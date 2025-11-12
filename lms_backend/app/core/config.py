@@ -30,11 +30,22 @@ class Settings(BaseSettings):
     
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v):
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
+        if v is None:
+            return ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
+        if isinstance(v, str):
+            # Handle JSON array string
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    return json.loads(v)
+                except:
+                    # If JSON parsing fails, try comma-separated
+                    return [i.strip().strip('"').strip("'") for i in v.strip("[]").split(",") if i.strip()]
+            # Handle comma-separated string
+            return [i.strip().strip('"').strip("'") for i in v.split(",") if i.strip()]
+        elif isinstance(v, list):
             return v
-        raise ValueError(v)
+        return ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
     
     # Security
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
