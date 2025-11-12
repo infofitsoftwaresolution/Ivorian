@@ -147,7 +147,19 @@ export default function CoursesPage() {
       loadCourses();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, currentPage, searchTerm, filterStatus, filterCategory, filterOrganization]);
+  }, [user, authLoading, currentPage, filterStatus, filterCategory, filterOrganization]);
+
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
+      const timeoutId = setTimeout(() => {
+        setCurrentPage(1); // Reset to first page on search
+        loadCourses();
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm]);
 
   const handleViewCourse = (courseId: number) => {
     router.push(`/admin/courses/${courseId}`);

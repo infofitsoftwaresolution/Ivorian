@@ -80,7 +80,19 @@ export default function UsersPage() {
       console.log('UsersPage: Starting data load...');
       loadUsers();
     }
-  }, [user, authLoading, currentPage, searchTerm, filterRole, filterStatus]);
+  }, [user, authLoading, currentPage, filterRole, filterStatus]);
+
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
+      const timeoutId = setTimeout(() => {
+        setCurrentPage(1); // Reset to first page on search
+        loadUsers();
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm]);
 
   const loadUsers = async () => {
     try {

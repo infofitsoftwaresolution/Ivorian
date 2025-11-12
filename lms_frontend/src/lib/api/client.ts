@@ -640,9 +640,14 @@ class ApiClient {
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            const data = JSON.parse(xhr.responseText);
+            const responseData = JSON.parse(xhr.responseText);
+            // Backend returns {url: ..., message: ..., filename: ...} directly
+            const url = responseData.url || responseData.data?.url;
+            if (!url) {
+              throw new Error('No URL in response');
+            }
             resolve({
-              data: { url: data.url },
+              data: { url },
               status: xhr.status,
             });
           } catch (error) {

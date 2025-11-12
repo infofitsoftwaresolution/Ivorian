@@ -138,8 +138,8 @@ export default function CreateOrganization() {
       // Refresh user authentication state
       await refreshUser();
       
-      // Redirect to organizations list page which will refresh data
-      router.push('/admin/organizations');
+      // Redirect to organizations list page with query param to trigger refresh
+      router.push('/admin/organizations?created=true');
 
     } catch (err: any) {
       console.error('Error creating organization:', err);

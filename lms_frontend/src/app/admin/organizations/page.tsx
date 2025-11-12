@@ -67,6 +67,39 @@ export default function OrganizationsPage() {
     }
   }, [user, authLoading]);
 
+  // Reload data when page becomes visible or when query param indicates new creation
+  useEffect(() => {
+    if (!user || user.role !== 'super_admin') return;
+
+    // Check if we have a query param indicating a new organization was created
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('created') === 'true') {
+      // Remove the query param and reload
+      window.history.replaceState({}, '', '/admin/organizations');
+      setTimeout(() => loadOrganizations(), 100);
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !loading) {
+        loadOrganizations();
+      }
+    };
+
+    const handleFocus = () => {
+      if (!loading) {
+        loadOrganizations();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user, loading]);
+
   const loadOrganizations = async () => {
     try {
       console.log('OrganizationsPage: Loading organizations...');

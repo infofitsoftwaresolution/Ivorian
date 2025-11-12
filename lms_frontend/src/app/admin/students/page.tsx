@@ -142,13 +142,25 @@ export default function StudentsPage() {
 
   useEffect(() => {
     if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
-      loadStudents();
       if (user?.role === 'super_admin') {
         loadOrganizations();
       }
+      loadStudents();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, currentPage, searchTerm, filterStatus, filterOrganization]);
+  }, [user, authLoading, currentPage, filterStatus, filterOrganization]);
+
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
+      const timeoutId = setTimeout(() => {
+        setCurrentPage(1); // Reset to first page on search
+        loadStudents();
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm]);
 
   const loadOrganizations = async () => {
     try {

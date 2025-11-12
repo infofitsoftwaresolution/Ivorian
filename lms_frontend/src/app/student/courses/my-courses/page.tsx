@@ -48,41 +48,65 @@ export default function MyCoursesPage() {
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
+  const fetchEnrolledCourses = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await apiClient.getMyEnrollments();
+      console.log('Enrolled courses response:', response);
+      
+      // Handle different response structures
+      let enrollments = [];
+      if (Array.isArray(response.data)) {
+        enrollments = response.data;
+      } else if (response.data && Array.isArray(response.data.enrollments)) {
+        enrollments = response.data.enrollments;
+      } else {
+        console.log('No enrollments found or unexpected response structure');
+        enrollments = [];
+      }
+      
+      console.log('📚 Processed enrollments for My Courses:', enrollments);
+      console.log('📚 First enrollment structure:', enrollments[0]);
+      
+      setEnrolledCourses(enrollments);
+    } catch (error) {
+      console.error('Error fetching enrolled courses:', error);
+      setError('Failed to load enrolled courses. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch enrolled courses
   useEffect(() => {
-    const fetchEnrolledCourses = async () => {
-      try {
-        setLoading(true);
-        const response = await apiClient.getMyEnrollments();
-        console.log('Enrolled courses response:', response);
-        
-        // Handle different response structures
-        let enrollments = [];
-        if (Array.isArray(response.data)) {
-          enrollments = response.data;
-        } else if (response.data && Array.isArray(response.data.enrollments)) {
-          enrollments = response.data.enrollments;
-        } else {
-          console.log('No enrollments found or unexpected response structure');
-          enrollments = [];
-        }
-        
-        console.log('📚 Processed enrollments for My Courses:', enrollments);
-        console.log('📚 First enrollment structure:', enrollments[0]);
-        
-        setEnrolledCourses(enrollments);
-      } catch (error) {
-        console.error('Error fetching enrolled courses:', error);
-        setError('Failed to load enrolled courses. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (user && user.role === 'student') {
       fetchEnrolledCourses();
     }
   }, [user]);
+
+  // Reload data when page becomes visible (e.g., after enrollment)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user?.role === 'student' && !loading) {
+        fetchEnrolledCourses();
+      }
+    };
+
+    const handleFocus = () => {
+      if (user?.role === 'student' && !loading) {
+        fetchEnrolledCourses();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user, loading]);
 
   const filteredCourses = enrolledCourses.filter(course => {
     if (filterStatus === 'all') return true;
