@@ -33,6 +33,8 @@ class Settings(BaseSettings):
         if v is None:
             return ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
         if isinstance(v, str):
+            # Remove surrounding quotes if present
+            v = v.strip().strip('"').strip("'")
             # Handle JSON array string
             if v.startswith("[") and v.endswith("]"):
                 import json
@@ -40,9 +42,10 @@ class Settings(BaseSettings):
                     return json.loads(v)
                 except:
                     # If JSON parsing fails, try comma-separated
-                    return [i.strip().strip('"').strip("'") for i in v.strip("[]").split(",") if i.strip()]
+                    v = v.strip("[]")
             # Handle comma-separated string
-            return [i.strip().strip('"').strip("'") for i in v.split(",") if i.strip()]
+            origins = [i.strip().strip('"').strip("'") for i in v.split(",") if i.strip()]
+            return origins if origins else ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
         elif isinstance(v, list):
             return v
         return ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
