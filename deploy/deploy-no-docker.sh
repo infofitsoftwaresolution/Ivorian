@@ -38,15 +38,14 @@ if [ -f lms_backend/.env ]; then
         echo "✅ Added EMAIL configuration placeholders to .env (please update EMAILS_FROM_EMAIL)"
     fi
     
-    # Fix BACKEND_CORS_ORIGINS format if it's malformed
-    if grep -q "^BACKEND_CORS_ORIGINS=\[" lms_backend/.env 2>/dev/null; then
-        # Replace JSON array format with comma-separated format
-        sed -i 's/^BACKEND_CORS_ORIGINS=\[.*\]/BACKEND_CORS_ORIGINS="http:\/\/15.206.84.110,http:\/\/15.206.84.110:3000,http:\/\/15.206.84.110:8000,http:\/\/localhost:3000"/' lms_backend/.env
-        echo "✅ Fixed BACKEND_CORS_ORIGINS format"
-    elif ! grep -q "^BACKEND_CORS_ORIGINS=" lms_backend/.env 2>/dev/null; then
-        echo 'BACKEND_CORS_ORIGINS="http://15.206.84.110,http://15.206.84.110:3000,http://15.206.84.110:8000,http://localhost:3000"' >> lms_backend/.env
-        echo "✅ Added BACKEND_CORS_ORIGINS to .env"
+    # Fix BACKEND_CORS_ORIGINS format - remove any existing and add correct format
+    if grep -q "^BACKEND_CORS_ORIGINS=" lms_backend/.env 2>/dev/null; then
+        # Remove existing BACKEND_CORS_ORIGINS line
+        sed -i '/^BACKEND_CORS_ORIGINS=/d' lms_backend/.env
     fi
+    # Add correct format
+    echo 'BACKEND_CORS_ORIGINS="http://15.206.84.110,http://15.206.84.110:3000,http://15.206.84.110:8000,http://localhost:3000"' >> lms_backend/.env
+    echo "✅ Fixed BACKEND_CORS_ORIGINS format"
 else
     # Create .env file if it doesn't exist
     echo "Creating lms_backend/.env file..."
@@ -88,6 +87,24 @@ sudo systemctl restart lms-backend
 echo "⚛️  Deploying frontend..."
 cd ../lms_frontend
 
+# Check memory and create swap if needed
+echo "💾 Checking available memory..."
+FREE_MEM=$(free -m | awk 'NR==2{printf "%.0f", $7}')
+if [ "$FREE_MEM" -lt 1000 ]; then
+    echo "⚠️  Low memory detected (${FREE_MEM}MB free). Checking swap..."
+    if [ ! -f /swapfile ] || [ $(swapon --show=SIZE --noheadings --bytes /swapfile 2>/dev/null | awk '{print int($1/1024/1024)}') -lt 512 ]; then
+        echo "📦 Creating swap file..."
+        sudo fallocate -l 1G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=512M count=1 2>/dev/null
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        echo "✅ Swap file created and activated"
+    else
+        echo "✅ Swap file already exists"
+        sudo swapon /swapfile 2>/dev/null || true
+    fi
+fi
+
 # Clear Next.js cache
 echo "🧹 Clearing Next.js cache..."
 rm -rf .next
@@ -97,9 +114,9 @@ rm -rf node_modules/.cache
 echo "📦 Installing frontend dependencies..."
 npm install
 
-# Build frontend
+# Build frontend with memory limit
 echo "🏗️  Building frontend..."
-npm run build
+NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 # Create symlinks for standalone mode
 echo "🔗 Creating symlinks for standalone mode..."
