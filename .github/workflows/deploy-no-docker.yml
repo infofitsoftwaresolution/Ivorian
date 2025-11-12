@@ -89,8 +89,12 @@ jobs:
 
       - name: Configure SSH
         run: |
-          mkdir -p ~/.ssh || true
-          chmod 700 ~/.ssh || true
+          if [ -z "${{ secrets.EC2_SSH_PRIVATE_KEY }}" ]; then
+            echo "❌ Error: EC2_SSH_PRIVATE_KEY secret is not set in GitHub Secrets"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
           echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
