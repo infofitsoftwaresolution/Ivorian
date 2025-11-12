@@ -70,10 +70,8 @@ pip install -r requirements.txt
 
 # Run database migrations
 echo "📊 Running database migrations..."
-cd lms_backend
 source venv/bin/activate
 alembic upgrade head || echo "⚠️  Migrations failed - check database connection"
-cd ..
 
 # Restart backend service
 echo "🔄 Restarting backend service..."
