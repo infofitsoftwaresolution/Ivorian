@@ -15,8 +15,8 @@ if [ -f .env ]; then
     export $(cat .env | grep -v '^#' | xargs)
 fi
 
-# Ensure AWS S3 and Email settings in .env file (if not already set)
-echo "🔧 Checking AWS S3 and Email configuration..."
+# Ensure AWS S3 settings in .env file (if not already set)
+echo "🔧 Checking AWS S3 configuration..."
 if [ -f lms_backend/.env ]; then
     # Check if AWS_REGION is set, if not add it
     if ! grep -q "^AWS_REGION=" lms_backend/.env 2>/dev/null; then
@@ -30,22 +30,12 @@ if [ -f lms_backend/.env ]; then
         echo "✅ Added AWS_S3_BUCKET to .env"
     fi
     
-    # Check if EMAILS_FROM_EMAIL is set, if not add it
+    # Check if EMAILS_FROM_EMAIL is set, if not add it (use a default or leave empty for user to set)
     if ! grep -q "^EMAILS_FROM_EMAIL=" lms_backend/.env 2>/dev/null; then
-        echo "EMAILS_FROM_EMAIL=infofitsoftware@gmail.com" >> lms_backend/.env
-        echo "✅ Added EMAILS_FROM_EMAIL to .env"
-    fi
-    
-    # Check if EMAILS_FROM_NAME is set, if not add it
-    if ! grep -q "^EMAILS_FROM_NAME=" lms_backend/.env 2>/dev/null; then
+        echo "# Email Configuration (AWS SES)" >> lms_backend/.env
+        echo "EMAILS_FROM_EMAIL=" >> lms_backend/.env
         echo "EMAILS_FROM_NAME=InfoFit LMS" >> lms_backend/.env
-        echo "✅ Added EMAILS_FROM_NAME to .env"
-    fi
-    
-    # Check if BACKEND_CORS_ORIGINS is set, if not add it
-    if ! grep -q "^BACKEND_CORS_ORIGINS=" lms_backend/.env 2>/dev/null; then
-        echo 'BACKEND_CORS_ORIGINS=["http://15.206.84.110","http://15.206.84.110:3000","http://15.206.84.110:8000","http://localhost:3000"]' >> lms_backend/.env
-        echo "✅ Added BACKEND_CORS_ORIGINS to .env"
+        echo "✅ Added EMAIL configuration placeholders to .env (please update EMAILS_FROM_EMAIL)"
     fi
 else
     # Create .env file if it doesn't exist
@@ -53,9 +43,9 @@ else
     touch lms_backend/.env
     echo "AWS_REGION=ap-south-1" >> lms_backend/.env
     echo "AWS_S3_BUCKET=infofitlabs-lms-videos" >> lms_backend/.env
-    echo "EMAILS_FROM_EMAIL=infofitsoftware@gmail.com" >> lms_backend/.env
+    echo "# Email Configuration (AWS SES)" >> lms_backend/.env
+    echo "EMAILS_FROM_EMAIL=" >> lms_backend/.env
     echo "EMAILS_FROM_NAME=InfoFit LMS" >> lms_backend/.env
-    echo 'BACKEND_CORS_ORIGINS=["http://15.206.84.110","http://15.206.84.110:3000","http://15.206.84.110:8000","http://localhost:3000"]' >> lms_backend/.env
     echo "✅ Created .env file with AWS S3 and Email settings"
 fi
 
