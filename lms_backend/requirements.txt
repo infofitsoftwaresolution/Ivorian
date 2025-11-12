@@ -31,8 +31,8 @@ pydantic-settings>=2.1.0
 # HTTP Client
 httpx>=0.25.0
 
-# File Upload and Storage (commented out for now)
-# boto3>=1.34.0
+# File Upload and Storage
+boto3>=1.34.0
 # python-magic>=0.4.27
 
 # Background Tasks (commented out for now)

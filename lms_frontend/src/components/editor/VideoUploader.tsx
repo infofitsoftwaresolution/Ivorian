@@ -15,6 +15,7 @@ import {
   CheckIcon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { apiClient } from '@/lib/api/client';
 
 interface VideoUploaderProps {
   videoUrl?: string;
@@ -96,47 +97,37 @@ export default function VideoUploader({
       return;
     }
 
-    // Validate file size (max 100MB)
-    if (file.size > 100 * 1024 * 1024) {
-      setError('File size must be less than 100MB');
+    // Validate file size (max 500MB for videos)
+    if (file.size > 500 * 1024 * 1024) {
+      setError('File size must be less than 500MB');
       return;
     }
 
     setIsUploading(true);
     setError('');
+    setUploadProgress(0);
 
     try {
-      // Simulate file upload to AWS S3
-      // In production, this would be a real upload
-      const formData = new FormData();
-      formData.append('video', file);
+      // Upload video to S3 via backend API
+      const response = await apiClient.uploadVideo(
+        file,
+        (progress) => {
+          setUploadProgress(progress);
+        }
+      );
 
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(progressInterval);
-            return 100;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Generate mock S3 URL with file-based ID
-      const fileId = file.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-      const mockS3Url = `https://your-s3-bucket.amazonaws.com/videos/${fileId}`;
-      
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-      
-      onVideoChange(mockS3Url);
-      setIsUploading(false);
-      setUploadProgress(0);
-    } catch (error) {
-      setError('Failed to upload video. Please try again.');
+      if (response.data && response.data.url) {
+        setUploadProgress(100);
+        onVideoChange(response.data.url);
+        setIsUploading(false);
+        setUploadProgress(0);
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (error: any) {
+      console.error('Video upload error:', error);
+      const errorMessage = error?.message || error?.details?.detail || 'Failed to upload video. Please try again.';
+      setError(errorMessage);
       setIsUploading(false);
       setUploadProgress(0);
     }

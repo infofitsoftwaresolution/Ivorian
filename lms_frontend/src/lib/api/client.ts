@@ -588,6 +588,171 @@ class ApiClient {
     return this.request('/api/v1/analytics/user/progress');
   }
 
+  // File Upload Methods
+  async uploadVideo(file: File, onProgress?: (progress: number) => void): Promise<ApiResponse<{ url: string; filename: string; size: number; content_type: string }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const accessToken = TokenManager.getAccessToken();
+    const url = `${this.baseURL}/api/v1/upload/video`;
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            onProgress(progress);
+          }
+        });
+      }
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            resolve({
+              data,
+              status: xhr.status,
+            });
+          } catch (error) {
+            reject(new ApiError({
+              message: 'Failed to parse response',
+              status: xhr.status,
+              code: 'PARSE_ERROR',
+            }));
+          }
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            reject(new ApiError({
+              message: errorData.detail || `HTTP ${xhr.status}`,
+              status: xhr.status,
+              code: `HTTP_${xhr.status}`,
+              details: errorData,
+            }));
+          } catch {
+            reject(new ApiError({
+              message: `HTTP ${xhr.status}`,
+              status: xhr.status,
+              code: `HTTP_${xhr.status}`,
+            }));
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new ApiError({
+          message: 'Network error',
+          status: 0,
+          code: 'NETWORK_ERROR',
+        }));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new ApiError({
+          message: 'Upload cancelled',
+          status: 0,
+          code: 'UPLOAD_CANCELLED',
+        }));
+      });
+
+      xhr.open('POST', url);
+      if (accessToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+      }
+      xhr.send(formData);
+    });
+  }
+
+  async uploadFile(file: File, folder: string = 'files', onProgress?: (progress: number) => void): Promise<ApiResponse<{ url: string; filename: string; size: number; content_type: string }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+
+    const accessToken = TokenManager.getAccessToken();
+    const url = `${this.baseURL}/api/v1/upload/file`;
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const progress = Math.round((e.loaded / e.total) * 100);
+            onProgress(progress);
+          }
+        });
+      }
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            resolve({
+              data,
+              status: xhr.status,
+            });
+          } catch (error) {
+            reject(new ApiError({
+              message: 'Failed to parse response',
+              status: xhr.status,
+              code: 'PARSE_ERROR',
+            }));
+          }
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            reject(new ApiError({
+              message: errorData.detail || `HTTP ${xhr.status}`,
+              status: xhr.status,
+              code: `HTTP_${xhr.status}`,
+              details: errorData,
+            }));
+          } catch {
+            reject(new ApiError({
+              message: `HTTP ${xhr.status}`,
+              status: xhr.status,
+              code: `HTTP_${xhr.status}`,
+            }));
+          }
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new ApiError({
+          message: 'Network error',
+          status: 0,
+          code: 'NETWORK_ERROR',
+        }));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new ApiError({
+          message: 'Upload cancelled',
+          status: 0,
+          code: 'UPLOAD_CANCELLED',
+        }));
+      });
+
+      xhr.open('POST', url);
+      if (accessToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+      }
+      xhr.send(formData);
+    });
+  }
+
+  async deleteFile(url: string): Promise<ApiResponse> {
+    const encodedUrl = encodeURIComponent(url);
+    return this.request(`/api/v1/upload/file?url=${encodedUrl}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Utility Methods
   isAuthenticated(): boolean {
     const token = TokenManager.getAccessToken();

@@ -221,3 +221,4 @@ Now every time you push to `main`, your website will automatically update!
 
 **Monitor deployments:** `https://github.com/infofitsoftwaresolution/Ivorian/actions`
 
+
