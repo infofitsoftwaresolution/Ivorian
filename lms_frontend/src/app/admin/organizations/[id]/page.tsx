@@ -23,6 +23,7 @@ import {
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
+import { apiClient } from '@/lib/api/client';
 
 interface Organization {
   id: number;
@@ -78,35 +79,61 @@ export default function OrganizationDetailPage() {
       console.log('OrganizationDetailPage: Loading organization...');
       setLoading(true);
       
-      // Add a small delay to simulate API call
-      await new Promise(resolve => setTimeout(resolve, 100));
+      const response = await apiClient.getOrganization(organizationId);
       
-      // TODO: Replace with actual API call
-      // const response = await apiClient.getOrganization(organizationId);
-      
-      // Mock data for now
-      const mockOrganization: Organization = {
-        id: parseInt(organizationId),
-        name: "Tech Academy",
-        description: "Leading technology education provider specializing in software development, data science, and digital transformation. We offer comprehensive training programs for individuals and corporate teams.",
-        website: "https://techacademy.com",
-        contact_email: "admin@techacademy.com",
-        contact_phone: "+1-555-0123",
-        address: "123 Tech Street, Silicon Valley, CA 94025",
-        industry: "Technology",
-        size: "51-200",
-        is_active: true,
-        created_at: "2024-01-15",
-        user_count: 1250,
-        course_count: 45,
-        revenue: 125000,
-        completion_rate: 78
-      };
+      // Handle different response structures
+      let orgData: Organization | null = null;
+      if (response.data) {
+        if (response.data.id) {
+          orgData = {
+            id: response.data.id,
+            name: response.data.name,
+            description: response.data.description || '',
+            website: response.data.website || '',
+            contact_email: response.data.contact_email || '',
+            contact_phone: response.data.contact_phone || '',
+            address: response.data.address || '',
+            industry: response.data.industry || '',
+            size: response.data.size || '',
+            is_active: response.data.is_active ?? true,
+            created_at: response.data.created_at || new Date().toISOString(),
+            user_count: response.data.user_count || 0,
+            course_count: response.data.course_count || 0,
+            revenue: 0, // Not available in API response
+            completion_rate: 0 // Not available in API response
+          };
+        } else if (response.data.organization) {
+          const org = response.data.organization;
+          orgData = {
+            id: org.id,
+            name: org.name,
+            description: org.description || '',
+            website: org.website || '',
+            contact_email: org.contact_email || '',
+            contact_phone: org.contact_phone || '',
+            address: org.address || '',
+            industry: org.industry || '',
+            size: org.size || '',
+            is_active: org.is_active ?? true,
+            created_at: org.created_at || new Date().toISOString(),
+            user_count: org.user_count || 0,
+            course_count: org.course_count || 0,
+            revenue: 0,
+            completion_rate: 0
+          };
+        }
+      }
 
-      setOrganization(mockOrganization);
+      if (!orgData) {
+        throw new Error('Organization not found');
+      }
+
+      setOrganization(orgData);
       console.log('OrganizationDetailPage: Data loaded successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading organization:', error);
+      const errorMessage = error?.response?.data?.detail || 'Failed to load organization. Please try again.';
+      // Set error state if needed
     } finally {
       setLoading(false);
       console.log('OrganizationDetailPage: Loading completed');
@@ -232,7 +259,7 @@ export default function OrganizationDetailPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Completion Rate</p>
-              <p className="text-2xl font-bold text-gray-900">{organization.completion_rate}%</p>
+              <p className="text-2xl font-bold text-gray-900">{organization.completion_rate || 0}%</p>
             </div>
           </div>
         </div>
@@ -244,7 +271,7 @@ export default function OrganizationDetailPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">${organization.revenue.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-gray-900">${(organization.revenue || 0).toLocaleString()}</p>
             </div>
           </div>
         </div>
