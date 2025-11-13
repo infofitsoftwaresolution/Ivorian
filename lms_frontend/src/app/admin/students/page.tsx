@@ -106,25 +106,42 @@ export default function StudentsPage() {
 
       const response = await apiClient.getUsers(params);
       
+      console.log('Students API response:', response);
+      
       // Handle different response structures
       let studentsData: Student[] = [];
       let total = 0;
       let pages = 1;
       
       if (response.data) {
+        // Case 1: Direct array
         if (Array.isArray(response.data)) {
           studentsData = response.data.filter((s: any) => s.role === 'student');
           total = studentsData.length;
-        } else if (response.data.users && Array.isArray(response.data.users)) {
+        }
+        // Case 2: Nested under 'users' key
+        else if (response.data.users && Array.isArray(response.data.users)) {
           studentsData = response.data.users.filter((s: any) => s.role === 'student');
           total = response.data.total || studentsData.length;
           pages = response.data.pages || 1;
-        } else if (response.data.data && Array.isArray(response.data.data)) {
+        }
+        // Case 3: Nested under 'data' key
+        else if (response.data.data && Array.isArray(response.data.data)) {
           studentsData = response.data.data.filter((s: any) => s.role === 'student');
           total = response.data.total || studentsData.length;
           pages = response.data.pages || 1;
         }
+        // Case 4: Direct object with users array (some APIs return this)
+        else if (response.data.role === 'student' || (response.data as any).role) {
+          // Single user object
+          if ((response.data as any).role === 'student') {
+            studentsData = [response.data as any];
+            total = 1;
+          }
+        }
       }
+
+      console.log('Processed students data:', { studentsData, total, pages });
 
       setStudents(studentsData);
       setTotalPages(pages);
