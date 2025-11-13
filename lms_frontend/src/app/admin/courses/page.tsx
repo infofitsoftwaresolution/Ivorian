@@ -62,6 +62,7 @@ export default function CoursesPage() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'draft' | 'archived'>('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterOrganization, setFilterOrganization] = useState('all');
+  const [organizationsList, setOrganizationsList] = useState<Array<{id: number, name: string}>>([]);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,6 +105,12 @@ export default function CoursesPage() {
       // For organization_admin, filter by their organization
       if (user?.role === 'organization_admin' && user.organization_id) {
         params.organization_id = user.organization_id;
+      } else if (filterOrganization !== 'all' && user?.role === 'super_admin') {
+        // Find organization ID by name
+        const org = organizationsList.find(o => o.name === filterOrganization);
+        if (org) {
+          params.organization_id = org.id;
+        }
       }
 
       const response = await apiClient.getCourses(params);
@@ -144,10 +151,27 @@ export default function CoursesPage() {
 
   useEffect(() => {
     if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
+      if (user?.role === 'super_admin') {
+        loadOrganizations();
+      }
       loadCourses();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, currentPage, filterStatus, filterCategory, filterOrganization]);
+
+  const loadOrganizations = async () => {
+    try {
+      const response = await apiClient.getOrganizations();
+      const orgsData = response.data?.organizations || response.data || [];
+      const orgsList = Array.isArray(orgsData) ? orgsData.map((org: any) => ({
+        id: org.id,
+        name: org.name || 'Unnamed Organization'
+      })) : [];
+      setOrganizationsList(orgsList);
+    } catch (error) {
+      console.error('Error loading organizations:', error);
+    }
+  };
 
   // Debounce search to avoid too many API calls
   useEffect(() => {
@@ -188,11 +212,12 @@ export default function CoursesPage() {
     }
   };
 
-  // Get unique categories and organizations for filters
+  // Get unique categories for filters
   const categories = ['all', ...Array.from(new Set(courses.map(c => c.category).filter(Boolean)))];
   const uniqueCategories = categories.filter((cat, index, self) => self.indexOf(cat) === index);
-  const organizations = ['all', ...Array.from(new Set(courses.map(c => c.organization_name).filter(Boolean)))];
-  const uniqueOrganizations = organizations.filter((org, index, self) => self.indexOf(org) === index);
+  
+  // Use loaded organizations list for filter
+  const uniqueOrganizations = ['all', ...organizationsList.map(org => org.name)];
 
   // Helper function to get status color
   const getStatusColor = (status: string) => {

@@ -190,15 +190,12 @@ class UserService:
                 if filters.created_before:
                     conditions.append(User.created_at <= filters.created_before)
                 
+                if filters.role:
+                    conditions.append(User.role == filters.role)
+                
                 if conditions:
                     query = query.where(and_(*conditions))
                     count_query = count_query.where(and_(*conditions))
-            
-            # Apply role filter if specified
-            if filters and filters.role:
-                # This would require a more complex join with roles table
-                # For now, we'll implement this in a separate method
-                pass
             
             # Get total count
             total_result = await db.execute(count_query)

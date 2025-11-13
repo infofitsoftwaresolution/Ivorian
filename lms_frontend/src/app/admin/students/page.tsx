@@ -119,25 +119,23 @@ export default function StudentsPage() {
           studentsData = response.data.filter((s: any) => s.role === 'student');
           total = studentsData.length;
         }
-        // Case 2: Nested under 'users' key
+        // Case 2: Nested under 'users' key (most common - UserListResponse)
         else if (response.data.users && Array.isArray(response.data.users)) {
-          studentsData = response.data.users.filter((s: any) => s.role === 'student');
+          // Backend already filters by role, so we can use the users directly
+          studentsData = response.data.users;
           total = response.data.total || studentsData.length;
           pages = response.data.pages || 1;
         }
         // Case 3: Nested under 'data' key
         else if (response.data.data && Array.isArray(response.data.data)) {
-          studentsData = response.data.data.filter((s: any) => s.role === 'student');
+          studentsData = response.data.data;
           total = response.data.total || studentsData.length;
           pages = response.data.pages || 1;
         }
-        // Case 4: Direct object with users array (some APIs return this)
-        else if (response.data.role === 'student' || (response.data as any).role) {
-          // Single user object
-          if ((response.data as any).role === 'student') {
-            studentsData = [response.data as any];
-            total = 1;
-          }
+        // Case 4: Single user object (shouldn't happen for list endpoint)
+        else if (response.data.role === 'student') {
+          studentsData = [response.data];
+          total = 1;
         }
       }
 

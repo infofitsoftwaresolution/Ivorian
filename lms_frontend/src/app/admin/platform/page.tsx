@@ -414,10 +414,17 @@ export default function PlatformDashboard() {
                       <PencilIcon className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm(`Are you sure you want to delete ${org.name}?`)) {
-                          // Handle delete
-                          console.log('Delete organization:', org.id);
+                      onClick={async () => {
+                        if (confirm(`Are you sure you want to delete ${org.name}? This action cannot be undone.`)) {
+                          try {
+                            setLoading(true);
+                            await apiClient.deleteOrganization(org.id.toString());
+                            await loadPlatformData();
+                          } catch (error: any) {
+                            alert(error?.response?.data?.detail || 'Failed to delete organization. Please try again.');
+                          } finally {
+                            setLoading(false);
+                          }
                         }
                       }}
                       className="text-red-600 hover:text-red-900"
