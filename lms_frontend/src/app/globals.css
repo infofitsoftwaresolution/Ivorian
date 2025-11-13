@@ -231,8 +231,13 @@ svg {
     -webkit-overflow-scrolling: touch;
   }
   
-  /* Stack grid columns on mobile */
-  .grid {
+  /* Stack grid columns on mobile - more specific selectors */
+  .grid.grid-cols-1.md\\:grid-cols-2,
+  .grid.grid-cols-1.md\\:grid-cols-3,
+  .grid.grid-cols-1.md\\:grid-cols-4,
+  .grid.md\\:grid-cols-2,
+  .grid.md\\:grid-cols-3,
+  .grid.md\\:grid-cols-4 {
     grid-template-columns: 1fr !important;
   }
   
@@ -242,8 +247,10 @@ svg {
   }
   
   /* Make buttons full width on mobile */
-  .btn-mobile-full {
+  .btn-mobile-full,
+  button.inline-flex {
     @apply w-full;
+    justify-content: center;
   }
   
   /* Adjust card spacing on mobile */
@@ -257,18 +264,22 @@ svg {
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
+    width: 100%;
   }
   
   /* Responsive table cells */
   td, th {
     min-width: 120px;
     padding: 0.5rem !important;
+    font-size: 0.875rem;
   }
   
   /* Stack action buttons on mobile */
-  .space-x-2 > * {
-    margin-left: 0.25rem;
-    margin-right: 0.25rem;
+  .space-x-2 > *,
+  .space-x-3 > *,
+  .space-x-4 > * {
+    margin-left: 0.25rem !important;
+    margin-right: 0.25rem !important;
   }
   
   /* Make filter grids stack on mobile */
@@ -278,15 +289,26 @@ svg {
     grid-template-columns: 1fr !important;
   }
   
-  /* Responsive header buttons */
+  /* Responsive header buttons - more specific */
   .flex.justify-between.items-center {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
   }
   
-  .flex.justify-between.items-center > button {
-    width: 100%;
+  .flex.justify-between.items-center > button,
+  .flex.justify-between.items-center > div:last-child {
+    width: 100% !important;
+  }
+  
+  /* Responsive form grids */
+  .grid.grid-cols-1.md\\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Responsive stats cards */
+  .grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
   }
   
   /* Hide less important columns on mobile tables */
@@ -298,7 +320,14 @@ svg {
     /* Further reduce table cell padding on very small screens */
     td, th {
       padding: 0.375rem !important;
-      font-size: 0.875rem;
+      font-size: 0.75rem;
+      min-width: 100px;
+    }
+    
+    /* Make action buttons smaller on very small screens */
+    button svg {
+      width: 1rem;
+      height: 1rem;
     }
   }
 }

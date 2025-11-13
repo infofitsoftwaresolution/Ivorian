@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
+import { apiClient } from '@/lib/api/client';
 
 interface OrganizationFormData {
   name: string;
@@ -73,32 +74,52 @@ export default function EditOrganizationPage() {
     try {
       console.log('EditOrganizationPage: Loading organization...');
       setLoading(true);
+      setError('');
       
-      // Add a small delay to simulate API call
-      await new Promise(resolve => setTimeout(resolve, 100));
+      const response = await apiClient.getOrganization(organizationId);
       
-      // TODO: Replace with actual API call
-      // const response = await apiClient.getOrganization(organizationId);
-      
-      // Mock data for now
-      const mockOrganization: OrganizationFormData = {
-        name: "Tech Academy",
-        description: "Leading technology education provider specializing in software development, data science, and digital transformation. We offer comprehensive training programs for individuals and corporate teams.",
-        website: "https://techacademy.com",
-        contact_email: "admin@techacademy.com",
-        contact_phone: "+1-555-0123",
-        address: "123 Tech Street, Silicon Valley, CA 94025",
-        industry: "Technology",
-        size: "51-200",
-        is_active: true
-      };
+      // Handle different response structures
+      let orgData: OrganizationFormData | null = null;
+      if (response.data) {
+        if (response.data.id) {
+          orgData = {
+            name: response.data.name || '',
+            description: response.data.description || '',
+            website: response.data.website || '',
+            contact_email: response.data.contact_email || '',
+            contact_phone: response.data.contact_phone || '',
+            address: response.data.address || '',
+            industry: response.data.industry || '',
+            size: response.data.size || '',
+            is_active: response.data.is_active ?? true
+          };
+        } else if (response.data.organization) {
+          const org = response.data.organization;
+          orgData = {
+            name: org.name || '',
+            description: org.description || '',
+            website: org.website || '',
+            contact_email: org.contact_email || '',
+            contact_phone: org.contact_phone || '',
+            address: org.address || '',
+            industry: org.industry || '',
+            size: org.size || '',
+            is_active: org.is_active ?? true
+          };
+        }
+      }
 
-      setOrganization(mockOrganization);
-      reset(mockOrganization); // Set form data
+      if (!orgData) {
+        throw new Error('Organization not found');
+      }
+
+      setOrganization(orgData);
+      reset(orgData); // Set form data
       console.log('EditOrganizationPage: Data loaded successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading organization:', error);
-      setError('Failed to load organization data');
+      const errorMessage = error?.response?.data?.detail || 'Failed to load organization data';
+      setError(errorMessage);
     } finally {
       setLoading(false);
       console.log('EditOrganizationPage: Loading completed');
@@ -111,11 +132,7 @@ export default function EditOrganizationPage() {
       setSaving(true);
       setError('');
       
-      // Add a small delay to simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // TODO: Replace with actual API call
-      // await apiClient.updateOrganization(organizationId, data);
+      await apiClient.updateOrganization(organizationId, data);
       
       console.log('EditOrganizationPage: Organization updated successfully');
       
@@ -123,7 +140,8 @@ export default function EditOrganizationPage() {
       router.push(`/admin/organizations/${organizationId}`);
     } catch (err: any) {
       console.error('Error updating organization:', err);
-      setError(err.message || 'Failed to update organization');
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to update organization';
+      setError(errorMessage);
     } finally {
       setSaving(false);
     }
