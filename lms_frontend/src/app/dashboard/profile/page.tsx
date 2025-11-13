@@ -332,12 +332,17 @@ export default function ProfilePage() {
                           console.log(`Upload progress: ${progress}%`);
                         });
                         
-                        if (response.data?.url) {
-                          setProfileData({ ...profileData, avatar_url: response.data.url });
-                          await apiClient.updateUserProfile({ avatar_url: response.data.url });
+                        // Handle different response structures
+                        const avatarUrl = response.data?.url || response.data?.data?.url || response.data;
+                        if (avatarUrl) {
+                          const url = typeof avatarUrl === 'string' ? avatarUrl : avatarUrl.url || avatarUrl;
+                          setProfileData({ ...profileData, avatar_url: url });
+                          await apiClient.updateUserProfile({ avatar_url: url });
                           await refreshUser();
                           setSuccessMessage('Avatar updated successfully!');
                           setTimeout(() => setSuccessMessage(''), 3000);
+                        } else {
+                          throw new Error('No URL in response');
                         }
                       } catch (error: unknown) {
                         console.error('Error uploading avatar:', error);

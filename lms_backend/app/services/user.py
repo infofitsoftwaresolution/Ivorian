@@ -82,8 +82,7 @@ class UserService:
             
             # Send welcome email if temp password was generated (admin-created user)
             if password_change_required and user_data.organization_id:
-                # Get organization name
-                from app.models.organization import Organization
+                # Get organization name (Organization is already imported at top of file)
                 org_result = await db.execute(select(Organization).where(Organization.id == user_data.organization_id))
                 organization = org_result.scalar_one_or_none()
                 organization_name = organization.name if organization else "the organization"

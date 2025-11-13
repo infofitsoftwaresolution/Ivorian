@@ -4,7 +4,7 @@ Organization API endpoints for the LMS application
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, delete
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -327,7 +327,7 @@ async def delete_organization(
                 detail=f"Cannot delete organization with {user_count} users and {course_count} courses. Please remove all users and courses first."
             )
         
-        await db.delete(organization)
+        await db.execute(delete(Organization).where(Organization.id == organization_id))
         await db.commit()
         
         return None
