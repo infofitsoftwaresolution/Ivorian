@@ -144,7 +144,7 @@ jobs:
           done
 
       - name: Deploy to EC2
-        timeout-minutes: 45
+        timeout-minutes: 60
         run: |
           echo "🚀 Starting deployment to EC2..."
           
@@ -172,18 +172,19 @@ jobs:
               git fetch origin &&
               git reset --hard origin/main &&
               chmod +x deploy/deploy-no-docker.sh &&
-              # Run deployment script with output buffering disabled for real-time logs
+              # Run deployment script with optimized settings
+              export NODE_OPTIONS="--max-old-space-size=1024"
               if command -v stdbuf >/dev/null 2>&1; then
-                stdbuf -oL -eL timeout 2400 ./deploy/deploy-no-docker.sh
+                stdbuf -oL -eL timeout 3000 ./deploy/deploy-no-docker.sh
               else
-                timeout 2400 ./deploy/deploy-no-docker.sh
+                timeout 3000 ./deploy/deploy-no-docker.sh
               fi || {
                 EXIT_CODE=\$?;
-                if [ \$EXIT_CODE -eq 124 ]; then
-                  echo '❌ Deployment script timed out after 40 minutes';
-                else
-                  echo \"❌ Deployment script failed with exit code \$EXIT_CODE\";
-                fi;
+              if [ \$EXIT_CODE -eq 124 ]; then
+                echo '❌ Deployment script timed out after 50 minutes';
+              else
+                echo \"❌ Deployment script failed with exit code \$EXIT_CODE\";
+              fi;
                 exit 1;
               }
             "; then
