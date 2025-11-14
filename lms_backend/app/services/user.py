@@ -392,6 +392,141 @@ class UserService:
             raise
     
     @staticmethod
+    async def admin_reset_password(
+        db: AsyncSession,
+        user_id: int,
+        new_password: Optional[str] = None,
+        send_email: bool = True,
+        current_user: Optional[User] = None
+    ) -> Dict[str, Any]:
+        """
+        Admin reset user password - can set a new password or generate a temporary one
+        
+        Returns:
+            dict with 'password' (the new password) and 'email_sent' (bool)
+        """
+        try:
+            user = await UserService.get_user_by_id(db, user_id)
+            if not user:
+                raise ResourceNotFoundError("User not found")
+            
+            # Authorization check
+            if current_user:
+                # Super admin can reset any password
+                if current_user.role != "super_admin":
+                    # Organization admin can only reset passwords for users in their organization
+                    if current_user.role == "organization_admin":
+                        if user.organization_id != current_user.organization_id:
+                            raise AuthorizationError("You can only reset passwords for users in your organization")
+                    else:
+                        raise AuthorizationError("Only admins can reset user passwords")
+            
+            # Generate or use provided password
+            temp_password = None
+            if new_password and new_password.strip():
+                # Use provided password
+                hashed_password = get_password_hash(new_password.strip())
+                password_change_required = False
+                final_password = new_password.strip()
+            else:
+                # Generate temporary password
+                temp_password = UserService._generate_temp_password()
+                hashed_password = get_password_hash(temp_password)
+                password_change_required = True
+                final_password = temp_password
+            
+            # Update user password
+            user.hashed_password = hashed_password
+            user.password_change_required = password_change_required
+            user.updated_at = datetime.utcnow()
+            
+            await db.commit()
+            await db.refresh(user)
+            
+            email_sent = False
+            
+            # Send email if requested
+            if send_email and password_change_required and temp_password:
+                # Get organization name if applicable
+                organization_name = None
+                if user.organization_id:
+                    org_result = await db.execute(select(Organization).where(Organization.id == user.organization_id))
+                    organization = org_result.scalar_one_or_none()
+                    organization_name = organization.name if organization else "the organization"
+                
+                # Determine login URL
+                login_url = 'http://localhost:3000/login'
+                if settings.BACKEND_CORS_ORIGINS and len(settings.BACKEND_CORS_ORIGINS) > 0:
+                    for origin in settings.BACKEND_CORS_ORIGINS:
+                        if ':3000' in origin or origin.startswith('https://'):
+                            login_url = f"{origin}/login"
+                            break
+                    else:
+                        login_url = f"{settings.BACKEND_CORS_ORIGINS[0]}/login"
+                
+                app_logger.info(f"📧 Attempting to send password reset email to {user.email}")
+                
+                try:
+                    if user.role == "student":
+                        email_sent = await email_service.send_welcome_email_student(
+                            email=user.email,
+                            first_name=user.first_name or "Student",
+                            organization_name=organization_name or "the organization",
+                            temp_password=temp_password,
+                            login_url=login_url
+                        )
+                    elif user.role == "tutor":
+                        email_sent = await email_service.send_welcome_email_tutor(
+                            email=user.email,
+                            first_name=user.first_name or "Tutor",
+                            organization_name=organization_name or "the organization",
+                            temp_password=temp_password,
+                            login_url=login_url
+                        )
+                    else:
+                        # Generic welcome email for other roles
+                        email_sent = await email_service.send_email(
+                            to_email=user.email,
+                            subject="Your Password Has Been Reset",
+                            html_body=f"""
+                            <html>
+                            <body>
+                                <h2>Password Reset</h2>
+                                <p>Hello {user.first_name or 'User'},</p>
+                                <p>Your password has been reset by an administrator.</p>
+                                <p><strong>Your temporary password is: {temp_password}</strong></p>
+                                <p>Please log in and change your password immediately.</p>
+                                <p><a href="{login_url}">Click here to log in</a></p>
+                                <p>If you did not request this password reset, please contact your administrator.</p>
+                            </body>
+                            </html>
+                            """
+                        )
+                    
+                    if email_sent:
+                        app_logger.info(f"✅ Password reset email sent successfully to {user.email}")
+                    else:
+                        app_logger.error(f"❌ Failed to send password reset email to {user.email}")
+                        app_logger.error(f"   ⚠️  If AWS SES is in sandbox mode, recipient email must be verified")
+                except Exception as e:
+                    app_logger.error(f"❌ Exception while sending password reset email to {user.email}: {str(e)}")
+                    import traceback
+                    app_logger.error(f"   Traceback: {traceback.format_exc()}")
+            
+            logger.info(f"Password reset for user: {user.email} (ID: {user.id}) by admin")
+            
+            return {
+                "password": final_password,  # Return the password so admin can share it manually if email fails
+                "email_sent": email_sent,
+                "password_change_required": password_change_required
+            }
+            
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error resetting password: {str(e)}")
+            raise
+    
+    @staticmethod
     async def assign_roles_to_user(db: AsyncSession, user_id: int, role_names: List[str]) -> bool:
         """Assign roles to a user"""
         try:

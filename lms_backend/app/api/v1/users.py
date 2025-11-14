@@ -12,14 +12,14 @@ from app.core.dependencies import get_current_user
 # from app.core.permissions import require_permission, require_role  # Temporarily disabled
 from app.schemas.user import (
     UserCreate, UserUpdate, UserAdminUpdate, UserResponse, UserProfile,
-    UserListResponse, UserFilter, UserStats, ChangePasswordRequest
+    UserListResponse, UserFilter, UserStats, ChangePasswordRequest, AdminResetPasswordRequest
 )
 from app.services.user import UserService
 from app.services.course import EnrollmentService
 from app.models.user import User
 from app.schemas.tutor import TutorCreate, TutorResponse
 from app.schemas.course import EnrollmentResponse
-from app.core.errors import ValidationError, AuthorizationError
+from app.core.errors import ValidationError, AuthorizationError, ResourceNotFoundError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -382,6 +382,55 @@ async def update_user(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error updating user: {str(e)}"
+        )
+
+@router.post("/{user_id}/reset-password", summary="Reset user password (Admin only)")
+async def reset_user_password(
+    user_id: int,
+    password_data: AdminResetPasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Reset a user's password (Admin only).
+    
+    Super admins can reset any user's password.
+    Organization admins can only reset passwords for users in their organization.
+    
+    If new_password is not provided, a temporary password will be generated.
+    """
+    try:
+        result = await UserService.admin_reset_password(
+            db=db,
+            user_id=user_id,
+            new_password=password_data.new_password,
+            send_email=password_data.send_email,
+            current_user=current_user
+        )
+        
+        response = {
+            "message": "Password reset successfully",
+            "email_sent": result["email_sent"],
+            "password_change_required": result["password_change_required"]
+        }
+        
+        # Include password in response so admin can share it manually if email fails
+        # This is safe because only admins can access this endpoint
+        response["password"] = result["password"]
+        
+        return response
+        
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except AuthorizationError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ResourceNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error resetting password: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error resetting password: {str(e)}"
         )
 
 @router.delete("/{user_id}", summary="Delete user (Admin only)")

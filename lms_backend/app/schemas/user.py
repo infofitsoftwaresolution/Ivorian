@@ -149,6 +149,28 @@ class ChangePasswordRequest(BaseModel):
             raise ValueError('Password must contain at least one digit')
         return v
 
+# Admin Reset Password Schema
+class AdminResetPasswordRequest(BaseModel):
+    """Schema for admin resetting user password"""
+    new_password: Optional[str] = Field(None, min_length=8, description="New password (optional - if not provided, a temporary password will be generated)")
+    send_email: bool = Field(default=True, description="Whether to send email with new password")
+    
+    @field_validator('new_password')
+    @classmethod
+    def validate_new_password(cls, v):
+        """Validate new password strength if provided"""
+        if v is None:
+            return v  # Password is optional - will generate temp password
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+
 # User Search/Filter Schema
 class UserFilter(BaseModel):
     """Schema for filtering users"""
