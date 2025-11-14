@@ -212,11 +212,13 @@ else
     exit 1
 fi
 
-# Create symlinks for standalone mode
+# Create symlinks and copy public folder for standalone mode
 if [ -d ".next/standalone" ]; then
     ln -sfn $(pwd)/.next/static .next/standalone/.next/static 2>/dev/null || true
-    ln -sfn $(pwd)/public .next/standalone/public 2>/dev/null || true
-    print_success "Created symlinks for standalone mode"
+    # Copy public folder (standalone mode doesn't always follow symlinks reliably)
+    rm -rf .next/standalone/public 2>/dev/null || true
+    cp -r $(pwd)/public .next/standalone/public 2>/dev/null || true
+    print_success "Created symlinks and copied public folder for standalone mode"
 fi
 
 # Update systemd service with optimized settings

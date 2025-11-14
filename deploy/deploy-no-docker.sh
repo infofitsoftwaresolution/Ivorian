@@ -280,9 +280,11 @@ else
 fi
 
 # Create symlinks for standalone mode
-echo "🔗 Creating symlinks for standalone mode..."
+echo "🔗 Creating symlinks and copying public folder for standalone mode..."
 ln -sfn $(pwd)/.next/static .next/standalone/.next/static 2>/dev/null || true
-ln -sfn $(pwd)/public .next/standalone/public 2>/dev/null || true
+# Copy public folder (standalone mode doesn't always follow symlinks reliably)
+rm -rf .next/standalone/public 2>/dev/null || true
+cp -r $(pwd)/public .next/standalone/public 2>/dev/null || true
 
 # Restart frontend service
 echo "🔄 Restarting frontend service..."
