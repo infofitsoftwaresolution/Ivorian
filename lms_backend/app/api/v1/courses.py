@@ -57,58 +57,69 @@ async def get_courses(
     db: AsyncSession = Depends(get_db)
 ):
     """Get courses with filtering and pagination"""
-    # Use skip/limit if provided, otherwise calculate from page/size
-    if skip is not None and limit is not None:
-        actual_skip = skip
-        actual_limit = limit
-    else:
-        actual_skip = (page - 1) * size
-        actual_limit = size
-    
-    # Convert status string to CourseStatus enum if provided
-    status_enum = None
-    if status:
-        try:
-            # Normalize status to lowercase for comparison
-            status_lower = status.lower().strip()
-            # Try to match enum value
-            for enum_member in CourseStatus:
-                if enum_member.value.lower() == status_lower:
-                    status_enum = enum_member
-                    break
-            # If no match found, try direct conversion
-            if status_enum is None:
-                status_enum = CourseStatus(status_lower)
-        except (ValueError, AttributeError) as e:
-            # Invalid status value, will be ignored
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Invalid status value '{status}', ignoring filter: {str(e)}")
-            pass
-    
-    filters = CourseFilter(
-        search=search,
-        difficulty_level=difficulty_level,
-        min_price=min_price,
-        max_price=max_price,
-        status=status_enum,
-        organization_id=organization_id,
-        category=category,
-        is_featured=is_featured
-    )
-    
-    courses, total = await CourseService.get_courses(db, actual_skip, actual_limit, filters)
-    
-    pages = math.ceil(total / actual_limit) if total > 0 else 0
-    current_page = (actual_skip // actual_limit) + 1 if actual_limit > 0 else 1
-    
-    return CourseListResponse(
-        courses=courses,
-        total=total,
-        page=current_page,
-        size=actual_limit,
-        pages=pages
-    )
+    try:
+        # Use skip/limit if provided, otherwise calculate from page/size
+        if skip is not None and limit is not None:
+            actual_skip = skip
+            actual_limit = limit
+        else:
+            actual_skip = (page - 1) * size
+            actual_limit = size
+        
+        # Convert status string to CourseStatus enum if provided
+        status_enum = None
+        if status:
+            try:
+                # Normalize status to lowercase for comparison
+                status_lower = status.lower().strip()
+                # Try to match enum value
+                for enum_member in CourseStatus:
+                    if enum_member.value.lower() == status_lower:
+                        status_enum = enum_member
+                        break
+                # If no match found, try direct conversion
+                if status_enum is None:
+                    status_enum = CourseStatus(status_lower)
+            except (ValueError, AttributeError) as e:
+                # Invalid status value, will be ignored
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Invalid status value '{status}', ignoring filter: {str(e)}")
+                pass
+        
+        filters = CourseFilter(
+            search=search,
+            difficulty_level=difficulty_level,
+            min_price=min_price,
+            max_price=max_price,
+            status=status_enum,
+            organization_id=organization_id,
+            category=category,
+            is_featured=is_featured
+        )
+        
+        courses, total = await CourseService.get_courses(db, actual_skip, actual_limit, filters)
+        
+        pages = math.ceil(total / actual_limit) if total > 0 else 0
+        current_page = (actual_skip // actual_limit) + 1 if actual_limit > 0 else 1
+        
+        return CourseListResponse(
+            courses=courses,
+            total=total,
+            page=current_page,
+            size=actual_limit,
+            pages=pages
+        )
+    except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        error_traceback = traceback.format_exc()
+        logger.error(f"Error retrieving courses: {str(e)}\n{error_traceback}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving courses: {str(e)}"
+        )
 
 
 @router.get("/{course_id}", response_model=CourseDetail)
