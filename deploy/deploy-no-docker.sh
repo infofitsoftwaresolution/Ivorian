@@ -139,29 +139,90 @@ echo "📦 Installing frontend dependencies..."
 echo "⏱️  This may take a few minutes..."
 echo "📊 Starting at $(date)"
 
-# Try npm ci first with verbose output
-if timeout 600 npm ci --prefer-offline --no-audit --loglevel=info 2>&1 | tee /tmp/npm-install.log; then
-    echo "✅ npm ci completed successfully"
-else
-    EXIT_CODE=${PIPESTATUS[0]}
-    echo "⚠️  npm ci failed with exit code $EXIT_CODE"
-    echo "📋 Last 50 lines of npm output:"
-    tail -50 /tmp/npm-install.log || true
-    
-    if [ $EXIT_CODE -eq 124 ]; then
-        echo "⏱️  npm ci timed out after 10 minutes"
-    fi
-    
-    echo "🔄 Trying npm install as fallback..."
-    if timeout 600 npm install --prefer-offline --no-audit --loglevel=info 2>&1 | tee /tmp/npm-install.log; then
-        echo "✅ npm install completed successfully"
+# Check if node_modules exists and package-lock.json is up to date
+SKIP_INSTALL=false
+if [ -d "node_modules" ] && [ -f "package-lock.json" ]; then
+    echo "🔍 Checking if dependencies need updating..."
+    # Check if package-lock.json is newer than node_modules
+    if [ "package-lock.json" -nt "node_modules" ]; then
+        echo "📝 package-lock.json is newer, will reinstall dependencies"
     else
-        INSTALL_EXIT_CODE=${PIPESTATUS[0]}
-        echo "❌ npm install also failed with exit code $INSTALL_EXIT_CODE"
+        echo "✅ node_modules exists and is up to date, skipping install"
+        SKIP_INSTALL=true
+    fi
+fi
+
+if [ "$SKIP_INSTALL" = false ]; then
+    # Clear npm cache first
+    echo "🧹 Clearing npm cache..."
+    npm cache clean --force 2>&1 | head -20 || true
+    
+    # Check npm registry connectivity
+    echo "🌐 Testing npm registry connectivity..."
+    npm ping --registry https://registry.npmjs.org/ --timeout=5000 || {
+        echo "⚠️  npm registry ping failed, but continuing..."
+    }
+    
+    # Try npm ci first with progress and verbose output
+    echo "📥 Running npm ci..."
+    # Use a background process to show progress
+    (
+        while true; do
+            sleep 30
+            if pgrep -f "npm ci" > /dev/null; then
+                echo "⏳ npm ci still running... ($(date +%H:%M:%S))"
+            else
+                break
+            fi
+        done
+    ) &
+    PROGRESS_PID=$!
+    
+    if timeout 600 npm ci --prefer-offline --no-audit --progress=false 2>&1 | tee /tmp/npm-install.log; then
+        kill $PROGRESS_PID 2>/dev/null || true
+        echo "✅ npm ci completed successfully"
+    else
+        kill $PROGRESS_PID 2>/dev/null || true
+        EXIT_CODE=${PIPESTATUS[0]}
+        echo "⚠️  npm ci failed with exit code $EXIT_CODE"
         echo "📋 Last 50 lines of npm output:"
         tail -50 /tmp/npm-install.log || true
-        exit 1
+        
+        if [ $EXIT_CODE -eq 124 ]; then
+            echo "⏱️  npm ci timed out after 10 minutes"
+            echo "🔍 Checking what processes are running..."
+            ps aux | grep -E "npm|node" | grep -v grep || true
+        fi
+        
+        echo "🔄 Trying npm install as fallback..."
+        (
+            while true; do
+                sleep 30
+                if pgrep -f "npm install" > /dev/null; then
+                    echo "⏳ npm install still running... ($(date +%H:%M:%S))"
+                else
+                    break
+                fi
+            done
+        ) &
+        PROGRESS_PID=$!
+        
+        if timeout 600 npm install --prefer-offline --no-audit --progress=false 2>&1 | tee /tmp/npm-install.log; then
+            kill $PROGRESS_PID 2>/dev/null || true
+            echo "✅ npm install completed successfully"
+        else
+            kill $PROGRESS_PID 2>/dev/null || true
+            INSTALL_EXIT_CODE=${PIPESTATUS[0]}
+            echo "❌ npm install also failed with exit code $INSTALL_EXIT_CODE"
+            echo "📋 Last 50 lines of npm output:"
+            tail -50 /tmp/npm-install.log || true
+            echo "🔍 Checking what processes are running..."
+            ps aux | grep -E "npm|node" | grep -v grep || true
+            exit 1
+        fi
     fi
+else
+    echo "⏭️  Skipped npm install (dependencies already installed)"
 fi
 
 echo "📊 Completed at $(date)"
@@ -174,14 +235,36 @@ export NEXT_PUBLIC_API_URL="http://15.206.84.110:8000"
 export NODE_OPTIONS="--max-old-space-size=1024"
 
 # Run build with timeout and capture output
+echo "🏗️  Starting Next.js build..."
+# Use a background process to show progress
+(
+    while true; do
+        sleep 60
+        if pgrep -f "next build" > /dev/null || pgrep -f "npm run build" > /dev/null; then
+            echo "⏳ Build still running... ($(date +%H:%M:%S))"
+            # Show memory usage
+            free -h | grep Mem | awk '{print "💾 Memory: " $3 " / " $2 " (Free: " $7 ")"}'
+        else
+            break
+        fi
+    done
+) &
+BUILD_PROGRESS_PID=$!
+
 if timeout 1200 npm run build 2>&1 | tee /tmp/npm-build.log; then
+    kill $BUILD_PROGRESS_PID 2>/dev/null || true
     echo "✅ Frontend build completed successfully"
     echo "📊 Build completed at $(date)"
 else
+    kill $BUILD_PROGRESS_PID 2>/dev/null || true
     BUILD_EXIT_CODE=${PIPESTATUS[0]}
     echo "❌ Frontend build failed with exit code $BUILD_EXIT_CODE"
     if [ $BUILD_EXIT_CODE -eq 124 ]; then
         echo "⏱️  Build timed out after 20 minutes"
+        echo "🔍 Checking what processes are running..."
+        ps aux | grep -E "npm|node|next" | grep -v grep || true
+        echo "💾 Current memory usage:"
+        free -h
     fi
     echo "📋 Last 100 lines of build output:"
     tail -100 /tmp/npm-build.log || true
