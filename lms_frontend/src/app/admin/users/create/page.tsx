@@ -28,7 +28,10 @@ const userSchema = z.object({
   confirm_password: z.string().min(8, 'Password must be at least 8 characters'),
   phone: z.string().optional(),
   role: z.enum(['student', 'tutor', 'organization_admin']),
-  organization_id: z.union([z.number(), z.string().transform((val) => val === '' ? undefined : Number(val))]).optional(),
+  organization_id: z.union([z.number(), z.string()]).optional().transform((val) => {
+    if (val === '' || val === undefined || val === null) return undefined;
+    return typeof val === 'string' ? (val === '' ? undefined : Number(val)) : val;
+  }),
 }).refine((data) => data.password === data.confirm_password, {
   message: "Passwords don't match",
   path: ["confirm_password"],
@@ -118,7 +121,9 @@ export default function CreateUserPage() {
       // Determine organization_id
       let organizationId: number | undefined;
       if (user?.role === 'super_admin') {
-        organizationId = data.organization_id;
+        organizationId = typeof data.organization_id === 'string' 
+          ? (data.organization_id === '' ? undefined : Number(data.organization_id))
+          : data.organization_id;
       } else if (user?.role === 'organization_admin') {
         organizationId = user.organization_id;
       }
@@ -156,9 +161,16 @@ export default function CreateUserPage() {
         router.push('/admin/users');
       }, 2000);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating user:', error);
-      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to create user. Please try again.';
+      let errorMessage = 'Failed to create user. Please try again.';
+      if (error && typeof error === 'object' && 'response' in error && 
+          error.response && typeof error.response === 'object' && 'data' in error.response &&
+          error.response.data && typeof error.response.data === 'object' && 'detail' in error.response.data) {
+        errorMessage = String((error.response.data as { detail?: string }).detail) || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message || errorMessage;
+      }
       
       // Provide more specific error messages
       if (errorMessage.includes('email') || errorMessage.includes('Email')) {

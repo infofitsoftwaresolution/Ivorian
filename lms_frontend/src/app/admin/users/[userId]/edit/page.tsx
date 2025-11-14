@@ -129,9 +129,14 @@ export default function EditUserPage() {
         organization_id: user.organization_id,
         is_active: user.is_active !== false,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading user:', error);
-      setError(error?.response?.data?.detail || 'Failed to load user data');
+      const errorMessage = (error && typeof error === 'object' && 'response' in error && 
+        error.response && typeof error.response === 'object' && 'data' in error.response &&
+        error.response.data && typeof error.response.data === 'object' && 'detail' in error.response.data)
+        ? String((error.response.data as { detail?: string }).detail)
+        : (error instanceof Error ? error.message : 'Failed to load user data');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -165,9 +170,14 @@ export default function EditUserPage() {
       setTimeout(() => {
         router.push('/admin/users');
       }, 1500);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating user:', error);
-      setError(error?.response?.data?.detail || 'Failed to update user. Please try again.');
+      const errorMessage = (error && typeof error === 'object' && 'response' in error && 
+        error.response && typeof error.response === 'object' && 'data' in error.response &&
+        error.response.data && typeof error.response.data === 'object' && 'detail' in error.response.data)
+        ? String((error.response.data as { detail?: string }).detail)
+        : (error instanceof Error ? error.message : 'Failed to update user. Please try again.');
+      setError(errorMessage);
     } finally {
       setSaving(false);
     }

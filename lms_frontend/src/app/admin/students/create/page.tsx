@@ -128,10 +128,17 @@ export default function CreateStudentPage() {
         setOrganizations(orgsData);
       } catch (error: unknown) {
         // Silently handle 404 errors (API endpoint not implemented yet)
-        if (error && typeof error === 'object' && 'status' in error && (error as { status?: number }).status === 404) {
-          // API endpoint not available yet - set empty organizations
-          setOrganizations([]);
-          // Don't log 404 errors as they're expected when endpoint doesn't exist
+        if (error && typeof error === 'object' && 'status' in error) {
+          const errorWithStatus = error as { status?: number };
+          if (errorWithStatus.status === 404) {
+            // API endpoint not available yet - set empty organizations
+            setOrganizations([]);
+            // Don't log 404 errors as they're expected when endpoint doesn't exist
+          } else {
+            // Log other errors but still allow form to work
+            console.error('Error loading organizations:', error);
+            setOrganizations([]);
+          }
         } else {
           // Log other errors but still allow form to work
           console.error('Error loading organizations:', error);
