@@ -20,7 +20,7 @@ import Link from 'next/link';
 import HeroCarousel from '@/components/HeroCarousel';
 import HomeHeader from '@/components/layout/HomeHeader';
 import HomeFooter from '@/components/layout/HomeFooter';
-import apiClient from '@/lib/api/client';
+import { apiClient } from '@/lib/api/client';
 
 // Upcoming tutorial sessions data
 const upcomingSessions = [

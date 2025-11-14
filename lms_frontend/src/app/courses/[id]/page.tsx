@@ -17,7 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import HomeHeader from '@/components/layout/HomeHeader';
 import HomeFooter from '@/components/layout/HomeFooter';
-import apiClient from '@/lib/api/client';
+import { apiClient } from '@/lib/api/client';
 import { useAuth } from '@/hooks/useAuth';
 
 interface Course {
