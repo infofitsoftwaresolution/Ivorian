@@ -154,8 +154,8 @@ class UserService:
     ) -> tuple[List[User], int]:
         """Get paginated list of users with filtering"""
         try:
-            # Build query
-            query = select(User).options(selectinload(User.roles))
+            # Build query (removed selectinload for roles as we use role field directly)
+            query = select(User)
             count_query = select(func.count(User.id))
             
             # Apply filters
