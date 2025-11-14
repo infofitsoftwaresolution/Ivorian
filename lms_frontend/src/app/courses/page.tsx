@@ -120,11 +120,22 @@ export default function CoursesPage() {
 
   const filteredAndSortedCourses = useMemo(() => {
     let filtered = allCourses.filter(course => {
-      const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      // Search filter - if search query is empty, match all
+      const matchesSearch = !searchQuery || 
+                           course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            course.instructor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           course.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'All' || course.category === selectedCategory;
-      const matchesLevel = selectedLevel === 'All' || course.level === selectedLevel;
+                           (course.description && course.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      // Category filter - case-insensitive comparison
+      const matchesCategory = selectedCategory === 'All' || 
+                             course.category?.toLowerCase() === selectedCategory.toLowerCase();
+      
+      // Level filter - case-insensitive comparison, handle "All Levels" vs level values
+      const courseLevel = course.level?.toLowerCase() || '';
+      const selectedLevelLower = selectedLevel.toLowerCase();
+      const matchesLevel = selectedLevel === 'All' || 
+                          courseLevel === selectedLevelLower ||
+                          (courseLevel === 'all levels' && selectedLevelLower === 'beginner'); // Handle "All Levels" as beginner
       
       return matchesSearch && matchesCategory && matchesLevel;
     });
@@ -148,7 +159,7 @@ export default function CoursesPage() {
     });
 
     return filtered;
-  }, [searchQuery, selectedCategory, selectedLevel, sortBy]);
+  }, [allCourses, searchQuery, selectedCategory, selectedLevel, sortBy]);
 
   const clearFilters = () => {
     setSearchQuery('');
