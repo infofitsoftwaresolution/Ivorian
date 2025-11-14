@@ -275,20 +275,21 @@ export default function HomePage() {
           .map((course: any) => {
             console.log('🔄 Transforming course:', course.id, course.title);
             return {
-            id: course.id,
-            title: course.title,
-            instructor: course.instructor_name || course.instructor?.name || 'Instructor',
-            instructorAvatar: course.instructor_avatar || '/avatars/default.jpg',
-            rating: course.rating || 4.5,
-            students: course.enrollment_count || course.students || 0,
-            duration: course.duration_weeks ? `${course.duration_weeks} weeks` : course.duration || 'N/A',
-            price: course.price ? `$${course.price}` : 'Free',
-            originalPrice: course.original_price ? `$${course.original_price}` : undefined,
-            image: course.thumbnail_url || course.image || '/courses/default.jpg',
-            category: course.category || 'General',
-            level: course.difficulty_level || course.level || 'All Levels',
-            featured: true
-          }));
+              id: course.id,
+              title: course.title,
+              instructor: course.instructor_name || course.instructor?.name || 'Instructor',
+              instructorAvatar: course.instructor_avatar || '/avatars/default.jpg',
+              rating: course.rating || 4.5,
+              students: course.enrollment_count || course.students || 0,
+              duration: course.duration_weeks ? `${course.duration_weeks} weeks` : course.duration || 'N/A',
+              price: course.price ? `$${course.price}` : 'Free',
+              originalPrice: course.original_price ? `$${course.original_price}` : undefined,
+              image: course.thumbnail_url || course.image || '/courses/default.jpg',
+              category: course.category || 'General',
+              level: course.difficulty_level || course.level || 'All Levels',
+              featured: true
+            };
+          });
         
         console.log('✨ Transformed courses:', transformedCourses);
         console.log('✨ Number of transformed courses:', transformedCourses.length);
