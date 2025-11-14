@@ -384,7 +384,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Upcoming Tutorial Sessions Section */}
+      {/* Upcoming Tutorial Sessions Section - Removed demo sessions */}
+      {/* 
       <section className="py-16 bg-gradient-to-br from-white to-blue-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
@@ -465,6 +466,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      */}
 
       {/* Stats Section - Bright & Jolly */}
       <section className="py-16 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50">
