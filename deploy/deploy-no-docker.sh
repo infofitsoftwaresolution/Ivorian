@@ -3,7 +3,18 @@
 # Deployment script for non-Docker setup
 # This script is run by CI/CD pipeline or manually
 
+# Use set -e but allow some commands to fail
 set -e
+
+# Function to handle errors
+handle_error() {
+    echo "❌ Error occurred at line $1"
+    echo "Command: $2"
+    exit 1
+}
+
+# Trap errors
+trap 'handle_error $LINENO "$BASH_COMMAND"' ERR
 
 echo "🚀 Starting deployment (No Docker)..."
 
@@ -72,8 +83,11 @@ source venv/bin/activate
 
 # Install/update dependencies
 echo "📦 Installing backend dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install --upgrade pip || echo "⚠️  pip upgrade failed, continuing..."
+pip install -r requirements.txt || {
+    echo "❌ Failed to install backend dependencies"
+    exit 1
+}
 
 # Run database migrations
 echo "📊 Running database migrations..."
@@ -120,14 +134,25 @@ echo "🧹 Clearing Next.js cache..."
 rm -rf .next
 rm -rf node_modules/.cache
 
-# Install/update dependencies
+# Install/update dependencies with timeout
 echo "📦 Installing frontend dependencies..."
-npm install
+echo "⏱️  This may take a few minutes..."
+timeout 600 npm ci --prefer-offline --no-audit || {
+    echo "⚠️  npm ci failed or timed out, trying npm install..."
+    timeout 600 npm install --prefer-offline --no-audit || {
+        echo "❌ Failed to install dependencies after timeout"
+        exit 1
+    }
+}
 
 # Build frontend with memory limit and API URL
 echo "🏗️  Building frontend..."
+echo "⏱️  This may take several minutes..."
 export NEXT_PUBLIC_API_URL="http://15.206.84.110:8000"
-NODE_OPTIONS="--max-old-space-size=1024" npm run build
+timeout 1200 NODE_OPTIONS="--max-old-space-size=1024" npm run build || {
+    echo "❌ Frontend build failed or timed out"
+    exit 1
+}
 
 # Create symlinks for standalone mode
 echo "🔗 Creating symlinks for standalone mode..."

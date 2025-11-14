@@ -100,14 +100,18 @@ jobs:
           ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy to EC2
+        timeout-minutes: 30
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
+          ssh -i ~/.ssh/deploy_key -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
             set -e &&
             cd ${{ env.DEPLOY_PATH }} &&
             git fetch origin &&
             git reset --hard origin/main &&
             chmod +x deploy/deploy-no-docker.sh &&
-            ./deploy/deploy-no-docker.sh
+            timeout 1800 ./deploy/deploy-no-docker.sh || {
+              echo '❌ Deployment script timed out or failed'
+              exit 1
+            }
           "
 
       - name: Health Check
