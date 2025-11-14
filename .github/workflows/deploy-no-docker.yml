@@ -112,23 +112,30 @@ jobs:
           echo "✅ SSH configuration complete"
 
       - name: Deploy to EC2
-        timeout-minutes: 30
+        timeout-minutes: 45
         run: |
           ssh -i ~/.ssh/deploy_key \
               -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=~/.ssh/known_hosts \
-              -o ServerAliveInterval=60 \
-              -o ServerAliveCountMax=3 \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=10 \
               -o ConnectTimeout=10 \
+              -o LogLevel=ERROR \
               ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
             set -e &&
             cd ${{ env.DEPLOY_PATH }} &&
             git fetch origin &&
             git reset --hard origin/main &&
             chmod +x deploy/deploy-no-docker.sh &&
-            timeout 1800 ./deploy/deploy-no-docker.sh || {
-              echo '❌ Deployment script timed out or failed'
-              exit 1
+            # Run deployment script with output buffering disabled for real-time logs
+            stdbuf -oL -eL timeout 2400 ./deploy/deploy-no-docker.sh || {
+              EXIT_CODE=\$?;
+              if [ \$EXIT_CODE -eq 124 ]; then
+                echo '❌ Deployment script timed out after 40 minutes';
+              else
+                echo \"❌ Deployment script failed with exit code \$EXIT_CODE\";
+              fi;
+              exit 1;
             }
           "
 

@@ -134,26 +134,59 @@ echo "🧹 Clearing Next.js cache..."
 rm -rf .next
 rm -rf node_modules/.cache
 
-# Install/update dependencies with timeout
+# Install/update dependencies with timeout and verbose output
 echo "📦 Installing frontend dependencies..."
 echo "⏱️  This may take a few minutes..."
-timeout 600 npm ci --prefer-offline --no-audit || {
-    echo "⚠️  npm ci failed or timed out, trying npm install..."
-    timeout 600 npm install --prefer-offline --no-audit || {
-        echo "❌ Failed to install dependencies after timeout"
+echo "📊 Starting at $(date)"
+
+# Try npm ci first with verbose output
+if timeout 600 npm ci --prefer-offline --no-audit --loglevel=info 2>&1 | tee /tmp/npm-install.log; then
+    echo "✅ npm ci completed successfully"
+else
+    EXIT_CODE=${PIPESTATUS[0]}
+    echo "⚠️  npm ci failed with exit code $EXIT_CODE"
+    echo "📋 Last 50 lines of npm output:"
+    tail -50 /tmp/npm-install.log || true
+    
+    if [ $EXIT_CODE -eq 124 ]; then
+        echo "⏱️  npm ci timed out after 10 minutes"
+    fi
+    
+    echo "🔄 Trying npm install as fallback..."
+    if timeout 600 npm install --prefer-offline --no-audit --loglevel=info 2>&1 | tee /tmp/npm-install.log; then
+        echo "✅ npm install completed successfully"
+    else
+        INSTALL_EXIT_CODE=${PIPESTATUS[0]}
+        echo "❌ npm install also failed with exit code $INSTALL_EXIT_CODE"
+        echo "📋 Last 50 lines of npm output:"
+        tail -50 /tmp/npm-install.log || true
         exit 1
-    }
-}
+    fi
+fi
+
+echo "📊 Completed at $(date)"
 
 # Build frontend with memory limit and API URL
 echo "🏗️  Building frontend..."
 echo "⏱️  This may take several minutes..."
+echo "📊 Starting build at $(date)"
 export NEXT_PUBLIC_API_URL="http://15.206.84.110:8000"
 export NODE_OPTIONS="--max-old-space-size=1024"
-timeout 1200 npm run build || {
-    echo "❌ Frontend build failed or timed out"
+
+# Run build with timeout and capture output
+if timeout 1200 npm run build 2>&1 | tee /tmp/npm-build.log; then
+    echo "✅ Frontend build completed successfully"
+    echo "📊 Build completed at $(date)"
+else
+    BUILD_EXIT_CODE=${PIPESTATUS[0]}
+    echo "❌ Frontend build failed with exit code $BUILD_EXIT_CODE"
+    if [ $BUILD_EXIT_CODE -eq 124 ]; then
+        echo "⏱️  Build timed out after 20 minutes"
+    fi
+    echo "📋 Last 100 lines of build output:"
+    tail -100 /tmp/npm-build.log || true
     exit 1
-}
+fi
 
 # Create symlinks for standalone mode
 echo "🔗 Creating symlinks for standalone mode..."
