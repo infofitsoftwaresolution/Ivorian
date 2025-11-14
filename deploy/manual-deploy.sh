@@ -50,9 +50,21 @@ git reset --hard origin/main
 print_success "Code updated to latest version"
 echo "   Latest commit: $(git log -1 --oneline)"
 
-# Step 2: Clear all caches
+# Step 2: System optimization and cache clearing
 echo ""
-echo "🧹 Step 2: Clearing caches..."
+echo "🧹 Step 2: System optimization and cache clearing..."
+
+# Check and optimize swap
+if [ ! -f /swapfile ] || [ $(swapon --show=SIZE --noheadings --bytes /swapfile 2>/dev/null | awk '{print int($1/1024/1024)}') -lt 1024 ]; then
+    print_warning "Optimizing swap file..."
+    sudo swapoff /swapfile 2>/dev/null || true
+    sudo rm -f /swapfile
+    sudo dd if=/dev/zero of=/swapfile bs=128M count=8 status=progress 2>/dev/null || true
+    sudo chmod 600 /swapfile 2>/dev/null || true
+    sudo mkswap /swapfile 2>/dev/null || true
+    sudo swapon /swapfile 2>/dev/null || true
+    print_success "Swap file optimized"
+fi
 
 # Clear Next.js cache
 if [ -d "lms_frontend/.next" ]; then
@@ -71,9 +83,13 @@ find lms_backend -type d -name "__pycache__" -exec rm -r {} + 2>/dev/null || tru
 find lms_backend -type f -name "*.pyc" -delete 2>/dev/null || true
 print_success "Cleared Python cache"
 
-# Clear npm global cache (optional)
+# Clear npm global cache
 npm cache clean --force >/dev/null 2>&1 || true
 print_success "Cleared npm global cache"
+
+# Clean system logs (keep last 7 days)
+sudo journalctl --vacuum-time=7d >/dev/null 2>&1 || true
+print_success "Cleaned system logs"
 
 # Step 3: Deploy Backend
 echo ""
@@ -101,6 +117,14 @@ echo "📊 Running database migrations..."
 alembic upgrade head || print_warning "Migrations may have failed (check database connection)"
 print_success "Migrations completed"
 
+# Update systemd service with optimized settings
+if [ -f "deploy/systemd/lms-backend.service" ]; then
+    echo "⚙️  Updating backend service configuration..."
+    sudo cp deploy/systemd/lms-backend.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    print_success "Backend service configuration updated"
+fi
+
 # Restart backend service
 echo "🔄 Restarting backend service..."
 sudo systemctl restart lms-backend
@@ -110,6 +134,9 @@ print_success "Backend service restarted"
 # Check backend status
 if sudo systemctl is-active --quiet lms-backend; then
     print_success "Backend service is running"
+    # Show memory usage
+    BACKEND_MEM=$(systemctl show lms-backend --property=MemoryCurrent --value 2>/dev/null || echo "N/A")
+    echo "   Memory usage: $BACKEND_MEM"
 else
     print_error "Backend service failed to start!"
     sudo systemctl status lms-backend --no-pager -l | head -20
@@ -177,6 +204,14 @@ if [ -d ".next/standalone" ]; then
     print_success "Created symlinks for standalone mode"
 fi
 
+# Update systemd service with optimized settings
+if [ -f "deploy/systemd/lms-frontend.service" ]; then
+    echo "⚙️  Updating frontend service configuration..."
+    sudo cp deploy/systemd/lms-frontend.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    print_success "Frontend service configuration updated"
+fi
+
 # Restart frontend service
 echo "🔄 Restarting frontend service..."
 sudo systemctl restart lms-frontend
@@ -186,6 +221,9 @@ print_success "Frontend service restarted"
 # Check frontend status
 if sudo systemctl is-active --quiet lms-frontend; then
     print_success "Frontend service is running"
+    # Show memory usage
+    FRONTEND_MEM=$(systemctl show lms-frontend --property=MemoryCurrent --value 2>/dev/null || echo "N/A")
+    echo "   Memory usage: $FRONTEND_MEM"
 else
     print_error "Frontend service failed to start!"
     sudo systemctl status lms-frontend --no-pager -l | head -20
@@ -218,6 +256,11 @@ echo "📊 Deployment Summary"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Backend Status: $(sudo systemctl is-active lms-backend)"
 echo "✅ Frontend Status: $(sudo systemctl is-active lms-frontend)"
+echo ""
+echo "💾 System Resources:"
+free -h | grep Mem | awk '{print "   Memory: " $3 " / " $2 " (Free: " $7 ")"}'
+df -h / | tail -1 | awk '{print "   Disk: " $3 " / " $2 " (Free: " $4 ")"}'
+echo ""
 echo "📅 Completed at: $(date)"
 echo ""
 print_success "Deployment completed successfully! 🎉"
@@ -225,5 +268,10 @@ echo ""
 echo "🔗 Application URLs:"
 echo "   Backend:  http://15.206.84.110:8000"
 echo "   Frontend: http://15.206.84.110:3000"
+echo ""
+echo "💡 Useful commands:"
+echo "   Monitor resources: ./deploy/monitor-resources.sh"
+echo "   Optimize system:   ./deploy/optimize-system.sh"
+echo "   Check services:    sudo systemctl status lms-backend lms-frontend"
 echo ""
 

@@ -1,0 +1,36 @@
+[Unit]
+Description=LMS Frontend
+After=network.target lms-backend.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/lms-app/lms_frontend
+Environment="NODE_ENV=production"
+Environment="NODE_OPTIONS=--max-old-space-size=512"
+Environment="NEXT_TELEMETRY_DISABLED=1"
+EnvironmentFile=/home/ec2-user/lms-app/.env
+
+# Memory and resource limits
+MemoryMax=768M
+MemoryHigh=600M
+CPUQuota=50%
+
+# Optimized Node.js start
+ExecStart=/usr/bin/node --max-old-space-size=512 node_modules/.bin/next start
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lms-frontend
+
+[Install]
+WantedBy=multi-user.target
+
