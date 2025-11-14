@@ -394,6 +394,13 @@ class ApiClient {
     });
   }
 
+  async resetUserPassword(userId: string, data: { new_password?: string; send_email?: boolean }): Promise<ApiResponse> {
+    return this.request(`/api/v1/users/${userId}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Organization Methods
   async registerOrganization(data: any): Promise<ApiResponse> {
     return this.request('/api/v1/auth/register/organization', {

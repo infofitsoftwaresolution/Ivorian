@@ -259,14 +259,14 @@ class AuthService:
         app_logger.info(f"🔗 Login URL: {login_url}")
         
         try:
-            email_sent = await email_service.send_welcome_email_organization(
-                email=admin_user.email,
-                first_name=admin_user.first_name or "Admin",
-                organization_name=organization.name,
-                temp_password=temp_password,
-                login_url=login_url
-            )
-            
+        email_sent = await email_service.send_welcome_email_organization(
+            email=admin_user.email,
+            first_name=admin_user.first_name or "Admin",
+            organization_name=organization.name,
+            temp_password=temp_password,
+            login_url=login_url
+        )
+        
             if email_sent:
                 app_logger.info(f"✅ Welcome email sent successfully to {admin_user.email}")
             else:
