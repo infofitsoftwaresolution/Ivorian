@@ -13,10 +13,11 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.database import init_db, close_db, get_db
 from app.core.logging import app_logger
-from app.core.errors import setup_exception_handlers
+from app.core.errors import setup_exception_handlers, get_cors_headers
 from app.api.v1 import auth, rbac, courses, users, upload, analytics, organizations
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
+from fastapi.responses import JSONResponse
 # from app.api.v1 import assessments, ai  # TODO: Uncomment when implemented
 
 @asynccontextmanager
@@ -119,10 +120,6 @@ async def log_requests(request: Request, call_next):
         response = await call_next(request)
     except Exception as e:
         # Ensure CORS headers are added even if an exception occurs
-        from app.core.errors import get_cors_headers
-        from fastapi.responses import JSONResponse
-        from app.core.logging import app_logger
-        
         app_logger.error(f"Unhandled exception in middleware: {str(e)}", exc_info=True)
         
         cors_headers = get_cors_headers(request)
