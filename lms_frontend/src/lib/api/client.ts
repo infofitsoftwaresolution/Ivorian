@@ -446,26 +446,34 @@ class ApiClient {
 
   // Course Methods
   async getCourses(params?: any): Promise<ApiResponse> {
-    if (!params) {
-      return this.request(`/api/v1/courses/`);
-    }
-    
     // Build query string manually to handle boolean values properly
     // Courses endpoint now accepts page/size directly
     const queryParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        // Convert boolean to string properly
-        if (typeof value === 'boolean') {
-          queryParams.append(key, value.toString());
-        } else {
-          queryParams.append(key, String(value));
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          // Convert boolean to string properly
+          if (typeof value === 'boolean') {
+            queryParams.append(key, value.toString());
+          } else {
+            queryParams.append(key, String(value));
+          }
         }
-      }
-    });
+      });
+    }
     
     const queryString = queryParams.toString();
-    return this.request(`/api/v1/courses/${queryString ? `?${queryString}` : ''}`);
+    const endpoint = `/api/v1/courses/${queryString ? `?${queryString}` : ''}`;
+    console.log('🌐 API Client: Fetching courses from:', endpoint);
+    
+    try {
+      const response = await this.request(endpoint);
+      console.log('✅ API Client: Courses response received:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ API Client: Error fetching courses:', error);
+      throw error;
+    }
   }
 
   async getCourse(id: number): Promise<ApiResponse> {
