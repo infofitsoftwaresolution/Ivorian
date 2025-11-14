@@ -474,7 +474,7 @@ class ApiClient {
 
   async createCourse(courseData: any): Promise<ApiResponse> {
     console.log('API Client: Creating course with data:', courseData);
-    const response = await this.request('/api/v1/courses', {
+    const response = await this.request('/api/v1/courses/', {
       method: 'POST',
       body: JSON.stringify(courseData),
     });
