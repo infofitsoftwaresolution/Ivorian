@@ -28,10 +28,14 @@ const userSchema = z.object({
   confirm_password: z.string().min(8, 'Password must be at least 8 characters'),
   phone: z.string().optional(),
   role: z.enum(['student', 'tutor', 'organization_admin']),
-  organization_id: z.union([z.number(), z.string()]).optional().transform((val) => {
-    if (val === '' || val === undefined || val === null) return undefined;
-    return typeof val === 'string' ? (val === '' ? undefined : Number(val)) : val;
-  }),
+  organization_id: z.preprocess(
+    (val) => {
+      if (val === '' || val === undefined || val === null) return undefined;
+      if (typeof val === 'string') return val === '' ? undefined : Number(val);
+      return val;
+    },
+    z.number().optional()
+  ),
 }).refine((data) => data.password === data.confirm_password, {
   message: "Passwords don't match",
   path: ["confirm_password"],

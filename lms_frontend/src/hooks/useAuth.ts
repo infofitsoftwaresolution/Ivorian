@@ -139,8 +139,13 @@ export function useAuth(): UseAuthReturn {
         const msg = error.message.toString();
         if (msg.includes('Incorrect') || msg.includes('invalid') || msg.includes('401') || msg.includes('Unauthorized')) {
           errorMessage = 'Incorrect email or password. Please check your credentials and try again.';
-        } else if (!msg.startsWith('HTTP') && msg !== `HTTP ${error.status}`) {
-          errorMessage = msg;
+        } else if (!msg.startsWith('HTTP')) {
+          // Check if error has status property (ApiError)
+          if ('status' in error && typeof error.status === 'number' && msg === `HTTP ${error.status}`) {
+            // Skip generic HTTP error messages
+          } else {
+            errorMessage = msg;
+          }
         }
       }
       

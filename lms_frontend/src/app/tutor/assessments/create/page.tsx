@@ -241,7 +241,9 @@ export default function CreateAssessmentPage() {
       
       let errorMessage = 'Failed to create assessment';
       
-      if (err instanceof Error && err.message && err.message !== `HTTP ${err.status}`) {
+      if (err instanceof ApiError) {
+        errorMessage = err.message;
+      } else if (err instanceof Error && err.message) {
         errorMessage = err.message;
       } else if (err.message && !err.message.startsWith('HTTP')) {
         errorMessage = err.message;

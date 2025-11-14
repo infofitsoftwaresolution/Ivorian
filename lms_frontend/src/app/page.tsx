@@ -264,6 +264,8 @@ export default function HomePage() {
         // Handle ApiError properly
         if (error instanceof ApiError) {
           console.error('API Error:', error.message, error.status);
+        } else if (error instanceof Error) {
+          console.error('Error:', error.message);
         }
         // Fallback to empty array or keep default mock data
         setFeaturedCourses([]);

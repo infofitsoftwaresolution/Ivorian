@@ -144,7 +144,9 @@ export default function CreateTutor() {
       let errorMessage = 'Failed to create tutor';
       
       // Check for ApiError with detailed message
-      if (err instanceof Error && err.message && err.message !== `HTTP ${err.status}`) {
+      if (err instanceof ApiError) {
+        errorMessage = err.message;
+      } else if (err instanceof Error && err.message) {
         errorMessage = err.message;
       } else if (err.message && !err.message.startsWith('HTTP')) {
         errorMessage = err.message;
