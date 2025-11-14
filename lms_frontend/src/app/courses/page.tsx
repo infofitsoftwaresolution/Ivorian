@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   PlayCircleIcon,
   StarIcon,
@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import HomeHeader from '@/components/layout/HomeHeader';
 import HomeFooter from '@/components/layout/HomeFooter';
+import { apiClient, ApiError } from '@/lib/api/client';
 
 interface Course {
   id: number;
@@ -33,214 +34,8 @@ interface Course {
   lessons?: number;
 }
 
-const allCourses: Course[] = [
-  {
-    id: 1,
-    title: "Complete Web Development Bootcamp",
-    instructor: "Dr. Sarah Johnson",
-    instructorAvatar: "/avatars/sarah.jpg",
-    rating: 4.8,
-    students: 12450,
-    duration: "12 weeks",
-    price: "$299",
-    originalPrice: "$399",
-    image: "/courses/web-dev.jpg",
-    category: "Programming",
-    level: "Beginner",
-    featured: true,
-    description: "Master web development from scratch. Learn HTML, CSS, JavaScript, React, Node.js, and more.",
-    lessons: 120
-  },
-  {
-    id: 2,
-    title: "Advanced Machine Learning with Python",
-    instructor: "Prof. Michael Chen",
-    instructorAvatar: "/avatars/michael.jpg",
-    rating: 4.9,
-    students: 8920,
-    duration: "16 weeks",
-    price: "$399",
-    originalPrice: "$499",
-    image: "/courses/ml.jpg",
-    category: "Data Science",
-    level: "Advanced",
-    featured: true,
-    description: "Deep dive into machine learning algorithms, neural networks, and AI applications.",
-    lessons: 150
-  },
-  {
-    id: 3,
-    title: "Digital Marketing Masterclass",
-    instructor: "Emma Rodriguez",
-    instructorAvatar: "/avatars/emma.jpg",
-    rating: 4.7,
-    students: 15680,
-    duration: "8 weeks",
-    price: "$199",
-    originalPrice: "$249",
-    image: "/courses/marketing.jpg",
-    category: "Marketing",
-    level: "Intermediate",
-    featured: true,
-    description: "Comprehensive guide to digital marketing strategies, SEO, social media, and analytics.",
-    lessons: 80
-  },
-  {
-    id: 4,
-    title: "UI/UX Design Fundamentals",
-    instructor: "Alex Thompson",
-    instructorAvatar: "/avatars/alex.jpg",
-    rating: 4.6,
-    students: 10230,
-    duration: "10 weeks",
-    price: "$249",
-    originalPrice: "$299",
-    image: "/courses/design.jpg",
-    category: "Design",
-    level: "Beginner",
-    featured: true,
-    description: "Learn the principles of user interface and user experience design.",
-    lessons: 95
-  },
-  {
-    id: 5,
-    title: "Python for Data Analysis",
-    instructor: "Prof. Michael Chen",
-    instructorAvatar: "/avatars/michael.jpg",
-    rating: 4.8,
-    students: 11200,
-    duration: "10 weeks",
-    price: "$279",
-    originalPrice: "$349",
-    image: "/courses/python-data.jpg",
-    category: "Data Science",
-    level: "Beginner",
-    featured: false,
-    description: "Learn Python programming and data analysis with pandas, NumPy, and Matplotlib.",
-    lessons: 100
-  },
-  {
-    id: 6,
-    title: "Full-Stack JavaScript Development",
-    instructor: "Dr. Sarah Johnson",
-    instructorAvatar: "/avatars/sarah.jpg",
-    rating: 4.7,
-    students: 9800,
-    duration: "14 weeks",
-    price: "$349",
-    originalPrice: "$449",
-    image: "/courses/fullstack-js.jpg",
-    category: "Programming",
-    level: "Intermediate",
-    featured: false,
-    description: "Build complete web applications using JavaScript, React, Express, and MongoDB.",
-    lessons: 140
-  },
-  {
-    id: 7,
-    title: "Figma Design System Mastery",
-    instructor: "Alex Thompson",
-    instructorAvatar: "/avatars/alex.jpg",
-    rating: 4.9,
-    students: 7500,
-    duration: "6 weeks",
-    price: "$179",
-    originalPrice: "$229",
-    image: "/courses/figma-design.jpg",
-    category: "Design",
-    level: "Intermediate",
-    featured: false,
-    description: "Master Figma and create professional design systems and prototypes.",
-    lessons: 60
-  },
-  {
-    id: 8,
-    title: "Social Media Marketing Strategy",
-    instructor: "Emma Rodriguez",
-    instructorAvatar: "/avatars/emma.jpg",
-    rating: 4.6,
-    students: 13200,
-    duration: "6 weeks",
-    price: "$149",
-    originalPrice: "$199",
-    image: "/courses/social-media.jpg",
-    category: "Marketing",
-    level: "Beginner",
-    featured: false,
-    description: "Learn how to create effective social media campaigns and grow your audience.",
-    lessons: 50
-  },
-  {
-    id: 9,
-    title: "React Advanced Patterns",
-    instructor: "Dr. Sarah Johnson",
-    instructorAvatar: "/avatars/sarah.jpg",
-    rating: 4.9,
-    students: 6800,
-    duration: "8 weeks",
-    price: "$249",
-    originalPrice: "$299",
-    image: "/courses/react-advanced.jpg",
-    category: "Programming",
-    level: "Advanced",
-    featured: false,
-    description: "Advanced React patterns, hooks, context API, and performance optimization.",
-    lessons: 75
-  },
-  {
-    id: 10,
-    title: "Deep Learning with TensorFlow",
-    instructor: "Prof. Michael Chen",
-    instructorAvatar: "/avatars/michael.jpg",
-    rating: 4.8,
-    students: 5600,
-    duration: "12 weeks",
-    price: "$379",
-    originalPrice: "$479",
-    image: "/courses/tensorflow.jpg",
-    category: "Data Science",
-    level: "Advanced",
-    featured: false,
-    description: "Build and train deep neural networks using TensorFlow and Keras.",
-    lessons: 110
-  },
-  {
-    id: 11,
-    title: "Content Marketing Essentials",
-    instructor: "Emma Rodriguez",
-    instructorAvatar: "/avatars/emma.jpg",
-    rating: 4.5,
-    students: 8900,
-    duration: "7 weeks",
-    price: "$169",
-    originalPrice: "$219",
-    image: "/courses/content-marketing.jpg",
-    category: "Marketing",
-    level: "Beginner",
-    featured: false,
-    description: "Create compelling content that drives engagement and conversions.",
-    lessons: 55
-  },
-  {
-    id: 12,
-    title: "Mobile App Design with Figma",
-    instructor: "Alex Thompson",
-    instructorAvatar: "/avatars/alex.jpg",
-    rating: 4.7,
-    students: 7200,
-    duration: "8 weeks",
-    price: "$219",
-    originalPrice: "$269",
-    image: "/courses/mobile-design.jpg",
-    category: "Design",
-    level: "Intermediate",
-    featured: false,
-    description: "Design beautiful and functional mobile apps for iOS and Android.",
-    lessons: 70
-  }
-];
-
-const categories = ["All", "Programming", "Data Science", "Design", "Marketing"];
+// Categories will be dynamically generated from courses
+const baseCategories = ["All"];
 const levels = ["All", "Beginner", "Intermediate", "Advanced"];
 const sortOptions = [
   { value: "popular", label: "Most Popular" },
@@ -256,6 +51,72 @@ export default function CoursesPage() {
   const [selectedLevel, setSelectedLevel] = useState('All');
   const [sortBy, setSortBy] = useState('popular');
   const [showFilters, setShowFilters] = useState(false);
+  const [allCourses, setAllCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<string[]>(baseCategories);
+
+  // Fetch courses from API
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoading(true);
+        const response = await apiClient.getCourses({ 
+          page: 1, 
+          size: 100, // Fetch all courses
+          status: 'published' // Only fetch published courses
+        });
+        
+        // Handle different response structures
+        let coursesData: any[] = [];
+        if (response.data?.courses && Array.isArray(response.data.courses)) {
+          coursesData = response.data.courses;
+        } else if (Array.isArray(response.data)) {
+          coursesData = response.data;
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          coursesData = response.data.data;
+        }
+        
+        // Transform API data to match component format
+        const transformedCourses = coursesData
+          .filter((course: any) => {
+            const courseStatus = course.status?.value || course.status;
+            return courseStatus === 'published' || courseStatus === 'Published';
+          })
+          .map((course: any) => ({
+            id: course.id,
+            title: course.title,
+            instructor: course.instructor_name || course.instructor?.name || 'Instructor',
+            instructorAvatar: course.instructor_avatar || '/avatars/default.jpg',
+            rating: course.rating || 4.5,
+            students: course.enrollment_count || course.students || 0,
+            duration: course.duration_weeks ? `${course.duration_weeks} weeks` : course.duration || 'N/A',
+            price: course.price ? `$${course.price}` : 'Free',
+            originalPrice: course.original_price ? `$${course.original_price}` : undefined,
+            image: course.thumbnail_url || course.image || '/courses/default.jpg',
+            category: course.category || 'General',
+            level: course.difficulty_level || course.level || 'All Levels',
+            featured: course.is_featured || false,
+            description: course.short_description || course.description || '',
+            lessons: course.total_lessons || 0
+          }));
+        
+        setAllCourses(transformedCourses);
+        
+        // Extract unique categories from courses
+        const uniqueCategories = Array.from(new Set(transformedCourses.map(c => c.category)))
+          .filter(cat => cat && cat !== 'General')
+          .sort();
+        setCategories([...baseCategories, ...uniqueCategories]);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        setAllCourses([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
 
   const filteredAndSortedCourses = useMemo(() => {
     let filtered = allCourses.filter(course => {
@@ -400,7 +261,7 @@ export default function CoursesPage() {
 
           {/* Results Count */}
           <div className="mt-4 text-sm text-gray-600">
-            Showing {filteredAndSortedCourses.length} of {allCourses.length} courses
+            {loading ? 'Loading courses...' : `Showing ${filteredAndSortedCourses.length} of ${allCourses.length} courses`}
           </div>
         </div>
       </section>
@@ -408,7 +269,12 @@ export default function CoursesPage() {
       {/* Courses Grid */}
       <section className="py-16 bg-gradient-to-br from-white to-blue-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {filteredAndSortedCourses.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading courses...</p>
+            </div>
+          ) : filteredAndSortedCourses.length === 0 ? (
             <div className="text-center py-16">
               <AcademicCapIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses found</h3>
