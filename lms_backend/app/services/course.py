@@ -4,7 +4,7 @@ Course service for the LMS application
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import and_, or_, func, desc, select
+from sqlalchemy import and_, or_, func, desc, select, cast, String
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 
@@ -120,6 +120,7 @@ class CourseService:
             if filters.status is not None:
                 # Handle both enum and string status values
                 # Database column is VARCHAR, so we need to compare with string value (lowercase)
+                # Use cast() to explicitly cast the column to String to avoid enum type mismatch
                 status_value = None
                 if isinstance(filters.status, CourseStatus):
                     # Use enum's string value and convert to lowercase for comparison
@@ -132,8 +133,9 @@ class CourseService:
                     status_value = str(filters.status).lower()
                 
                 # Compare with lowercase string value (database stores lowercase)
+                # Cast the column to String to ensure VARCHAR comparison, not enum
                 if status_value:
-                    query = query.where(Course.status == status_value)
+                    query = query.where(cast(Course.status, String) == status_value)
             
             if filters.organization_id:
                 query = query.where(Course.organization_id == filters.organization_id)
