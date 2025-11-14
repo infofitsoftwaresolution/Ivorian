@@ -43,7 +43,13 @@ class EmailService:
     
     def is_configured(self) -> bool:
         """Check if SES is properly configured"""
-        return self.ses_client is not None
+        is_configured = self.ses_client is not None and settings.EMAILS_FROM_EMAIL is not None
+        if not is_configured:
+            app_logger.warning("⚠️  Email service not fully configured:")
+            app_logger.warning(f"   - SES client: {'✅' if self.ses_client is not None else '❌ None'}")
+            app_logger.warning(f"   - EMAILS_FROM_EMAIL: {'✅' if settings.EMAILS_FROM_EMAIL else '❌ Not set'}")
+            app_logger.warning(f"   - AWS_REGION: {settings.AWS_REGION or '❌ Not set'}")
+        return is_configured
     
     async def send_email(
         self,
@@ -65,11 +71,8 @@ class EmailService:
             True if email was sent successfully, False otherwise
         """
         if not self.is_configured():
-            app_logger.error("❌ SES not configured. Cannot send email.")
-            return False
-        
-        if not settings.EMAILS_FROM_EMAIL:
-            app_logger.error("❌ EMAILS_FROM_EMAIL not configured. Cannot send email.")
+            app_logger.error("❌ Email service not configured. Cannot send email.")
+            app_logger.error("   Please check your AWS SES configuration and EMAILS_FROM_EMAIL setting.")
             return False
         
         try:

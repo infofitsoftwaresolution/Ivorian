@@ -243,17 +243,41 @@ class AuthService:
         await self.db.refresh(admin_user)
         
         # Send welcome email with credentials
-        login_url = f"{settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else 'http://localhost:3000'}/login"
-        email_sent = await email_service.send_welcome_email_organization(
-            email=admin_user.email,
-            first_name=admin_user.first_name or "Admin",
-            organization_name=organization.name,
-            temp_password=temp_password,
-            login_url=login_url
-        )
+        # Determine login URL - use frontend URL from CORS origins or default
+        login_url = 'http://localhost:3000/login'
+        if settings.BACKEND_CORS_ORIGINS and len(settings.BACKEND_CORS_ORIGINS) > 0:
+            # Get the first origin that looks like a frontend URL (contains :3000 or is https)
+            for origin in settings.BACKEND_CORS_ORIGINS:
+                if ':3000' in origin or origin.startswith('https://'):
+                    login_url = f"{origin}/login"
+                    break
+            else:
+                # Fallback to first origin
+                login_url = f"{settings.BACKEND_CORS_ORIGINS[0]}/login"
         
-        if not email_sent:
-            app_logger.warning(f"⚠️  Failed to send welcome email to {admin_user.email}")
+        app_logger.info(f"📧 Attempting to send welcome email to {admin_user.email} for organization {organization.name}")
+        app_logger.info(f"🔗 Login URL: {login_url}")
+        
+        try:
+            email_sent = await email_service.send_welcome_email_organization(
+                email=admin_user.email,
+                first_name=admin_user.first_name or "Admin",
+                organization_name=organization.name,
+                temp_password=temp_password,
+                login_url=login_url
+            )
+            
+            if email_sent:
+                app_logger.info(f"✅ Welcome email sent successfully to {admin_user.email}")
+            else:
+                app_logger.error(f"❌ Failed to send welcome email to {admin_user.email}. Check email service configuration.")
+                app_logger.error(f"   - AWS_REGION: {settings.AWS_REGION}")
+                app_logger.error(f"   - EMAILS_FROM_EMAIL: {settings.EMAILS_FROM_EMAIL}")
+                app_logger.error(f"   - Email service configured: {email_service.is_configured()}")
+        except Exception as e:
+            app_logger.error(f"❌ Exception while sending welcome email to {admin_user.email}: {str(e)}")
+            import traceback
+            app_logger.error(f"   Traceback: {traceback.format_exc()}")
         
         # Create tokens for admin user
         tokens = create_tokens(str(admin_user.id))
