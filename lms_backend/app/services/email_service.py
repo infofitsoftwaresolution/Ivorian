@@ -103,7 +103,19 @@ class EmailService:
             return True
             
         except ClientError as e:
-            app_logger.error(f"❌ AWS SES ClientError: {str(e)}")
+            error_code = e.response.get('Error', {}).get('Code', '')
+            error_message = str(e)
+            
+            # Check for sandbox mode errors
+            if 'MessageRejected' in error_code or 'Email address is not verified' in error_message:
+                app_logger.error(f"❌ AWS SES Error: Email address is not verified")
+                app_logger.error(f"   Recipient: {to_email}")
+                app_logger.error(f"   Error: {error_message}")
+                app_logger.error(f"   ⚠️  AWS SES is in SANDBOX MODE - recipient email must be verified")
+                app_logger.error(f"   Solution: Verify '{to_email}' in AWS SES Console or request production access")
+                app_logger.error(f"   SES Console: https://console.aws.amazon.com/ses/home?region={settings.AWS_REGION}#/verified-identities")
+            else:
+                app_logger.error(f"❌ AWS SES ClientError: {error_message}")
             return False
         except BotoCoreError as e:
             app_logger.error(f"❌ AWS BotoCoreError: {str(e)}")

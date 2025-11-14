@@ -90,27 +90,38 @@ class UserService:
                 # Determine email type based on role
                 login_url = f"{settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else 'http://localhost:3000'}/login"
                 
-                if user.role == "student":
-                    email_sent = await email_service.send_welcome_email_student(
-                        email=user.email,
-                        first_name=user.first_name or "Student",
-                        organization_name=organization_name,
-                        temp_password=temp_password,
-                        login_url=login_url
-                    )
-                elif user.role == "tutor":
-                    email_sent = await email_service.send_welcome_email_tutor(
-                        email=user.email,
-                        first_name=user.first_name or "Tutor",
-                        organization_name=organization_name,
-                        temp_password=temp_password,
-                        login_url=login_url
-                    )
-                else:
-                    email_sent = False
+                app_logger.info(f"📧 Attempting to send welcome email to {user.email} for {user.role} account")
                 
-                if not email_sent:
-                    app_logger.warning(f"⚠️  Failed to send welcome email to {user.email}")
+                try:
+                    if user.role == "student":
+                        email_sent = await email_service.send_welcome_email_student(
+                            email=user.email,
+                            first_name=user.first_name or "Student",
+                            organization_name=organization_name,
+                            temp_password=temp_password,
+                            login_url=login_url
+                        )
+                    elif user.role == "tutor":
+                        email_sent = await email_service.send_welcome_email_tutor(
+                            email=user.email,
+                            first_name=user.first_name or "Tutor",
+                            organization_name=organization_name,
+                            temp_password=temp_password,
+                            login_url=login_url
+                        )
+                    else:
+                        email_sent = False
+                    
+                    if email_sent:
+                        app_logger.info(f"✅ Welcome email sent successfully to {user.email}")
+                    else:
+                        app_logger.error(f"❌ Failed to send welcome email to {user.email}")
+                        app_logger.error(f"   ⚠️  If AWS SES is in sandbox mode, recipient email must be verified")
+                        app_logger.error(f"   Verify email: https://console.aws.amazon.com/ses/home?region={settings.AWS_REGION}#/verified-identities")
+                except Exception as e:
+                    app_logger.error(f"❌ Exception while sending welcome email to {user.email}: {str(e)}")
+                    import traceback
+                    app_logger.error(f"   Traceback: {traceback.format_exc()}")
             
             # Assign roles
             if user_data.roles:
@@ -535,17 +546,40 @@ class UserService:
             await db.refresh(tutor)
             
             # Send welcome email with credentials
-            login_url = f"{settings.BACKEND_CORS_ORIGINS[0] if settings.BACKEND_CORS_ORIGINS else 'http://localhost:3000'}/login"
-            email_sent = await email_service.send_welcome_email_tutor(
-                email=tutor.email,
-                first_name=tutor.first_name or "Tutor",
-                organization_name=organization_name,
-                temp_password=temp_password,
-                login_url=login_url
-            )
+            # Determine login URL - use frontend URL from CORS origins or default
+            login_url = 'http://localhost:3000/login'
+            if settings.BACKEND_CORS_ORIGINS and len(settings.BACKEND_CORS_ORIGINS) > 0:
+                # Get the first origin that looks like a frontend URL (contains :3000 or is https)
+                for origin in settings.BACKEND_CORS_ORIGINS:
+                    if ':3000' in origin or origin.startswith('https://'):
+                        login_url = f"{origin}/login"
+                        break
+                else:
+                    # Fallback to first origin
+                    login_url = f"{settings.BACKEND_CORS_ORIGINS[0]}/login"
             
-            if not email_sent:
-                app_logger.warning(f"⚠️  Failed to send welcome email to {tutor.email}")
+            app_logger.info(f"📧 Attempting to send welcome email to {tutor.email} for tutor account")
+            app_logger.info(f"🔗 Login URL: {login_url}")
+            
+            try:
+                email_sent = await email_service.send_welcome_email_tutor(
+                    email=tutor.email,
+                    first_name=tutor.first_name or "Tutor",
+                    organization_name=organization_name,
+                    temp_password=temp_password,
+                    login_url=login_url
+                )
+                
+                if email_sent:
+                    app_logger.info(f"✅ Welcome email sent successfully to {tutor.email}")
+                else:
+                    app_logger.error(f"❌ Failed to send welcome email to {tutor.email}")
+                    app_logger.error(f"   ⚠️  If AWS SES is in sandbox mode, recipient email must be verified")
+                    app_logger.error(f"   Verify email: https://console.aws.amazon.com/ses/home?region={settings.AWS_REGION}#/verified-identities")
+            except Exception as e:
+                app_logger.error(f"❌ Exception while sending welcome email to {tutor.email}: {str(e)}")
+                import traceback
+                app_logger.error(f"   Traceback: {traceback.format_exc()}")
             
             logger.info(f"Tutor created: {tutor.email} (ID: {tutor.id}) for organization {organization_id}")
             return tutor
