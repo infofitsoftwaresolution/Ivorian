@@ -149,7 +149,8 @@ timeout 600 npm ci --prefer-offline --no-audit || {
 echo "🏗️  Building frontend..."
 echo "⏱️  This may take several minutes..."
 export NEXT_PUBLIC_API_URL="http://15.206.84.110:8000"
-timeout 1200 NODE_OPTIONS="--max-old-space-size=1024" npm run build || {
+export NODE_OPTIONS="--max-old-space-size=1024"
+timeout 1200 npm run build || {
     echo "❌ Frontend build failed or timed out"
     exit 1
 }
