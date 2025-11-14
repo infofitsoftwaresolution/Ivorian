@@ -123,12 +123,12 @@ if [ -f "deploy/systemd/lms-backend.service" ]; then
     # Replace %h with actual home directory and set user
     CURRENT_USER=$(whoami)
     CURRENT_HOME=$(eval echo ~$CURRENT_USER)
-    sed "s|%h|$CURRENT_HOME|g" deploy/systemd/lms-backend.service | \
-        sed "s|^# User will be set|User=$CURRENT_USER|" | \
-        sed "s|^# User will be set|User=$CURRENT_USER|" > /tmp/lms-backend.service
-    # Add User line if not present
+    sed "s|%h|$CURRENT_HOME|g" deploy/systemd/lms-backend.service > /tmp/lms-backend.service
+    # Add User line after [Service] if not present
     if ! grep -q "^User=" /tmp/lms-backend.service; then
         sed -i "/^\[Service\]/a User=$CURRENT_USER" /tmp/lms-backend.service
+    else
+        sed -i "s|^User=.*|User=$CURRENT_USER|" /tmp/lms-backend.service
     fi
     sudo cp /tmp/lms-backend.service /etc/systemd/system/lms-backend.service
     sudo systemctl daemon-reload
@@ -220,11 +220,12 @@ if [ -f "deploy/systemd/lms-frontend.service" ]; then
     # Replace %h with actual home directory and set user
     CURRENT_USER=$(whoami)
     CURRENT_HOME=$(eval echo ~$CURRENT_USER)
-    sed "s|%h|$CURRENT_HOME|g" deploy/systemd/lms-frontend.service | \
-        sed "s|^# User will be set|User=$CURRENT_USER|" > /tmp/lms-frontend.service
-    # Add User line if not present
+    sed "s|%h|$CURRENT_HOME|g" deploy/systemd/lms-frontend.service > /tmp/lms-frontend.service
+    # Add User line after [Service] if not present
     if ! grep -q "^User=" /tmp/lms-frontend.service; then
         sed -i "/^\[Service\]/a User=$CURRENT_USER" /tmp/lms-frontend.service
+    else
+        sed -i "s|^User=.*|User=$CURRENT_USER|" /tmp/lms-frontend.service
     fi
     sudo cp /tmp/lms-frontend.service /etc/systemd/system/lms-frontend.service
     sudo systemctl daemon-reload
