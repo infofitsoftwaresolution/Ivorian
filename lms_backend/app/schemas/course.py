@@ -238,6 +238,7 @@ class EnrollmentResponse(BaseModel):
     certificate_issued_at: Optional[datetime]
     created_at: datetime
     updated_at: Optional[datetime]
+    course: Optional[CourseResponse] = None  # Include course data if available
     
     class Config:
         from_attributes = True
