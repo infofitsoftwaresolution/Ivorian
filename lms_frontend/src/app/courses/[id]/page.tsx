@@ -90,15 +90,35 @@ export default function CourseDetailPage() {
       return;
     }
 
+    // Check if user is a student
+    if (user.role !== 'student') {
+      alert('Only students can enroll in courses. Please log in with a student account.');
+      return;
+    }
+
     try {
       setIsEnrolling(true);
       const response = await apiClient.enrollInCourse(course.id);
+      console.log('Enrollment successful:', response);
+      
+      // Show success message
+      alert('Successfully enrolled in course! Redirecting to course content...');
+      
+      // Redirect to course learning page
       router.push(`/student/courses/${course.id}/learn`);
     } catch (error) {
       console.error('Error enrolling in course:', error);
       let errorMessage = 'Failed to enroll in course. Please try again.';
       if (error instanceof ApiError) {
         errorMessage = error.message || errorMessage;
+        // Handle specific error cases
+        if (error.status === 400 && errorMessage.includes('already enrolled')) {
+          errorMessage = 'You are already enrolled in this course.';
+          // Redirect to course learning page if already enrolled
+          setTimeout(() => {
+            router.push(`/student/courses/${course.id}/learn`);
+          }, 2000);
+        }
       } else if (error instanceof Error) {
         errorMessage = error.message || errorMessage;
       }

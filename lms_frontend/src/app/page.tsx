@@ -224,7 +224,7 @@ export default function HomePage() {
         setLoadingCourses(true);
         const response = await apiClient.getCourses({ 
           page: 1, 
-          size: 8,
+          size: 20, // Fetch more courses to show all available
           status: 'published' // Only fetch published courses
         });
         
@@ -236,12 +236,15 @@ export default function HomePage() {
           coursesData = response.data.courses;
         } else if (response.data?.data && Array.isArray(response.data.data)) {
           coursesData = response.data.data;
+        } else if (response.data?.users && Array.isArray(response.data.users)) {
+          // Handle if response structure is different
+          coursesData = [];
         }
         
         // Transform API data to match component format
         const transformedCourses = coursesData
           .filter((course: any) => course.status === 'published') // Ensure only published
-          .slice(0, 4) // Show only first 4 courses
+          // Show all published courses (removed .slice(0, 4))
           .map((course: any) => ({
             id: course.id,
             title: course.title,
