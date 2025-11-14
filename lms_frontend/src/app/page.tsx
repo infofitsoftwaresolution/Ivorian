@@ -20,7 +20,7 @@ import Link from 'next/link';
 import HeroCarousel from '@/components/HeroCarousel';
 import HomeHeader from '@/components/layout/HomeHeader';
 import HomeFooter from '@/components/layout/HomeFooter';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 
 // Upcoming tutorial sessions data
 const upcomingSessions = [
@@ -261,6 +261,10 @@ export default function HomePage() {
         setFeaturedCourses(transformedCourses);
       } catch (error) {
         console.error('Error fetching courses:', error);
+        // Handle ApiError properly
+        if (error instanceof ApiError) {
+          console.error('API Error:', error.message, error.status);
+        }
         // Fallback to empty array or keep default mock data
         setFeaturedCourses([]);
       } finally {

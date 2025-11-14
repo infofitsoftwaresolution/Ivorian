@@ -17,7 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import HomeHeader from '@/components/layout/HomeHeader';
 import HomeFooter from '@/components/layout/HomeFooter';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useAuth } from '@/hooks/useAuth';
 
 interface Course {
@@ -65,9 +65,15 @@ export default function CourseDetailPage() {
         
         const response = await apiClient.getCourse(parseInt(courseId));
         setCourse(response.data);
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error fetching course data:', error);
-        setError(error.message || 'Failed to load course. Please try again.');
+        if (error instanceof ApiError) {
+          setError(error.message || 'Failed to load course. Please try again.');
+        } else if (error instanceof Error) {
+          setError(error.message || 'Failed to load course. Please try again.');
+        } else {
+          setError('Failed to load course. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
@@ -88,9 +94,15 @@ export default function CourseDetailPage() {
       setIsEnrolling(true);
       const response = await apiClient.enrollInCourse(course.id);
       router.push(`/student/courses/${course.id}/learn`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error enrolling in course:', error);
-      alert(error.message || 'Failed to enroll in course. Please try again.');
+      let errorMessage = 'Failed to enroll in course. Please try again.';
+      if (error instanceof ApiError) {
+        errorMessage = error.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message || errorMessage;
+      }
+      alert(errorMessage);
     } finally {
       setIsEnrolling(false);
     }
