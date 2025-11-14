@@ -119,23 +119,24 @@ class CourseService:
             
             if filters.status is not None:
                 # Handle both enum and string status values
-                # Database column is VARCHAR, so we need to compare with string value (lowercase)
-                # Use cast() to explicitly cast the column to String to avoid enum type mismatch
+                # Database column is VARCHAR, so we need to compare with string value
+                # Use case-insensitive comparison to handle different case storage
                 status_value = None
                 if isinstance(filters.status, CourseStatus):
-                    # Use enum's string value and convert to lowercase for comparison
-                    status_value = filters.status.value.lower()
+                    # Use enum's string value
+                    status_value = filters.status.value
                 elif isinstance(filters.status, str):
-                    # Already a string, convert to lowercase
-                    status_value = filters.status.lower()
+                    # Already a string
+                    status_value = filters.status
                 else:
-                    # Try to convert to string and lowercase
-                    status_value = str(filters.status).lower()
+                    # Try to convert to string
+                    status_value = str(filters.status)
                 
-                # Compare with lowercase string value (database stores lowercase)
+                # Use case-insensitive comparison (ILIKE for PostgreSQL, or func.lower for cross-database)
                 # Cast the column to String to ensure VARCHAR comparison, not enum
                 if status_value:
-                    query = query.where(cast(Course.status, String) == status_value)
+                    # Use func.lower() for case-insensitive comparison
+                    query = query.where(func.lower(cast(Course.status, String)) == func.lower(status_value))
             
             if filters.organization_id:
                 query = query.where(Course.organization_id == filters.organization_id)
