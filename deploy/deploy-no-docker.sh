@@ -101,6 +101,35 @@ sudo systemctl restart lms-backend
 echo "⚛️  Deploying frontend..."
 cd ../lms_frontend
 
+# Ensure frontend .env.local file has correct API URL
+echo "🔧 Checking frontend environment configuration..."
+if [ -f .env.local ]; then
+    # Update or add NEXT_PUBLIC_API_URL if needed
+    if grep -q "^NEXT_PUBLIC_API_URL=" .env.local 2>/dev/null; then
+        # Check if it's already set to production URL, if not update it
+        if ! grep -q "edumentry.com" .env.local 2>/dev/null; then
+            # Keep existing value if it's not localhost (might be custom)
+            if ! grep -q "localhost:8000" .env.local 2>/dev/null; then
+                echo "ℹ️  NEXT_PUBLIC_API_URL already set to custom value, keeping it"
+            else
+                # Update localhost to production URL
+                sed -i 's|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=https://edumentry.com/api|' .env.local
+                echo "✅ Updated NEXT_PUBLIC_API_URL to production domain"
+            fi
+        fi
+    else
+        # Add NEXT_PUBLIC_API_URL if not present
+        echo "NEXT_PUBLIC_API_URL=https://edumentry.com/api" >> .env.local
+        echo "✅ Added NEXT_PUBLIC_API_URL to .env.local"
+    fi
+else
+    # Create .env.local if it doesn't exist
+    echo "Creating .env.local file..."
+    touch .env.local
+    echo "NEXT_PUBLIC_API_URL=https://edumentry.com/api" >> .env.local
+    echo "✅ Created .env.local with production API URL"
+fi
+
 # Check memory and create swap if needed
 echo "💾 Checking available memory..."
 FREE_MEM=$(free -m | awk 'NR==2{printf "%.0f", $7}')
