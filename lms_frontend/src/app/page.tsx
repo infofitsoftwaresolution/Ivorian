@@ -86,69 +86,7 @@ const upcomingSessions = [
   }
 ];
 
-// Mock data for demonstration
-const featuredCourses = [
-  {
-    id: 1,
-    title: "Complete Web Development Bootcamp",
-    instructor: "Dr. Sarah Johnson",
-    instructorAvatar: "/avatars/sarah.jpg",
-    rating: 4.8,
-    students: 12450,
-    duration: "12 weeks",
-    price: "$299",
-    originalPrice: "$399",
-    image: "/courses/web-dev.jpg",
-    category: "Programming",
-    level: "Beginner",
-    featured: true
-  },
-  {
-    id: 2,
-    title: "Advanced Machine Learning with Python",
-    instructor: "Prof. Michael Chen",
-    instructorAvatar: "/avatars/michael.jpg",
-    rating: 4.9,
-    students: 8920,
-    duration: "16 weeks",
-    price: "$399",
-    originalPrice: "$499",
-    image: "/courses/ml.jpg",
-    category: "Data Science",
-    level: "Advanced",
-    featured: true
-  },
-  {
-    id: 3,
-    title: "Digital Marketing Masterclass",
-    instructor: "Emma Rodriguez",
-    instructorAvatar: "/avatars/emma.jpg",
-    rating: 4.7,
-    students: 15680,
-    duration: "8 weeks",
-    price: "$199",
-    originalPrice: "$249",
-    image: "/courses/marketing.jpg",
-    category: "Marketing",
-    level: "Intermediate",
-    featured: true
-  },
-  {
-    id: 4,
-    title: "UI/UX Design Fundamentals",
-    instructor: "Alex Thompson",
-    instructorAvatar: "/avatars/alex.jpg",
-    rating: 4.6,
-    students: 10230,
-    duration: "10 weeks",
-    price: "$249",
-    originalPrice: "$299",
-    image: "/courses/design.jpg",
-    category: "Design",
-    level: "Beginner",
-    featured: true
-  }
-];
+// Courses are now fetched from API - see useEffect in HomePage component
 
 const famousTutors = [
   {
