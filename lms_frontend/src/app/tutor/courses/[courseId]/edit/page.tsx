@@ -562,7 +562,7 @@ export default function CourseBuilder() {
       {/* Course Preview Modal */}
       {showCoursePreview && course && (
         <CoursePreview
-          course={course}
+          course={course as any}
           onClose={() => setShowCoursePreview(false)}
         />
       )}
@@ -1077,7 +1077,7 @@ function LessonEditor({ lesson, course, onUpdate }: { lesson: Lesson; course: Co
       {/* Student Preview Modal */}
       {showStudentPreview && (
         <StudentPreview
-          lesson={localLesson}
+          lesson={localLesson as any}
           onClose={() => setShowStudentPreview(false)}
         />
       )}

@@ -462,7 +462,7 @@ function QuestionEditor({ question, onSave, onCancel }: QuestionEditorProps) {
                       placeholder={`Option ${index + 1}`}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                     />
-                    {editedQuestion.options.length > 2 && (
+                    {editedQuestion.options && editedQuestion.options.length > 2 && (
                       <button
                         onClick={() => removeOption(index)}
                         className="p-1 text-red-400 hover:text-red-600"

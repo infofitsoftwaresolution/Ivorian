@@ -124,7 +124,7 @@ export default function StudentPreview({ lesson, onClose, className = '' }: Stud
   };
 
   const nextQuestion = () => {
-    if (lesson.knowledge_checks && currentQuestion < lesson.knowledge_checks[0].questions.length - 1) {
+    if (lesson.knowledge_checks && lesson.knowledge_checks[0] && lesson.knowledge_checks[0].questions && currentQuestion < lesson.knowledge_checks[0].questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
       setQuizCompleted(true);
@@ -352,17 +352,19 @@ export default function StudentPreview({ lesson, onClose, className = '' }: Stud
                   <div className="text-center py-8">
                     <QuestionMarkCircleIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                     <h4 className="text-lg font-medium text-gray-900 mb-2">
-                      {lesson.knowledge_checks[0].title}
+                      {lesson.knowledge_checks?.[0]?.title || 'Knowledge Check'}
                     </h4>
-                    <p className="text-gray-600 mb-4">{lesson.knowledge_checks[0].description}</p>
-                    <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 mb-6">
-                      <span>{lesson.knowledge_checks[0].questions.length} questions</span>
-                      <span>{lesson.knowledge_checks[0].totalPoints} points</span>
-                      {lesson.knowledge_checks[0].timeLimit && (
-                        <span>{lesson.knowledge_checks[0].timeLimit} min</span>
-                      )}
-                      <span>{lesson.knowledge_checks[0].passingScore}% passing</span>
-                    </div>
+                    <p className="text-gray-600 mb-4">{lesson.knowledge_checks?.[0]?.description || ''}</p>
+                    {lesson.knowledge_checks?.[0] && (
+                      <div className="flex items-center justify-center space-x-4 text-sm text-gray-500 mb-6">
+                        <span>{lesson.knowledge_checks[0].questions?.length || 0} questions</span>
+                        <span>{lesson.knowledge_checks[0].totalPoints || 0} points</span>
+                        {lesson.knowledge_checks[0].timeLimit && (
+                          <span>{lesson.knowledge_checks[0].timeLimit} min</span>
+                        )}
+                        <span>{lesson.knowledge_checks[0].passingScore || 0}% passing</span>
+                      </div>
+                    )}
                     <button
                       onClick={startKnowledgeCheck}
                       className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700"
@@ -376,72 +378,76 @@ export default function StudentPreview({ lesson, onClose, className = '' }: Stud
                       <div>
                         <div className="flex items-center justify-between mb-4">
                           <span className="text-sm text-gray-500">
-                            Question {currentQuestion + 1} of {lesson.knowledge_checks[0].questions.length}
+                            Question {currentQuestion + 1} of {lesson.knowledge_checks?.[0]?.questions?.length || 0}
                           </span>
                           <span className="text-sm text-gray-500">
-                            {lesson.knowledge_checks[0].questions[currentQuestion].points} points
+                            {lesson.knowledge_checks?.[0]?.questions?.[currentQuestion]?.points || 0} points
                           </span>
                         </div>
                         
                         <div className="mb-6">
                           <h4 className="text-lg font-medium text-gray-900 mb-4">
-                            {lesson.knowledge_checks[0].questions[currentQuestion].question}
+                            {lesson.knowledge_checks?.[0]?.questions?.[currentQuestion]?.question || ''}
                           </h4>
                           
-                          {lesson.knowledge_checks[0].questions[currentQuestion].type === 'multiple-choice' && (
-                            <div className="space-y-2">
-                              {lesson.knowledge_checks[0].questions[currentQuestion].options?.map((option, index) => (
-                                <label key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                  <input
-                                    type="radio"
-                                    name={`question-${lesson.knowledge_checks[0].questions[currentQuestion].id}`}
-                                    value={index}
-                                    checked={answers[lesson.knowledge_checks[0].questions[currentQuestion].id] === index}
-                                    onChange={(e) => handleAnswerSelect(lesson.knowledge_checks[0].questions[currentQuestion].id, parseInt(e.target.value))}
-                                    className="text-indigo-600"
-                                  />
-                                  <span>{option}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                          
-                          {lesson.knowledge_checks[0].questions[currentQuestion].type === 'true-false' && (
-                            <div className="space-y-2">
-                              <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={`question-${lesson.knowledge_checks[0].questions[currentQuestion].id}`}
-                                  value="true"
-                                  checked={answers[lesson.knowledge_checks[0].questions[currentQuestion].id] === 'true'}
+                          {lesson.knowledge_checks && lesson.knowledge_checks[0] && lesson.knowledge_checks[0].questions && lesson.knowledge_checks[0].questions[currentQuestion] && (
+                            <>
+                              {lesson.knowledge_checks[0].questions[currentQuestion].type === 'multiple-choice' && (
+                                <div className="space-y-2">
+                                  {lesson.knowledge_checks[0].questions[currentQuestion].options?.map((option, index) => (
+                                    <label key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                      <input
+                                        type="radio"
+                                        name={`question-${lesson.knowledge_checks[0].questions[currentQuestion].id}`}
+                                        value={index}
+                                        checked={answers[lesson.knowledge_checks[0].questions[currentQuestion].id] === index}
+                                        onChange={(e) => handleAnswerSelect(lesson.knowledge_checks[0].questions[currentQuestion].id, parseInt(e.target.value))}
+                                        className="text-indigo-600"
+                                      />
+                                      <span>{option}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {lesson.knowledge_checks[0].questions[currentQuestion].type === 'true-false' && (
+                                <div className="space-y-2">
+                                  <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`question-${lesson.knowledge_checks[0].questions[currentQuestion].id}`}
+                                      value="true"
+                                      checked={answers[lesson.knowledge_checks[0].questions[currentQuestion].id] === 'true'}
+                                      onChange={(e) => handleAnswerSelect(lesson.knowledge_checks[0].questions[currentQuestion].id, e.target.value)}
+                                      className="text-indigo-600"
+                                    />
+                                    <span>True</span>
+                                  </label>
+                                  <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`question-${lesson.knowledge_checks[0].questions[currentQuestion].id}`}
+                                      value="false"
+                                      checked={answers[lesson.knowledge_checks[0].questions[currentQuestion].id] === 'false'}
+                                      onChange={(e) => handleAnswerSelect(lesson.knowledge_checks[0].questions[currentQuestion].id, e.target.value)}
+                                      className="text-indigo-600"
+                                    />
+                                    <span>False</span>
+                                  </label>
+                                </div>
+                              )}
+                              
+                              {(lesson.knowledge_checks[0].questions[currentQuestion].type === 'short-answer' || 
+                                lesson.knowledge_checks[0].questions[currentQuestion].type === 'essay') && (
+                                <textarea
+                                  value={answers[lesson.knowledge_checks[0].questions[currentQuestion].id] || ''}
                                   onChange={(e) => handleAnswerSelect(lesson.knowledge_checks[0].questions[currentQuestion].id, e.target.value)}
-                                  className="text-indigo-600"
+                                  placeholder="Enter your answer here..."
+                                  rows={lesson.knowledge_checks[0].questions[currentQuestion].type === 'essay' ? 6 : 3}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                                 />
-                                <span>True</span>
-                              </label>
-                              <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={`question-${lesson.knowledge_checks[0].questions[currentQuestion].id}`}
-                                  value="false"
-                                  checked={answers[lesson.knowledge_checks[0].questions[currentQuestion].id] === 'false'}
-                                  onChange={(e) => handleAnswerSelect(lesson.knowledge_checks[0].questions[currentQuestion].id, e.target.value)}
-                                  className="text-indigo-600"
-                                />
-                                <span>False</span>
-                              </label>
-                            </div>
-                          )}
-                          
-                          {(lesson.knowledge_checks[0].questions[currentQuestion].type === 'short-answer' || 
-                            lesson.knowledge_checks[0].questions[currentQuestion].type === 'essay') && (
-                            <textarea
-                              value={answers[lesson.knowledge_checks[0].questions[currentQuestion].id] || ''}
-                              onChange={(e) => handleAnswerSelect(lesson.knowledge_checks[0].questions[currentQuestion].id, e.target.value)}
-                              placeholder="Enter your answer here..."
-                              rows={lesson.knowledge_checks[0].questions[currentQuestion].type === 'essay' ? 6 : 3}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                            />
+                              )}
+                            </>
                           )}
                         </div>
                         
@@ -457,7 +463,7 @@ export default function StudentPreview({ lesson, onClose, className = '' }: Stud
                             onClick={nextQuestion}
                             className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                           >
-                            {currentQuestion === lesson.knowledge_checks[0].questions.length - 1 ? 'Submit' : 'Next'}
+                            {lesson.knowledge_checks?.[0]?.questions && currentQuestion === lesson.knowledge_checks[0].questions.length - 1 ? 'Submit' : 'Next'}
                           </button>
                         </div>
                       </div>

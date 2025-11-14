@@ -34,7 +34,7 @@ const assessmentSchema = z.object({
   passing_score: z.number().min(0).max(100).optional(),
   attempts_allowed: z.number().min(1).optional(),
   due_date: z.string().optional(),
-  status: z.enum(['draft', 'published']).optional().default('draft'),
+  status: z.enum(['draft', 'published']).default('draft'),
 });
 
 type AssessmentFormData = z.infer<typeof assessmentSchema>;

@@ -627,31 +627,6 @@ class ApiClient {
     return this.request('/api/v1/analytics/platform/stats');
   }
 
-  // User Management Methods
-  async deleteUser(userId: number): Promise<ApiResponse> {
-    return this.request(`/api/v1/users/${userId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async updateUser(userId: number, data: any): Promise<ApiResponse> {
-    return this.request(`/api/v1/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async getUserProfile(): Promise<ApiResponse> {
-    return this.request('/api/v1/users/me');
-  }
-
-  async updateUserProfile(data: any): Promise<ApiResponse> {
-    return this.request('/api/v1/users/me', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
   async uploadAvatar(file: File, onProgress?: (progress: number) => void): Promise<ApiResponse<{ url: string }>> {
     const formData = new FormData();
     formData.append('file', file);

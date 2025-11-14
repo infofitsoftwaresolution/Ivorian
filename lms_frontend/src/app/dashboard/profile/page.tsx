@@ -333,9 +333,19 @@ export default function ProfilePage() {
                         });
                         
                         // Handle different response structures
-                        const avatarUrl = response.data?.url || response.data?.data?.url || response.data;
+                        let avatarUrl: string | undefined;
+                        if (response.data && typeof response.data === 'object') {
+                          if ('url' in response.data && typeof response.data.url === 'string') {
+                            avatarUrl = response.data.url;
+                          } else if ('data' in response.data && response.data.data && typeof response.data.data === 'object' && 'url' in response.data.data && typeof response.data.data.url === 'string') {
+                            avatarUrl = response.data.data.url;
+                          }
+                        } else if (typeof response.data === 'string') {
+                          avatarUrl = response.data;
+                        }
+                        
                         if (avatarUrl) {
-                          const url = typeof avatarUrl === 'string' ? avatarUrl : avatarUrl.url || avatarUrl;
+                          const url = avatarUrl;
                           setProfileData({ ...profileData, avatar_url: url });
                           await apiClient.updateUserProfile({ avatar_url: url });
                           await refreshUser();

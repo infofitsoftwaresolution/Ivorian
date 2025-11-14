@@ -26,14 +26,14 @@ const userSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   phone: z.string().optional(),
   role: z.enum(['student', 'tutor', 'organization_admin', 'super_admin']),
-  organization_id: z.preprocess(
-    (val) => {
-      if (val === '' || val === undefined || val === null) return undefined;
-      if (typeof val === 'string') return val === '' ? undefined : Number(val);
-      return val;
-    },
-    z.number().optional()
-  ),
+  organization_id: z.union([
+    z.number(),
+    z.string()
+  ]).optional().transform((val) => {
+    if (val === '' || val === undefined || val === null) return undefined;
+    if (typeof val === 'string') return val === '' ? undefined : Number(val);
+    return val;
+  }) as z.ZodEffects<z.ZodUnion<[z.ZodNumber, z.ZodString]>, number | undefined, string | number | undefined>,
   is_active: z.boolean().optional(),
 });
 

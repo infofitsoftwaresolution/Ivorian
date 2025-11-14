@@ -121,9 +121,11 @@ export default function VideoUploader({
       if (response.data && typeof response.data === 'object') {
         if ('url' in response.data && typeof response.data.url === 'string') {
           videoUrl = response.data.url;
-        } else if ('data' in response.data && response.data.data && typeof response.data.data === 'object' && 'url' in response.data.data) {
+        } else if ('data' in response.data && response.data.data && typeof response.data.data === 'object' && 'url' in response.data.data && typeof response.data.data.url === 'string') {
           videoUrl = response.data.data.url;
         }
+      } else if (typeof response.data === 'string') {
+        videoUrl = response.data;
       }
       
       if (videoUrl) {
