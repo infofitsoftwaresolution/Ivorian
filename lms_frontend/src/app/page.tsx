@@ -207,7 +207,9 @@ export default function HomePage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
+  const [allCourses, setAllCourses] = useState<any[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
+  const [showAllCourses, setShowAllCourses] = useState(false);
 
   const formatDate = (dateString: string) => {
     // Use a consistent date format to avoid hydration issues
@@ -230,21 +232,28 @@ export default function HomePage() {
         
         // Handle different response structures
         let coursesData: any[] = [];
+        console.log('API Response:', response);
+        console.log('Response data:', response.data);
+        
         if (Array.isArray(response.data)) {
           coursesData = response.data;
         } else if (response.data?.courses && Array.isArray(response.data.courses)) {
           coursesData = response.data.courses;
         } else if (response.data?.data && Array.isArray(response.data.data)) {
           coursesData = response.data.data;
-        } else if (response.data?.users && Array.isArray(response.data.users)) {
-          // Handle if response structure is different
+        } else if (response.data?.data?.courses && Array.isArray(response.data.data.courses)) {
+          coursesData = response.data.data.courses;
+        } else {
+          // Try to find courses array in nested structure
+          console.warn('Unexpected response structure:', response.data);
           coursesData = [];
         }
+        
+        console.log('Extracted courses data:', coursesData);
         
         // Transform API data to match component format
         const transformedCourses = coursesData
           .filter((course: any) => course.status === 'published') // Ensure only published
-          // Show all published courses (removed .slice(0, 4))
           .map((course: any) => ({
             id: course.id,
             title: course.title,
@@ -261,7 +270,12 @@ export default function HomePage() {
             featured: true
           }));
         
-        setFeaturedCourses(transformedCourses);
+        console.log('Transformed courses:', transformedCourses);
+        
+        // Store all courses
+        setAllCourses(transformedCourses);
+        // Show only first 3 courses initially
+        setFeaturedCourses(transformedCourses.slice(0, 3));
       } catch (error) {
         console.error('Error fetching courses:', error);
         // Handle ApiError properly
@@ -504,16 +518,42 @@ export default function HomePage() {
               </Link>
             ))}
           </div>
+          
+          {/* Show All Courses Button */}
+          {!showAllCourses && allCourses.length > 3 && (
+            <div className="text-center mt-8">
+              <button
+                onClick={() => setShowAllCourses(true)}
+                className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-8 py-3 text-lg font-semibold rounded-full hover:from-green-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                See All Courses ({allCourses.length})
+              </button>
+            </div>
           )}
           
-          <div className="text-center mt-12">
+          {/* Show Less Button */}
+          {showAllCourses && allCourses.length > 3 && (
+            <div className="text-center mt-8">
+              <button
+                onClick={() => setShowAllCourses(false)}
+                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-8 py-3 text-lg font-semibold rounded-full hover:from-gray-600 hover:to-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                Show Less
+              </button>
+            </div>
+          )}
+          
+          {/* View All Courses Link */}
+          <div className="text-center mt-8">
             <Link 
               href="/courses" 
-              className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-8 py-3 text-lg font-semibold rounded-full hover:from-green-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 text-lg font-semibold rounded-full hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl inline-block"
             >
-              View All Courses
+              Browse All Courses
             </Link>
           </div>
+          </>
+          )}
         </div>
       </section>
 
