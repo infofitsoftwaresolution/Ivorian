@@ -39,7 +39,7 @@ interface Course {
   status: 'published' | 'draft';
   tags?: string[];
   learning_objectives?: string[];
-  prerequisites?: string[];
+  prerequisites?: string[] | string; // Can be array or string
   created_at: string;
 }
 
@@ -64,7 +64,18 @@ export default function CourseDetailPage() {
         setError('');
         
         const response = await apiClient.getCourse(parseInt(courseId));
-        setCourse(response.data);
+        const courseData = response.data;
+        
+        // Transform prerequisites: convert string to array if needed
+        if (courseData.prerequisites && typeof courseData.prerequisites === 'string') {
+          // Split by newlines and filter out empty strings
+          courseData.prerequisites = courseData.prerequisites
+            .split('\n')
+            .map((p: string) => p.trim())
+            .filter((p: string) => p.length > 0);
+        }
+        
+        setCourse(courseData);
       } catch (error) {
         console.error('Error fetching course data:', error);
         if (error instanceof ApiError) {
@@ -236,17 +247,21 @@ export default function CourseDetailPage() {
             )}
 
             {/* Prerequisites */}
-            {course.prerequisites && course.prerequisites.length > 0 && (
+            {course.prerequisites && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Prerequisites</h2>
-                <ul className="space-y-2">
-                  {course.prerequisites.map((prereq, index) => (
-                    <li key={index} className="flex items-start">
-                      <AcademicCapIcon className="h-5 w-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-700">{prereq}</span>
-                    </li>
-                  ))}
-                </ul>
+                {Array.isArray(course.prerequisites) && course.prerequisites.length > 0 ? (
+                  <ul className="space-y-2">
+                    {course.prerequisites.map((prereq, index) => (
+                      <li key={index} className="flex items-start">
+                        <AcademicCapIcon className="h-5 w-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">{prereq}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : typeof course.prerequisites === 'string' && course.prerequisites.trim() ? (
+                  <div className="text-gray-700 whitespace-pre-wrap">{course.prerequisites}</div>
+                ) : null}
               </div>
             )}
           </div>
