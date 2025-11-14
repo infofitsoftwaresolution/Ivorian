@@ -21,6 +21,7 @@ from app.schemas.course import (
     CourseInstructorCreate, CourseInstructorUpdate, CourseInstructorResponse,
     BulkEnrollmentCreate, BulkEnrollmentResponse, EnrollmentAnalytics
 )
+from app.models.course import CourseStatus
 from app.services.course import CourseService, TopicService, LessonService, EnrollmentService, LessonAttachmentService, CourseInstructorService
 
 router = APIRouter()
@@ -64,12 +65,21 @@ async def get_courses(
         actual_skip = (page - 1) * size
         actual_limit = size
     
+    # Convert status string to CourseStatus enum if provided
+    status_enum = None
+    if status:
+        try:
+            status_enum = CourseStatus(status)
+        except ValueError:
+            # Invalid status value, will be ignored
+            pass
+    
     filters = CourseFilter(
         search=search,
         difficulty_level=difficulty_level,
         min_price=min_price,
         max_price=max_price,
-        status=status,
+        status=status_enum,
         organization_id=organization_id,
         category=category,
         is_featured=is_featured
