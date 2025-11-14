@@ -29,7 +29,11 @@ class Settings(BaseSettings):
             "http://localhost:8080", 
             "http://127.0.0.1:3000",
             "http://15.206.84.110:3000",
-            "https://15.206.84.110:3000"
+            "https://15.206.84.110:3000",
+            "https://edumentry.com",
+            "http://edumentry.com",
+            "https://www.edumentry.com",
+            "http://www.edumentry.com"
         ],
         env="BACKEND_CORS_ORIGINS"
     )
@@ -43,7 +47,11 @@ class Settings(BaseSettings):
             "http://localhost:8080", 
             "http://127.0.0.1:3000",
             "http://15.206.84.110:3000",
-            "https://15.206.84.110:3000"
+            "https://15.206.84.110:3000",
+            "https://edumentry.com",
+            "http://edumentry.com",
+            "https://www.edumentry.com",
+            "http://www.edumentry.com"
         ]
         
         if v is None:
