@@ -350,7 +350,7 @@ class ApiClient {
 
   async getUsers(params?: any): Promise<ApiResponse> {
     if (!params) {
-      return this.request(`/api/v1/users`);
+      return this.request(`/api/v1/users/`);
     }
     
     // Build query string manually to handle boolean values properly
@@ -367,7 +367,7 @@ class ApiClient {
     });
     
     const queryString = queryParams.toString();
-    return this.request(`/api/v1/users${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/v1/users/${queryString ? `?${queryString}` : ''}`);
   }
 
   async getUser(id: string): Promise<ApiResponse> {

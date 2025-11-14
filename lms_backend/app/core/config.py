@@ -24,7 +24,13 @@ class Settings(BaseSettings):
     
     # CORS - Use Any to prevent automatic JSON parsing, then convert in validator
     BACKEND_CORS_ORIGINS: Any = Field(
-        default=["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"],
+        default=[
+            "http://localhost:3000", 
+            "http://localhost:8080", 
+            "http://127.0.0.1:3000",
+            "http://15.206.84.110:3000",
+            "https://15.206.84.110:3000"
+        ],
         env="BACKEND_CORS_ORIGINS"
     )
     
@@ -32,7 +38,13 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_cors_origins(cls, v: Any) -> List[str]:
         """Parse CORS origins from various formats"""
-        default_origins = ["http://localhost:3000", "http://localhost:8080", "http://127.0.0.1:3000"]
+        default_origins = [
+            "http://localhost:3000", 
+            "http://localhost:8080", 
+            "http://127.0.0.1:3000",
+            "http://15.206.84.110:3000",
+            "https://15.206.84.110:3000"
+        ]
         
         if v is None:
             return default_origins

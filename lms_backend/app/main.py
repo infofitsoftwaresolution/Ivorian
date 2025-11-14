@@ -61,7 +61,8 @@ app = FastAPI(
 # Setup exception handlers
 setup_exception_handlers(app)
 
-# Add CORS middleware
+# Add CORS middleware - Must be added before other middleware
+# This ensures CORS headers are set even on redirects
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
