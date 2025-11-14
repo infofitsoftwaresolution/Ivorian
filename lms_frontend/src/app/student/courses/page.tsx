@@ -192,7 +192,11 @@ export default function StudentCoursesPage() {
   };
 
   // Extract unique categories from enrolled courses
-  const categories = ['all', ...Array.from(new Set(enrolledCourses.map(e => e.course.category).filter(Boolean)))];
+  const categories = ['all', ...Array.from(new Set(
+    enrolledCourses
+      .map(e => e?.course?.category)
+      .filter((cat): cat is string => Boolean(cat))
+  ))];
 
   return (
     <div className="space-y-6">
@@ -345,6 +349,12 @@ export default function StudentCoursesPage() {
       ) : filteredCourses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCourses.map((enrollment) => {
+            // Skip if course data is missing
+            if (!enrollment?.course) {
+              console.warn('Missing course data for enrollment:', enrollment);
+              return null;
+            }
+            
             const course = enrollment.course;
             const progress = enrollment.progress_percentage || 0;
             
@@ -363,11 +373,13 @@ export default function StudentCoursesPage() {
                       <BookOpenIcon className="h-12 w-12 text-gray-400" />
                     </div>
                   )}
-                  <div className="absolute top-2 right-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(course.difficulty_level)}`}>
-                      {course.difficulty_level}
-                    </span>
-                  </div>
+                  {course.difficulty_level && (
+                    <div className="absolute top-2 right-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(course.difficulty_level)}`}>
+                        {course.difficulty_level}
+                      </span>
+                    </div>
+                  )}
                   {/* Progress Bar */}
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200">
                     <div 
@@ -406,14 +418,18 @@ export default function StudentCoursesPage() {
 
                   {/* Course Stats */}
                   <div className="flex items-center space-x-4 mb-4 text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <ClockIcon className="h-4 w-4 mr-1" />
-                      {formatDuration(course.total_duration)}
-                    </div>
-                    <div className="flex items-center">
-                      <BookOpenIcon className="h-4 w-4 mr-1" />
-                      {course.total_lessons} lessons
-                    </div>
+                    {course.total_duration !== undefined && (
+                      <div className="flex items-center">
+                        <ClockIcon className="h-4 w-4 mr-1" />
+                        {formatDuration(course.total_duration)}
+                      </div>
+                    )}
+                    {course.total_lessons !== undefined && (
+                      <div className="flex items-center">
+                        <BookOpenIcon className="h-4 w-4 mr-1" />
+                        {course.total_lessons} lessons
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Button */}
