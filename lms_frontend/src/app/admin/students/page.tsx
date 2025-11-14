@@ -222,7 +222,7 @@ export default function StudentsPage() {
     if (confirm('Are you sure you want to delete this student? This action cannot be undone.')) {
       try {
         setLoading(true);
-        await apiClient.deleteUser(studentId);
+        await apiClient.deleteUser(String(studentId));
         await loadStudents();
       } catch (error: unknown) {
         console.error('Error deleting student:', error);

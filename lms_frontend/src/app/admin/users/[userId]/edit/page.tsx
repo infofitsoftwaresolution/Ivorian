@@ -33,7 +33,7 @@ const userSchema = z.object({
     if (val === '' || val === undefined || val === null) return undefined;
     if (typeof val === 'string') return val === '' ? undefined : Number(val);
     return val;
-  }) as z.ZodEffects<z.ZodUnion<[z.ZodNumber, z.ZodString]>, number | undefined, string | number | undefined>,
+  }) as z.ZodType<number | undefined>,
   is_active: z.boolean().optional(),
 });
 

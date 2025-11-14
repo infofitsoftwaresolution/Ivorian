@@ -184,7 +184,7 @@ export default function UsersPage() {
     if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       try {
         setLoading(true);
-        await apiClient.deleteUser(userId);
+        await apiClient.deleteUser(String(userId));
         await loadUsers();
       } catch (error: any) {
         console.error('Error deleting user:', error);

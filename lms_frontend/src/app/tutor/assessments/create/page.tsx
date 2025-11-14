@@ -34,7 +34,7 @@ const assessmentSchema = z.object({
   passing_score: z.number().min(0).max(100).optional(),
   attempts_allowed: z.number().min(1).optional(),
   due_date: z.string().optional(),
-  status: z.enum(['draft', 'published']).default('draft'),
+  status: z.enum(['draft', 'published']),
 });
 
 type AssessmentFormData = z.infer<typeof assessmentSchema>;
@@ -68,7 +68,7 @@ export default function CreateAssessmentPage() {
     resolver: zodResolver(assessmentSchema),
     defaultValues: {
       type: 'quiz',
-      status: 'draft',
+      status: 'draft' as 'draft' | 'published',
     }
   });
 

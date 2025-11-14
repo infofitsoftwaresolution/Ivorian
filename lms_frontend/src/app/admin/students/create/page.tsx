@@ -37,7 +37,7 @@ const studentSchema = z.object({
     if (val === '' || val === undefined || val === null) return undefined;
     if (typeof val === 'string') return val === '' ? undefined : Number(val);
     return val;
-  }) as z.ZodEffects<z.ZodUnion<[z.ZodNumber, z.ZodString]>, number | undefined, string | number | undefined>,
+  }) as z.ZodType<number | undefined>,
   course_ids: z.array(z.number()).default([]),
 }).refine((data) => data.password === data.confirm_password, {
   message: "Passwords don't match",
@@ -84,12 +84,12 @@ export default function CreateStudentPage() {
   } = useForm<StudentFormData>({
     resolver: zodResolver(studentSchema),
     defaultValues: {
-      course_ids: [],
+      course_ids: [] as number[],
       organization_id: user?.organization_id,
     }
   });
 
-  const selectedCourseIds = watch('course_ids');
+  const selectedCourseIds = watch('course_ids') as number[] | undefined;
   const selectedOrganizationId = watch('organization_id');
 
   // Check if user is super admin or organization admin
