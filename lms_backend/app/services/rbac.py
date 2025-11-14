@@ -4,6 +4,7 @@ RBAC Service for role and permission management
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.models.rbac import Role, Permission
 from app.models.user import User
 
@@ -14,7 +15,12 @@ class RBACService:
     @staticmethod
     async def get_user_roles(db: AsyncSession, user_id: int) -> List[Role]:
         """Get all roles for a user"""
-        user = await db.get(User, user_id)
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.roles))
+            .where(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
         if not user:
             return []
         return user.roles
@@ -22,7 +28,14 @@ class RBACService:
     @staticmethod
     async def get_user_permissions(db: AsyncSession, user_id: int) -> List[Permission]:
         """Get all permissions for a user through their roles"""
-        user = await db.get(User, user_id)
+        result = await db.execute(
+            select(User)
+            .options(
+                selectinload(User.roles).selectinload(Role.permissions)
+            )
+            .where(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
         if not user:
             return []
         
