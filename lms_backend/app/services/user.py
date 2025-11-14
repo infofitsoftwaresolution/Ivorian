@@ -44,11 +44,12 @@ class UserService:
                 if not organization:
                     raise ValidationError(f"Organization with ID {user_data.organization_id} does not exist")
             
-            # Generate temporary password if user is being created by admin (student/tutor)
-            # Check if password is provided (for manual creation) or generate temp password
+            # Handle password: use provided password if available, otherwise generate temp password
             temp_password = None
-            if hasattr(user_data, 'password') and user_data.password:
-                # Password provided - use it (for manual registration)
+            password_provided = hasattr(user_data, 'password') and user_data.password and user_data.password.strip()
+            
+            if password_provided:
+                # Password provided - use it (validation already done by Pydantic schema)
                 hashed_password = get_password_hash(user_data.password)
                 password_change_required = False
             else:
@@ -80,8 +81,8 @@ class UserService:
             await db.commit()
             await db.refresh(user)
             
-            # Send welcome email if temp password was generated (admin-created user)
-            if password_change_required and user_data.organization_id:
+            # Send welcome email only if temp password was generated (admin-created user)
+            if password_change_required and temp_password and user_data.organization_id:
                 # Get organization name (Organization is already imported at top of file)
                 org_result = await db.execute(select(Organization).where(Organization.id == user_data.organization_id))
                 organization = org_result.scalar_one_or_none()
@@ -122,6 +123,8 @@ class UserService:
                     app_logger.error(f"❌ Exception while sending welcome email to {user.email}: {str(e)}")
                     import traceback
                     app_logger.error(f"   Traceback: {traceback.format_exc()}")
+            elif not password_change_required and user_data.organization_id:
+                app_logger.info(f"ℹ️  User {user.email} ({user.role}) created with custom password - no welcome email sent")
             
             # Assign roles
             if user_data.roles:
@@ -515,9 +518,20 @@ class UserService:
             if existing_user:
                 raise ValidationError("User with this email already exists")
             
-            # Generate temporary password
-            temp_password = UserService._generate_temp_password()
-            hashed_password = get_password_hash(temp_password)
+            # Handle password: use provided password if available, otherwise generate temp password
+            temp_password = None
+            password_provided = tutor_data.get("password") and tutor_data["password"].strip()
+            
+            if password_provided:
+                # Password provided by organization admin - use it
+                # Validation is already done by Pydantic schema
+                hashed_password = get_password_hash(tutor_data["password"])
+                password_change_required = False
+            else:
+                # No password provided - generate temp password
+                temp_password = UserService._generate_temp_password()
+                hashed_password = get_password_hash(temp_password)
+                password_change_required = True
             
             # Get organization name for email
             from app.models.organization import Organization
@@ -538,7 +552,7 @@ class UserService:
                 is_active=tutor_data.get("is_active", True),
                 status="active",
                 is_verified=False,
-                password_change_required=True  # Require password change on first login
+                password_change_required=password_change_required  # Only require change if temp password was generated
             )
             
             db.add(tutor)
@@ -558,28 +572,32 @@ class UserService:
                     # Fallback to first origin
                     login_url = f"{settings.BACKEND_CORS_ORIGINS[0]}/login"
             
-            app_logger.info(f"📧 Attempting to send welcome email to {tutor.email} for tutor account")
-            app_logger.info(f"🔗 Login URL: {login_url}")
-            
-            try:
-                email_sent = await email_service.send_welcome_email_tutor(
-                    email=tutor.email,
-                    first_name=tutor.first_name or "Tutor",
-                    organization_name=organization_name,
-                    temp_password=temp_password,
-                    login_url=login_url
-                )
+            # Send welcome email only if temp password was generated
+            if password_change_required and temp_password:
+                app_logger.info(f"📧 Attempting to send welcome email to {tutor.email} for tutor account")
+                app_logger.info(f"🔗 Login URL: {login_url}")
                 
-                if email_sent:
-                    app_logger.info(f"✅ Welcome email sent successfully to {tutor.email}")
-                else:
-                    app_logger.error(f"❌ Failed to send welcome email to {tutor.email}")
-                    app_logger.error(f"   ⚠️  If AWS SES is in sandbox mode, recipient email must be verified")
-                    app_logger.error(f"   Verify email: https://console.aws.amazon.com/ses/home?region={settings.AWS_REGION}#/verified-identities")
-            except Exception as e:
-                app_logger.error(f"❌ Exception while sending welcome email to {tutor.email}: {str(e)}")
-                import traceback
-                app_logger.error(f"   Traceback: {traceback.format_exc()}")
+                try:
+                    email_sent = await email_service.send_welcome_email_tutor(
+                        email=tutor.email,
+                        first_name=tutor.first_name or "Tutor",
+                        organization_name=organization_name,
+                        temp_password=temp_password,
+                        login_url=login_url
+                    )
+                    
+                    if email_sent:
+                        app_logger.info(f"✅ Welcome email sent successfully to {tutor.email}")
+                    else:
+                        app_logger.error(f"❌ Failed to send welcome email to {tutor.email}")
+                        app_logger.error(f"   ⚠️  If AWS SES is in sandbox mode, recipient email must be verified")
+                        app_logger.error(f"   Verify email: https://console.aws.amazon.com/ses/home?region={settings.AWS_REGION}#/verified-identities")
+                except Exception as e:
+                    app_logger.error(f"❌ Exception while sending welcome email to {tutor.email}: {str(e)}")
+                    import traceback
+                    app_logger.error(f"   Traceback: {traceback.format_exc()}")
+            elif not password_change_required:
+                app_logger.info(f"ℹ️  Tutor {tutor.email} created with custom password - no welcome email sent")
             
             logger.info(f"Tutor created: {tutor.email} (ID: {tutor.id}) for organization {organization_id}")
             return tutor

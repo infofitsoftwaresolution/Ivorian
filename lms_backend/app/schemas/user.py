@@ -37,14 +37,16 @@ class UserBase(BaseModel):
 # Create User Schema
 class UserCreate(UserBase):
     """Schema for creating a new user"""
-    password: str = Field(..., min_length=8, description="User's password")
+    password: Optional[str] = Field(None, min_length=8, description="User's password (optional - if not provided, a temporary password will be generated for admin-created users)")
     organization_id: Optional[int] = Field(None, description="Organization ID if user belongs to an organization")
     roles: List[str] = Field(default=["student"], description="List of role names to assign to user")
     
     @field_validator('password')
     @classmethod
     def validate_password(cls, v):
-        """Validate password strength"""
+        """Validate password strength if provided"""
+        if v is None:
+            return v  # Password is optional - will generate temp password for admin-created users
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         if not any(c.isupper() for c in v):
@@ -174,14 +176,3 @@ class UserStats(BaseModel):
     new_users_this_month: int
     new_users_this_week: int
 
-class TutorCreate(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-    first_name: str = Field(..., min_length=1, max_length=50)
-    last_name: str = Field(..., min_length=1, max_length=50)
-    phone: Optional[str] = None
-    bio: Optional[str] = None
-    expertise: Optional[str] = None
-    experience_years: Optional[int] = Field(None, ge=0, le=50)
-    hourly_rate: Optional[float] = Field(None, ge=0)
-    is_active: bool = True
