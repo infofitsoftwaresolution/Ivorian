@@ -49,21 +49,21 @@ if [ -f lms_backend/.env ]; then
         echo "✅ Added EMAIL configuration placeholders to .env (please update EMAILS_FROM_EMAIL)"
     fi
     
-    # Fix BACKEND_CORS_ORIGINS format - remove any existing and add correct format
+    # Fix BACKEND_CORS_ORIGINS format - remove any existing and add correct format with domain
     if grep -q "^BACKEND_CORS_ORIGINS=" lms_backend/.env 2>/dev/null; then
         # Remove existing BACKEND_CORS_ORIGINS line
         sed -i '/^BACKEND_CORS_ORIGINS=/d' lms_backend/.env
     fi
-    # Add correct format
-    echo 'BACKEND_CORS_ORIGINS="http://15.206.84.110,http://15.206.84.110:3000,http://15.206.84.110:8000,http://localhost:3000"' >> lms_backend/.env
-    echo "✅ Fixed BACKEND_CORS_ORIGINS format"
+    # Add correct format with edumentry.com domain
+    echo 'BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:8080","http://127.0.0.1:3000","http://15.206.84.110:3000","https://15.206.84.110:3000","https://edumentry.com","http://edumentry.com","https://www.edumentry.com","http://www.edumentry.com"]' >> lms_backend/.env
+    echo "✅ Updated BACKEND_CORS_ORIGINS with edumentry.com domain"
 else
     # Create .env file if it doesn't exist
     echo "Creating lms_backend/.env file..."
     touch lms_backend/.env
     echo "AWS_REGION=ap-south-1" >> lms_backend/.env
     echo "AWS_S3_BUCKET=infofitlabs-lms-videos" >> lms_backend/.env
-    echo 'BACKEND_CORS_ORIGINS="http://15.206.84.110,http://15.206.84.110:3000,http://15.206.84.110:8000,http://localhost:3000"' >> lms_backend/.env
+    echo 'BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:8080","http://127.0.0.1:3000","http://15.206.84.110:3000","https://15.206.84.110:3000","https://edumentry.com","http://edumentry.com","https://www.edumentry.com","http://www.edumentry.com"]' >> lms_backend/.env
     echo "# Email Configuration (AWS SES)" >> lms_backend/.env
     echo "EMAILS_FROM_EMAIL=" >> lms_backend/.env
     echo "EMAILS_FROM_NAME=InfoFit LMS" >> lms_backend/.env
