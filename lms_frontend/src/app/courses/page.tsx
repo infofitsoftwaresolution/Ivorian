@@ -94,7 +94,7 @@ export default function CoursesPage() {
             originalPrice: course.original_price ? `$${course.original_price}` : undefined,
             image: course.thumbnail_url || course.image || '/courses/default.jpg',
             category: course.category || 'General',
-            level: course.difficulty_level || course.level || 'All Levels',
+            level: (course.difficulty_level || course.level || 'beginner').toLowerCase(),
             featured: course.is_featured || false,
             description: course.short_description || course.description || '',
             lessons: course.total_lessons || 0
