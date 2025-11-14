@@ -64,20 +64,25 @@ def user_to_profile(user: User) -> UserProfile:
     # For now, just use the role field directly to avoid relationship issues
     roles = [user.role] if user.role else []
     
+    # Handle None values with defaults
+    status = user.status if user.status else "active"
+    is_verified = user.is_verified if user.is_verified is not None else False
+    is_active = user.is_active if user.is_active is not None else True
+    
     return UserProfile(
         id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
+        first_name=user.first_name or "",
+        last_name=user.last_name or "",
         email=user.email,
         phone=user.phone,
         bio=user.bio,
         avatar_url=user.avatar_url,
         date_of_birth=user.date_of_birth,
-        timezone=user.timezone,
-        language=user.language,
-        status=user.status,
-        is_active=user.is_active,
-        is_verified=user.is_verified,
+        timezone=user.timezone or "UTC",
+        language=user.language or "en",
+        status=status,
+        is_active=is_active,
+        is_verified=is_verified,
         organization_id=user.organization_id,
         roles=roles,
         created_at=user.created_at,
