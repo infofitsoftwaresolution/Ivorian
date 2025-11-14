@@ -5,7 +5,7 @@ on:
     branches:
       - main
   workflow_dispatch:
-  # Retry deployment trigger - Attempt 2
+  # Retry deployment trigger - Attempt 3
 
 env:
   EC2_HOST: 15.206.84.110
