@@ -116,9 +116,19 @@ export default function VideoUploader({
         }
       );
 
-      if (response.data && response.data.url) {
+      // Handle different response structures
+      let videoUrl: string | undefined;
+      if (response.data && typeof response.data === 'object') {
+        if ('url' in response.data && typeof response.data.url === 'string') {
+          videoUrl = response.data.url;
+        } else if ('data' in response.data && response.data.data && typeof response.data.data === 'object' && 'url' in response.data.data) {
+          videoUrl = response.data.data.url;
+        }
+      }
+      
+      if (videoUrl) {
         setUploadProgress(100);
-        onVideoChange(response.data.url);
+        onVideoChange(videoUrl);
         setIsUploading(false);
         setUploadProgress(0);
       } else {

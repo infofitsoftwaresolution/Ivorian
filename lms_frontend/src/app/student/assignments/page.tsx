@@ -168,10 +168,10 @@ export default function StudentAssignmentsPage() {
           return {
             ...assessment,
             submission_status: submissionStatus,
-            is_overdue: isOverdue,
-            days_until_due: daysUntilDue,
+            is_overdue: isOverdue ?? false,
+            days_until_due: daysUntilDue ?? null,
             attempts_used: assessment.attempts_used || 0
-          };
+          } as Assignment;
         });
 
       setAssignments(studentAssignments);
