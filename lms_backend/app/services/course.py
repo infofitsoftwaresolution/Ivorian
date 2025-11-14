@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, func, desc, select
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 
-from app.models.course import Course, Topic, Lesson, Enrollment, LessonProgress, CourseInstructor, CourseReview, LessonAttachment
+from app.models.course import Course, Topic, Lesson, Enrollment, LessonProgress, CourseInstructor, CourseReview, LessonAttachment, CourseStatus
 from app.models.user import User
 from app.models.organization import Organization
 from app.schemas.course import (
@@ -118,7 +118,17 @@ class CourseService:
                 query = query.where(Course.price <= filters.max_price)
             
             if filters.status is not None:
-                query = query.where(Course.status == filters.status)
+                # Handle both enum and string status values
+                if isinstance(filters.status, str):
+                    # Convert string to enum if needed
+                    try:
+                        status_enum = CourseStatus(filters.status.lower())
+                        query = query.where(Course.status == status_enum)
+                    except ValueError:
+                        # Invalid status, skip filter
+                        pass
+                else:
+                    query = query.where(Course.status == filters.status)
             
             if filters.organization_id:
                 query = query.where(Course.organization_id == filters.organization_id)

@@ -69,9 +69,21 @@ async def get_courses(
     status_enum = None
     if status:
         try:
-            status_enum = CourseStatus(status)
-        except ValueError:
+            # Normalize status to lowercase for comparison
+            status_lower = status.lower().strip()
+            # Try to match enum value
+            for enum_member in CourseStatus:
+                if enum_member.value.lower() == status_lower:
+                    status_enum = enum_member
+                    break
+            # If no match found, try direct conversion
+            if status_enum is None:
+                status_enum = CourseStatus(status_lower)
+        except (ValueError, AttributeError) as e:
             # Invalid status value, will be ignored
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Invalid status value '{status}', ignoring filter: {str(e)}")
             pass
     
     filters = CourseFilter(
