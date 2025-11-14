@@ -5,11 +5,10 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-User=ec2-user
-Group=ec2-user
-WorkingDirectory=/home/ec2-user/lms-app/lms_backend
-Environment="PATH=/home/ec2-user/lms-app/lms_backend/venv/bin"
-EnvironmentFile=/home/ec2-user/lms-app/.env
+# User will be set by deployment script based on system
+WorkingDirectory=%h/lms-app/lms_backend
+Environment="PATH=%h/lms-app/lms_backend/venv/bin"
+EnvironmentFile=%h/lms-app/.env
 Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONDONTWRITEBYTECODE=1"
 
@@ -19,7 +18,7 @@ MemoryHigh=400M
 CPUQuota=50%
 
 # Optimized uvicorn with limited workers
-ExecStart=/home/ec2-user/lms-app/lms_backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --limit-concurrency 100
+ExecStart=%h/lms-app/lms_backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --limit-concurrency 100
 
 # Restart policy
 Restart=always

@@ -120,7 +120,17 @@ print_success "Migrations completed"
 # Update systemd service with optimized settings
 if [ -f "deploy/systemd/lms-backend.service" ]; then
     echo "⚙️  Updating backend service configuration..."
-    sudo cp deploy/systemd/lms-backend.service /etc/systemd/system/
+    # Replace %h with actual home directory and set user
+    CURRENT_USER=$(whoami)
+    CURRENT_HOME=$(eval echo ~$CURRENT_USER)
+    sed "s|%h|$CURRENT_HOME|g" deploy/systemd/lms-backend.service | \
+        sed "s|^# User will be set|User=$CURRENT_USER|" | \
+        sed "s|^# User will be set|User=$CURRENT_USER|" > /tmp/lms-backend.service
+    # Add User line if not present
+    if ! grep -q "^User=" /tmp/lms-backend.service; then
+        sed -i "/^\[Service\]/a User=$CURRENT_USER" /tmp/lms-backend.service
+    fi
+    sudo cp /tmp/lms-backend.service /etc/systemd/system/lms-backend.service
     sudo systemctl daemon-reload
     print_success "Backend service configuration updated"
 fi
@@ -207,7 +217,16 @@ fi
 # Update systemd service with optimized settings
 if [ -f "deploy/systemd/lms-frontend.service" ]; then
     echo "⚙️  Updating frontend service configuration..."
-    sudo cp deploy/systemd/lms-frontend.service /etc/systemd/system/
+    # Replace %h with actual home directory and set user
+    CURRENT_USER=$(whoami)
+    CURRENT_HOME=$(eval echo ~$CURRENT_USER)
+    sed "s|%h|$CURRENT_HOME|g" deploy/systemd/lms-frontend.service | \
+        sed "s|^# User will be set|User=$CURRENT_USER|" > /tmp/lms-frontend.service
+    # Add User line if not present
+    if ! grep -q "^User=" /tmp/lms-frontend.service; then
+        sed -i "/^\[Service\]/a User=$CURRENT_USER" /tmp/lms-frontend.service
+    fi
+    sudo cp /tmp/lms-frontend.service /etc/systemd/system/lms-frontend.service
     sudo systemctl daemon-reload
     print_success "Frontend service configuration updated"
 fi
