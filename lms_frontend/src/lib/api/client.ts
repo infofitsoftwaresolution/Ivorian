@@ -349,8 +349,25 @@ class ApiClient {
   }
 
   async getUsers(params?: any): Promise<ApiResponse> {
-    const queryString = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return this.request(`/api/v1/users${queryString}`);
+    if (!params) {
+      return this.request(`/api/v1/users`);
+    }
+    
+    // Build query string manually to handle boolean values properly
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        // Convert boolean to string properly
+        if (typeof value === 'boolean') {
+          queryParams.append(key, value.toString());
+        } else {
+          queryParams.append(key, String(value));
+        }
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return this.request(`/api/v1/users${queryString ? `?${queryString}` : ''}`);
   }
 
   async getUser(id: string): Promise<ApiResponse> {
@@ -422,8 +439,26 @@ class ApiClient {
 
   // Course Methods
   async getCourses(params?: any): Promise<ApiResponse> {
-    const queryString = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return this.request(`/api/v1/courses${queryString}`);
+    if (!params) {
+      return this.request(`/api/v1/courses`);
+    }
+    
+    // Build query string manually to handle boolean values properly
+    // Courses endpoint now accepts page/size directly
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        // Convert boolean to string properly
+        if (typeof value === 'boolean') {
+          queryParams.append(key, value.toString());
+        } else {
+          queryParams.append(key, String(value));
+        }
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    return this.request(`/api/v1/courses${queryString ? `?${queryString}` : ''}`);
   }
 
   async getCourse(id: number): Promise<ApiResponse> {

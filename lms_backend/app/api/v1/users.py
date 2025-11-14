@@ -254,14 +254,16 @@ async def list_users(
     Supports filtering by various criteria.
     """
     try:
+        # FastAPI automatically parses boolean query params from strings
+        # "true" -> True, "false" -> False, anything else -> None
         # Build filters
         filters = UserFilter(
             search=search,
             status=status,
             role=role,
             organization_id=organization_id,
-            is_active=is_active,
-            is_verified=is_verified
+            is_active=is_active,  # FastAPI handles string-to-bool conversion
+            is_verified=is_verified  # FastAPI handles string-to-bool conversion
         )
         
         # Calculate pagination

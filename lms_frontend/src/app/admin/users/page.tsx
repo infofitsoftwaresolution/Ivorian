@@ -149,9 +149,23 @@ export default function UsersPage() {
       setTotalUsers(total);
       
       console.log('UsersPage: Data loaded successfully', { users: usersData, total, pages });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading users:', error);
-      setError(error?.response?.data?.detail || 'Failed to load users. Please try again.');
+      let errorMessage = 'Failed to load users. Please try again.';
+      
+      if (error && typeof error === 'object') {
+        // Handle ApiError from apiClient
+        if ('message' in error && typeof (error as any).message === 'string') {
+          errorMessage = (error as any).message;
+        } else if ('response' in error) {
+          const apiError = error as { response?: { data?: { detail?: string } } };
+          errorMessage = apiError.response?.data?.detail || errorMessage;
+        } else if ('details' in error && (error as any).details?.detail) {
+          errorMessage = (error as any).details.detail;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
       console.log('UsersPage: Loading completed');

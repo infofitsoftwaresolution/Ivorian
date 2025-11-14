@@ -5,6 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import math
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -40,8 +41,10 @@ async def create_course(
 
 @router.get("/", response_model=CourseListResponse)
 async def get_courses(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(20, ge=1, le=100, description="Page size"),
+    skip: Optional[int] = Query(None, ge=0, description="Number of records to skip (alternative to page)"),
+    limit: Optional[int] = Query(None, ge=1, le=1000, description="Number of records to return (alternative to size)"),
     search: Optional[str] = Query(None, description="Search term for course title/description"),
     difficulty_level: Optional[str] = Query(None, description="Filter by difficulty level"),
     min_price: Optional[float] = Query(None, ge=0, description="Minimum price filter"),
@@ -53,6 +56,14 @@ async def get_courses(
     db: AsyncSession = Depends(get_db)
 ):
     """Get courses with filtering and pagination"""
+    # Use skip/limit if provided, otherwise calculate from page/size
+    if skip is not None and limit is not None:
+        actual_skip = skip
+        actual_limit = limit
+    else:
+        actual_skip = (page - 1) * size
+        actual_limit = size
+    
     filters = CourseFilter(
         search=search,
         difficulty_level=difficulty_level,
@@ -64,16 +75,16 @@ async def get_courses(
         is_featured=is_featured
     )
     
-    courses, total = await CourseService.get_courses(db, skip, limit, filters)
+    courses, total = await CourseService.get_courses(db, actual_skip, actual_limit, filters)
     
-    pages = (total + limit - 1) // limit
-    page = (skip // limit) + 1
+    pages = math.ceil(total / actual_limit) if total > 0 else 0
+    current_page = (actual_skip // actual_limit) + 1 if actual_limit > 0 else 1
     
     return CourseListResponse(
         courses=courses,
         total=total,
-        page=page,
-        size=limit,
+        page=current_page,
+        size=actual_limit,
         pages=pages
     )
 

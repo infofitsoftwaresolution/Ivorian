@@ -146,10 +146,21 @@ export default function StudentsPage() {
       setTotalStudents(total);
     } catch (error: unknown) {
       console.error('Error loading students:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : undefined;
-      setError(errorMessage || 'Failed to load students. Please try again.');
+      let errorMessage = 'Failed to load students. Please try again.';
+      
+      if (error && typeof error === 'object') {
+        // Handle ApiError from apiClient
+        if ('message' in error && typeof (error as any).message === 'string') {
+          errorMessage = (error as any).message;
+        } else if ('response' in error) {
+          const apiError = error as { response?: { data?: { detail?: string } } };
+          errorMessage = apiError.response?.data?.detail || errorMessage;
+        } else if ('details' in error && (error as any).details?.detail) {
+          errorMessage = (error as any).details.detail;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -160,10 +171,9 @@ export default function StudentsPage() {
       if (user?.role === 'super_admin') {
         loadOrganizations();
       }
-      loadStudents();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, currentPage, filterStatus, filterOrganization]);
+  }, [user, authLoading]);
 
   // Debounce search to avoid too many API calls
   useEffect(() => {
@@ -175,7 +185,16 @@ export default function StudentsPage() {
 
       return () => clearTimeout(timeoutId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
+
+  // Load students when filters or pagination change
+  useEffect(() => {
+    if (!authLoading && (user?.role === 'super_admin' || user?.role === 'organization_admin')) {
+      loadStudents();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading, currentPage, filterStatus, filterOrganization]);
 
   const loadOrganizations = async () => {
     try {

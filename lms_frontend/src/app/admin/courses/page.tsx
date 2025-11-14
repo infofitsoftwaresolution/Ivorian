@@ -140,10 +140,21 @@ export default function CoursesPage() {
       setTotalCourses(total);
     } catch (error: unknown) {
       console.error('Error loading courses:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : undefined;
-      setError(errorMessage || 'Failed to load courses. Please try again.');
+      let errorMessage = 'Failed to load courses. Please try again.';
+      
+      if (error && typeof error === 'object') {
+        // Handle ApiError from apiClient
+        if ('message' in error && typeof (error as any).message === 'string') {
+          errorMessage = (error as any).message;
+        } else if ('response' in error) {
+          const apiError = error as { response?: { data?: { detail?: string } } };
+          errorMessage = apiError.response?.data?.detail || errorMessage;
+        } else if ('details' in error && (error as any).details?.detail) {
+          errorMessage = (error as any).details.detail;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
