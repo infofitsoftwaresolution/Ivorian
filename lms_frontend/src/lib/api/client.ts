@@ -404,7 +404,7 @@ class ApiClient {
 
   async getOrganizations(params?: any): Promise<ApiResponse> {
     const queryString = params ? `?${new URLSearchParams(params).toString()}` : '';
-    return this.request(`/api/v1/organizations${queryString}`);
+    return this.request(`/api/v1/organizations/${queryString}`);
   }
 
   async getOrganization(id: string): Promise<ApiResponse> {
@@ -440,7 +440,7 @@ class ApiClient {
   // Course Methods
   async getCourses(params?: any): Promise<ApiResponse> {
     if (!params) {
-      return this.request(`/api/v1/courses`);
+      return this.request(`/api/v1/courses/`);
     }
     
     // Build query string manually to handle boolean values properly
@@ -458,7 +458,7 @@ class ApiClient {
     });
     
     const queryString = queryParams.toString();
-    return this.request(`/api/v1/courses${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/v1/courses/${queryString ? `?${queryString}` : ''}`);
   }
 
   async getCourse(id: number): Promise<ApiResponse> {
