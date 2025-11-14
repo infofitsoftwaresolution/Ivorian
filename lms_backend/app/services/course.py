@@ -119,16 +119,16 @@ class CourseService:
             
             if filters.status is not None:
                 # Handle both enum and string status values
-                if isinstance(filters.status, str):
-                    # Convert string to enum if needed
-                    try:
-                        status_enum = CourseStatus(filters.status.lower())
-                        query = query.where(Course.status == status_enum)
-                    except ValueError:
-                        # Invalid status, skip filter
-                        pass
+                # Database column is VARCHAR, so we need to compare with string value
+                if isinstance(filters.status, CourseStatus):
+                    # Use enum's string value for comparison
+                    query = query.where(Course.status == filters.status.value)
+                elif isinstance(filters.status, str):
+                    # Already a string, use directly
+                    query = query.where(Course.status == filters.status.lower())
                 else:
-                    query = query.where(Course.status == filters.status)
+                    # Try to convert to string
+                    query = query.where(Course.status == str(filters.status).lower())
             
             if filters.organization_id:
                 query = query.where(Course.organization_id == filters.organization_id)
