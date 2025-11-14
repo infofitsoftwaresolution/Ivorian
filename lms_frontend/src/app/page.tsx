@@ -477,8 +477,9 @@ export default function HomePage() {
               </Link>
             </div>
           ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredCourses.map((course) => (
+          <>
+          <div className={`grid grid-cols-1 md:grid-cols-2 ${showAllCourses ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6`}>
+            {(showAllCourses ? allCourses : featuredCourses).map((course) => (
               <Link key={course.id} href={`/courses/${course.id}`} className="group block">
                 <div className="relative overflow-hidden rounded-xl mb-3 shadow-lg hover:shadow-xl transition-all duration-300">
                   <div className="aspect-video bg-gradient-to-br from-green-100 via-blue-100 to-purple-100 flex items-center justify-center">
