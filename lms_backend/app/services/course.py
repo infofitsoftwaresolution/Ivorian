@@ -119,16 +119,21 @@ class CourseService:
             
             if filters.status is not None:
                 # Handle both enum and string status values
-                # Database column is VARCHAR, so we need to compare with string value
+                # Database column is VARCHAR, so we need to compare with string value (lowercase)
+                status_value = None
                 if isinstance(filters.status, CourseStatus):
-                    # Use enum's string value for comparison
-                    query = query.where(Course.status == filters.status.value)
+                    # Use enum's string value and convert to lowercase for comparison
+                    status_value = filters.status.value.lower()
                 elif isinstance(filters.status, str):
-                    # Already a string, use directly
-                    query = query.where(Course.status == filters.status.lower())
+                    # Already a string, convert to lowercase
+                    status_value = filters.status.lower()
                 else:
-                    # Try to convert to string
-                    query = query.where(Course.status == str(filters.status).lower())
+                    # Try to convert to string and lowercase
+                    status_value = str(filters.status).lower()
+                
+                # Compare with lowercase string value (database stores lowercase)
+                if status_value:
+                    query = query.where(Course.status == status_value)
             
             if filters.organization_id:
                 query = query.where(Course.organization_id == filters.organization_id)
