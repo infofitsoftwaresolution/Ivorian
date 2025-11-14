@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 
 // Form validation schema
 const tutorSchema = z.object({
