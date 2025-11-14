@@ -209,7 +209,10 @@ class UserService:
             return users, total
             
         except Exception as e:
-            logger.error(f"Error getting users: {str(e)}")
+            import traceback
+            error_traceback = traceback.format_exc()
+            logger.error(f"Error getting users: {str(e)}\n{error_traceback}")
+            app_logger.error(f"Error getting users: {str(e)}\n{error_traceback}")
             raise
     
     @staticmethod

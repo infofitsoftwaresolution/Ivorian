@@ -285,7 +285,12 @@ async def list_users(
             pages=pages
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"Error retrieving users: {str(e)}\n{error_traceback}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving users: {str(e)}"
