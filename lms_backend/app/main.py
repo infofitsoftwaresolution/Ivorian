@@ -114,8 +114,29 @@ async def log_requests(request: Request, call_next):
         }
     )
     
-    # Process request
-    response = await call_next(request)
+    try:
+        # Process request
+        response = await call_next(request)
+    except Exception as e:
+        # Ensure CORS headers are added even if an exception occurs
+        from app.core.errors import get_cors_headers
+        from fastapi.responses import JSONResponse
+        from app.core.logging import app_logger
+        
+        app_logger.error(f"Unhandled exception in middleware: {str(e)}", exc_info=True)
+        
+        cors_headers = get_cors_headers(request)
+        response = JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": "An unexpected error occurred",
+                    "status_code": 500,
+                }
+            },
+            headers=cors_headers,
+        )
     
     # Calculate processing time
     process_time = time.time() - start_time
@@ -132,6 +153,13 @@ async def log_requests(request: Request, call_next):
     
     # Add processing time to response headers
     response.headers["X-Process-Time"] = str(process_time)
+    
+    # Ensure CORS headers are present on all responses
+    origin = request.headers.get("origin")
+    if origin and origin in settings.BACKEND_CORS_ORIGINS:
+        if "Access-Control-Allow-Origin" not in response.headers:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
     
     return response
 

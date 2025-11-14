@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
 from app.core.logging import app_logger
+from app.core.config import settings
 
 
 class LMSException(HTTPException):
@@ -91,6 +92,22 @@ class ExternalServiceError(LMSException):
         )
 
 
+def get_cors_headers(request: Request) -> Dict[str, str]:
+    """Get CORS headers based on request origin"""
+    origin = request.headers.get("origin")
+    cors_headers = {}
+    
+    if origin and origin in settings.BACKEND_CORS_ORIGINS:
+        cors_headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Accept, Accept-Language, Content-Language, Content-Type, Authorization, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers, Cache-Control, Pragma",
+        }
+    
+    return cors_headers
+
+
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Handle HTTP exceptions"""
     app_logger.error(
@@ -102,6 +119,9 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         }
     )
     
+    # Merge CORS headers with existing headers
+    headers = {**(exc.headers or {}), **get_cors_headers(request)}
+    
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -111,7 +131,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
                 "status_code": exc.status_code,
             }
         },
-        headers=exc.headers,
+        headers=headers,
     )
 
 
@@ -195,6 +215,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         }
     )
     
+    # Add CORS headers
+    headers = get_cors_headers(request)
+    
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
@@ -205,6 +228,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 "details": error_details,
             }
         },
+        headers=headers,
     )
 
 
@@ -265,6 +289,9 @@ async def pydantic_validation_exception_handler(request: Request, exc: Validatio
         }
     )
     
+    # Add CORS headers
+    headers = get_cors_headers(request)
+    
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
@@ -275,6 +302,7 @@ async def pydantic_validation_exception_handler(request: Request, exc: Validatio
                 "details": error_details,
             }
         },
+        headers=headers,
     )
 
 
@@ -291,6 +319,9 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
         exc_info=True,
     )
     
+    # Add CORS headers
+    headers = get_cors_headers(request)
+    
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
@@ -300,6 +331,7 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
                 "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
             }
         },
+        headers=headers,
     )
 
 
