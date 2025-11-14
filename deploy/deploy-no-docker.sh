@@ -262,7 +262,12 @@ echo "🏗️  Building frontend..."
 echo "📊 Starting build at $(date)"
 
 # Set environment variables
-export NEXT_PUBLIC_API_URL="http://15.206.84.110:8000"
+# Use production domain from .env.local if available, otherwise fallback to IP
+if [ -f .env.local ] && grep -q "edumentry.com" .env.local 2>/dev/null; then
+    export NEXT_PUBLIC_API_URL="https://edumentry.com/api"
+else
+    export NEXT_PUBLIC_API_URL="http://15.206.84.110:8000"
+fi
 export NODE_OPTIONS="--max-old-space-size=1024"
 export NODE_ENV=production
 
