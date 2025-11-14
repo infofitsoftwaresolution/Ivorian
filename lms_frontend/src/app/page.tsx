@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   AcademicCapIcon, 
@@ -20,6 +20,7 @@ import Link from 'next/link';
 import HeroCarousel from '@/components/HeroCarousel';
 import HomeHeader from '@/components/layout/HomeHeader';
 import HomeFooter from '@/components/layout/HomeFooter';
+import apiClient from '@/lib/api/client';
 
 // Upcoming tutorial sessions data
 const upcomingSessions = [
@@ -267,6 +268,8 @@ const howItWorks = [
 export default function HomePage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
 
   const formatDate = (dateString: string) => {
     // Use a consistent date format to avoid hydration issues
@@ -275,6 +278,60 @@ export default function HomePage() {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     return `${days[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()}`;
   };
+
+  // Fetch courses from API
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoadingCourses(true);
+        const response = await apiClient.getCourses({ 
+          page: 1, 
+          size: 8,
+          status: 'published' // Only fetch published courses
+        });
+        
+        // Handle different response structures
+        let coursesData: any[] = [];
+        if (Array.isArray(response.data)) {
+          coursesData = response.data;
+        } else if (response.data?.courses && Array.isArray(response.data.courses)) {
+          coursesData = response.data.courses;
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          coursesData = response.data.data;
+        }
+        
+        // Transform API data to match component format
+        const transformedCourses = coursesData
+          .filter((course: any) => course.status === 'published') // Ensure only published
+          .slice(0, 4) // Show only first 4 courses
+          .map((course: any) => ({
+            id: course.id,
+            title: course.title,
+            instructor: course.instructor_name || course.instructor?.name || 'Instructor',
+            instructorAvatar: course.instructor_avatar || '/avatars/default.jpg',
+            rating: course.rating || 4.5,
+            students: course.enrollment_count || course.students || 0,
+            duration: course.duration_weeks ? `${course.duration_weeks} weeks` : course.duration || 'N/A',
+            price: course.price ? `$${course.price}` : 'Free',
+            originalPrice: course.original_price ? `$${course.original_price}` : undefined,
+            image: course.thumbnail_url || course.image || '/courses/default.jpg',
+            category: course.category || 'General',
+            level: course.difficulty_level || course.level || 'All Levels',
+            featured: true
+          }));
+        
+        setFeaturedCourses(transformedCourses);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        // Fallback to empty array or keep default mock data
+        setFeaturedCourses([]);
+      } finally {
+        setLoadingCourses(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -441,6 +498,24 @@ export default function HomePage() {
             </p>
           </div>
           
+          {loadingCourses ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading courses...</p>
+              </div>
+            </div>
+          ) : featuredCourses.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600">No courses available at the moment.</p>
+              <Link 
+                href="/courses" 
+                className="mt-4 inline-block bg-gradient-to-r from-green-500 to-blue-600 text-white px-8 py-3 text-lg font-semibold rounded-full hover:from-green-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                Browse All Courses
+              </Link>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredCourses.map((course) => (
               <Link key={course.id} href={`/courses/${course.id}`} className="group block">
@@ -482,6 +557,7 @@ export default function HomePage() {
               </Link>
             ))}
           </div>
+          )}
           
           <div className="text-center mt-12">
             <Link 
