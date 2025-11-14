@@ -97,12 +97,30 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Add host key to known_hosts with strict host key checking disabled for this host
+          ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts 2>&1 || {
+            echo "⚠️  Failed to add host key, will use StrictHostKeyChecking=no"
+          }
+          
+          # Verify SSH key format
+          ssh-keygen -l -f ~/.ssh/deploy_key > /dev/null 2>&1 || {
+            echo "❌ Invalid SSH private key format"
+            exit 1
+          }
+          
+          echo "✅ SSH configuration complete"
 
       - name: Deploy to EC2
         timeout-minutes: 30
         run: |
-          ssh -i ~/.ssh/deploy_key -o ServerAliveInterval=60 -o ServerAliveCountMax=3 ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o ServerAliveInterval=60 \
+              -o ServerAliveCountMax=3 \
+              -o ConnectTimeout=10 \
+              ${{ env.EC2_USER }}@${{ env.EC2_HOST }} "
             set -e &&
             cd ${{ env.DEPLOY_PATH }} &&
             git fetch origin &&
