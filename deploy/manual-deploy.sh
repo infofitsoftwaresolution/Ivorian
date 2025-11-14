@@ -123,13 +123,18 @@ if [ -f "deploy/systemd/lms-backend.service" ]; then
     # Replace %h with actual home directory and set user
     CURRENT_USER=$(whoami)
     CURRENT_HOME=$(eval echo ~$CURRENT_USER)
+    # Create temp file with replaced paths
     sed "s|%h|$CURRENT_HOME|g" deploy/systemd/lms-backend.service > /tmp/lms-backend.service
-    # Add User line after [Service] if not present
+    # Add User line after [Service] if not present (handle both cases)
     if ! grep -q "^User=" /tmp/lms-backend.service; then
-        sed -i "/^\[Service\]/a User=$CURRENT_USER" /tmp/lms-backend.service
+        # Use awk to insert User line after [Service]
+        awk -v user="$CURRENT_USER" '/^\[Service\]/ {print; print "User=" user; next} 1' /tmp/lms-backend.service > /tmp/lms-backend.service.tmp
+        mv /tmp/lms-backend.service.tmp /tmp/lms-backend.service
     else
         sed -i "s|^User=.*|User=$CURRENT_USER|" /tmp/lms-backend.service
     fi
+    # Remove comment line about user
+    sed -i '/^# User will be set/d' /tmp/lms-backend.service
     sudo cp /tmp/lms-backend.service /etc/systemd/system/lms-backend.service
     sudo systemctl daemon-reload
     print_success "Backend service configuration updated"
@@ -220,13 +225,18 @@ if [ -f "deploy/systemd/lms-frontend.service" ]; then
     # Replace %h with actual home directory and set user
     CURRENT_USER=$(whoami)
     CURRENT_HOME=$(eval echo ~$CURRENT_USER)
+    # Create temp file with replaced paths
     sed "s|%h|$CURRENT_HOME|g" deploy/systemd/lms-frontend.service > /tmp/lms-frontend.service
     # Add User line after [Service] if not present
     if ! grep -q "^User=" /tmp/lms-frontend.service; then
-        sed -i "/^\[Service\]/a User=$CURRENT_USER" /tmp/lms-frontend.service
+        # Use awk to insert User line after [Service]
+        awk -v user="$CURRENT_USER" '/^\[Service\]/ {print; print "User=" user; next} 1' /tmp/lms-frontend.service > /tmp/lms-frontend.service.tmp
+        mv /tmp/lms-frontend.service.tmp /tmp/lms-frontend.service
     else
         sed -i "s|^User=.*|User=$CURRENT_USER|" /tmp/lms-frontend.service
     fi
+    # Remove comment line about user
+    sed -i '/^# User will be set/d' /tmp/lms-frontend.service
     sudo cp /tmp/lms-frontend.service /etc/systemd/system/lms-frontend.service
     sudo systemctl daemon-reload
     print_success "Frontend service configuration updated"
