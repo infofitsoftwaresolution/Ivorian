@@ -224,6 +224,7 @@ export default function HomePage() {
     const fetchCourses = async () => {
       try {
         setLoadingCourses(true);
+        console.log('🔄 Fetching courses from API...');
         const response = await apiClient.getCourses({ 
           page: 1, 
           size: 20, // Fetch more courses to show all available
@@ -232,29 +233,48 @@ export default function HomePage() {
         
         // Handle different response structures
         let coursesData: any[] = [];
-        console.log('API Response:', response);
-        console.log('Response data:', response.data);
+        console.log('📦 Full API Response:', JSON.stringify(response, null, 2));
+        console.log('📦 Response data:', response.data);
+        console.log('📦 Response data type:', typeof response.data);
+        console.log('📦 Is array?', Array.isArray(response.data));
         
-        if (Array.isArray(response.data)) {
-          coursesData = response.data;
-        } else if (response.data?.courses && Array.isArray(response.data.courses)) {
+        // The backend returns CourseListResponse with structure: { courses: [...], total: ..., page: ..., size: ..., pages: ... }
+        if (response.data?.courses && Array.isArray(response.data.courses)) {
           coursesData = response.data.courses;
-        } else if (response.data?.data && Array.isArray(response.data.data)) {
-          coursesData = response.data.data;
+          console.log('✅ Found courses in response.data.courses:', coursesData.length);
+        } else if (Array.isArray(response.data)) {
+          coursesData = response.data;
+          console.log('✅ Found courses as direct array:', coursesData.length);
         } else if (response.data?.data?.courses && Array.isArray(response.data.data.courses)) {
           coursesData = response.data.data.courses;
+          console.log('✅ Found courses in response.data.data.courses:', coursesData.length);
+        } else if (response.data?.data && Array.isArray(response.data.data)) {
+          coursesData = response.data.data;
+          console.log('✅ Found courses in response.data.data:', coursesData.length);
         } else {
           // Try to find courses array in nested structure
-          console.warn('Unexpected response structure:', response.data);
+          console.warn('⚠️ Unexpected response structure. Full response:', response);
+          console.warn('⚠️ Response keys:', response.data ? Object.keys(response.data) : 'No data');
           coursesData = [];
         }
         
-        console.log('Extracted courses data:', coursesData);
+        console.log('📚 Extracted courses data:', coursesData);
+        console.log('📚 Number of courses:', coursesData.length);
         
         // Transform API data to match component format
         const transformedCourses = coursesData
-          .filter((course: any) => course.status === 'published') // Ensure only published
-          .map((course: any) => ({
+          .filter((course: any) => {
+            // Filter only published courses (status might be enum or string)
+            const courseStatus = course.status?.value || course.status;
+            const isPublished = courseStatus === 'published' || courseStatus === 'Published';
+            if (!isPublished) {
+              console.log('⏭️ Skipping non-published course:', course.id, course.title, 'Status:', courseStatus);
+            }
+            return isPublished;
+          })
+          .map((course: any) => {
+            console.log('🔄 Transforming course:', course.id, course.title);
+            return {
             id: course.id,
             title: course.title,
             instructor: course.instructor_name || course.instructor?.name || 'Instructor',
@@ -270,24 +290,39 @@ export default function HomePage() {
             featured: true
           }));
         
-        console.log('Transformed courses:', transformedCourses);
+        console.log('✨ Transformed courses:', transformedCourses);
+        console.log('✨ Number of transformed courses:', transformedCourses.length);
         
         // Store all courses
         setAllCourses(transformedCourses);
         // Show only first 3 courses initially
         setFeaturedCourses(transformedCourses.slice(0, 3));
+        
+        if (transformedCourses.length === 0) {
+          console.warn('⚠️ No courses found after transformation. Check if courses are published in the database.');
+        }
       } catch (error) {
-        console.error('Error fetching courses:', error);
+        console.error('❌ Error fetching courses:', error);
         // Handle ApiError properly
         if (error instanceof ApiError) {
-          console.error('API Error:', error.message, error.status);
+          console.error('❌ API Error Details:', {
+            message: error.message,
+            status: error.status,
+            code: error.code,
+            details: error.details
+          });
         } else if (error instanceof Error) {
-          console.error('Error:', error.message);
+          console.error('❌ Error:', error.message);
+          console.error('❌ Error stack:', error.stack);
+        } else {
+          console.error('❌ Unknown error:', error);
         }
-        // Fallback to empty array or keep default mock data
+        // Fallback to empty array
         setFeaturedCourses([]);
+        setAllCourses([]);
       } finally {
         setLoadingCourses(false);
+        console.log('✅ Finished fetching courses');
       }
     };
 
