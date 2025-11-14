@@ -48,6 +48,7 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI application
+# Set redirect_slashes=False to prevent automatic redirects that can cause CORS issues
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.APP_VERSION,
@@ -55,7 +56,8 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False  # Disable automatic trailing slash redirects to prevent CORS issues
 )
 
 # Setup exception handlers
