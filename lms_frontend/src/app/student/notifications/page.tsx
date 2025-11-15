@@ -81,129 +81,16 @@ export default function StudentNotificationsPage() {
       setError('');
 
       // TODO: Replace with actual API endpoint when available
-      // For now, generate mock notifications based on enrolled courses and assignments
-      const mockNotifications: Notification[] = [];
+      // const response = await apiClient.getNotifications();
+      // const notificationsData = response.data?.notifications || response.data || [];
+      // setNotifications(notificationsData);
 
-      // Fetch enrolled courses to create relevant notifications
-      try {
-        const enrollmentsResponse = await apiClient.getMyEnrollments();
-        let enrollments: any[] = [];
-        if (Array.isArray(enrollmentsResponse.data)) {
-          enrollments = enrollmentsResponse.data;
-        } else if (enrollmentsResponse.data?.enrollments && Array.isArray(enrollmentsResponse.data.enrollments)) {
-          enrollments = enrollmentsResponse.data.enrollments;
-        }
-
-        // Fetch assignments to create assignment-related notifications
-        try {
-          const assessmentsResponse = await apiClient.getAssessments({ status: 'published' });
-          let assessments: any[] = [];
-          if (Array.isArray(assessmentsResponse.data)) {
-            assessments = assessmentsResponse.data;
-          } else if (assessmentsResponse.data?.assessments && Array.isArray(assessmentsResponse.data.assessments)) {
-            assessments = assessmentsResponse.data.assessments;
-          }
-
-          const enrolledCourseIds = enrollments.map((e: any) => e.course_id || e.course?.id).filter(Boolean);
-          const courseAssessments = assessments.filter((a: any) => 
-            a.course_id && enrolledCourseIds.includes(a.course_id)
-          );
-
-          // Generate mock notifications
-          enrollments.slice(0, 3).forEach((enrollment: any, index: number) => {
-            const course = enrollment.course || {};
-            const daysAgo = index * 2;
-
-            // Course announcement
-            mockNotifications.push({
-              id: index * 3 + 1,
-              title: `New announcement in ${course.title || 'Course'}`,
-              message: 'Your instructor has posted a new announcement. Check it out!',
-              type: 'announcement',
-              is_read: index === 0 ? false : true,
-              created_at: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString(),
-              course_id: course.id,
-              course_title: course.title,
-              link: `/student/courses/${course.id}`,
-              priority: 'medium',
-              action_required: false
-            });
-          });
-
-          courseAssessments.slice(0, 2).forEach((assessment: any, index: number) => {
-            const daysAgo = index * 3 + 1;
-            const dueDate = assessment.due_date ? new Date(assessment.due_date) : null;
-            const now = new Date();
-            const isOverdue = dueDate && dueDate < now;
-
-            // Assignment due soon/overdue
-            if (dueDate) {
-              mockNotifications.push({
-                id: 10 + index * 2,
-                title: `${isOverdue ? 'Overdue' : 'Due Soon'}: ${assessment.title}`,
-                message: isOverdue
-                  ? `This assignment was due on ${dueDate.toLocaleDateString()}. Please submit it as soon as possible.`
-                  : `This assignment is due on ${dueDate.toLocaleDateString()}. Don't forget to submit it!`,
-                type: 'assignment',
-                is_read: false,
-                created_at: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString(),
-                course_id: assessment.course_id,
-                course_title: assessment.course_title,
-                assignment_id: assessment.id,
-                assignment_title: assessment.title,
-                link: `/student/assignments/${assessment.id}/submit`,
-                priority: isOverdue ? 'high' : 'medium',
-                action_required: true
-              });
-            }
-          });
-
-          // Grade notification
-          mockNotifications.push({
-            id: 20,
-            title: 'New grade received',
-            message: 'Your assignment "Introduction to Python" has been graded. Check your results!',
-            type: 'grade',
-            is_read: false,
-            created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-            course_id: enrollments[0]?.course_id || enrollments[0]?.course?.id,
-            course_title: enrollments[0]?.course?.title,
-            link: '/student/assignments',
-            priority: 'medium',
-            action_required: false
-          });
-
-          // System notification
-          mockNotifications.push({
-            id: 21,
-            title: 'Welcome to InfoFit Labs LMS!',
-            message: 'Thank you for joining our learning platform. Start exploring courses and begin your learning journey!',
-            type: 'system',
-            is_read: true,
-            created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            link: '/student/catalog',
-            priority: 'low',
-            action_required: false
-          });
-
-        } catch (assessmentsError) {
-          // Silently handle 404 for assessments
-          console.log('Assessments endpoint not available');
-        }
-      } catch (enrollmentsError) {
-        // Silently handle 404 for enrollments
-        console.log('Enrollments endpoint not available');
-      }
-
-      // Sort by created_at (newest first)
-      mockNotifications.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-
-      setNotifications(mockNotifications);
+      // For now, return empty array - notifications endpoint not yet implemented
+      setNotifications([]);
     } catch (error: unknown) {
       console.error('Error loading notifications:', error);
       setError('Failed to load notifications. Please try again.');
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
