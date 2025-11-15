@@ -1,0 +1,35 @@
+[Unit]
+Description=LMS Backend API
+After=network.target redis.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# User will be set by deployment script based on system
+WorkingDirectory=%h/lms-app/lms_backend
+Environment="PATH=%h/lms-app/lms_backend/venv/bin"
+EnvironmentFile=%h/lms-app/.env
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+
+# Memory and resource limits
+MemoryMax=512M
+MemoryHigh=400M
+CPUQuota=50%
+
+# Optimized uvicorn with limited workers
+ExecStart=%h/lms-app/lms_backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --limit-concurrency 100
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lms-backend
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,37 @@
+[Unit]
+Description=LMS Frontend
+After=network.target lms-backend.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# User will be set by deployment script based on system
+# Working directory must be .next/standalone for standalone mode
+WorkingDirectory=%h/lms-app/lms_frontend/.next/standalone
+Environment="NODE_ENV=production"
+Environment="NODE_OPTIONS=--max-old-space-size=512"
+Environment="NEXT_TELEMETRY_DISABLED=1"
+EnvironmentFile=%h/lms-app/.env
+
+# Memory and resource limits
+MemoryMax=768M
+MemoryHigh=600M
+CPUQuota=50%
+
+# Optimized Node.js start (standalone mode)
+# Use standalone server when output: standalone is configured
+ExecStart=/usr/bin/node --max-old-space-size=512 server.js
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lms-frontend
+
+[Install]
+WantedBy=multi-user.target
+

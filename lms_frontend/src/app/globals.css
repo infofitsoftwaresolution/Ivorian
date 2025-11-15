@@ -1,0 +1,347 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Light theme colors - Microsoft-inspired professional palette */
+  --background: #ffffff;
+  --foreground: #1b1b1b;
+  --card: #ffffff;
+  --card-foreground: #1b1b1b;
+  --popover: #ffffff;
+  --popover-foreground: #1b1b1b;
+  --primary: #0078d4;
+  --primary-foreground: #ffffff;
+  --secondary: #106ebe;
+  --secondary-foreground: #ffffff;
+  --muted: #f8f9fa;
+  --muted-foreground: #6c757d;
+  --accent: #f0f9ff;
+  --accent-foreground: #0078d4;
+  --destructive: #d13438;
+  --destructive-foreground: #ffffff;
+  --border: #e1e1e1;
+  --input: #f8f9fa;
+  --ring: #0078d4;
+  --radius: 0.375rem;
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 10px 25px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --card: #171717;
+    --card-foreground: #ededed;
+    --popover: #171717;
+    --popover-foreground: #ededed;
+    --primary: #3b82f6;
+    --primary-foreground: #ffffff;
+    --secondary: #0ea5e9;
+    --secondary-foreground: #ffffff;
+    --muted: #262626;
+    --muted-foreground: #a3a3a3;
+    --accent: #0c4a6e;
+    --accent-foreground: #0ea5e9;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #262626;
+    --input: #262626;
+    --ring: #3b82f6;
+  }
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", "Segoe UI", system-ui, sans-serif; /* Remove var(--font-sans) */
+  font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--muted); }
+::-webkit-scrollbar-thumb { background: var(--muted-foreground); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--foreground); }
+
+/* Focus styles helper */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-background;
+}
+
+/* Buttons */
+.btn {
+  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-background;
+}
+.btn-primary { 
+  @apply bg-primary text-primary-foreground hover:bg-primary-600 shadow-sm hover:shadow-md transform hover:-translate-y-0.5; 
+}
+.btn-secondary { 
+  @apply bg-secondary text-secondary-foreground hover:bg-secondary-600 shadow-sm hover:shadow-md transform hover:-translate-y-0.5; 
+}
+.btn-outline { 
+  @apply border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-sm hover:shadow-md; 
+}
+.btn-ghost { 
+  @apply hover:bg-accent hover:text-accent-foreground transition-colors; 
+}
+.btn-destructive { 
+  @apply bg-destructive text-destructive-foreground hover:bg-red-600 shadow-sm hover:shadow-md; 
+}
+
+/* Cards - Microsoft-inspired */
+.card { 
+  @apply rounded-lg border bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow duration-200; 
+}
+.card-header { 
+  @apply flex flex-col space-y-1.5 p-6; 
+}
+.card-title { 
+  @apply text-2xl font-semibold leading-none tracking-tight text-foreground; 
+}
+.card-description { 
+  @apply text-sm text-muted-foreground; 
+}
+.card-content { 
+  @apply p-6 pt-0; 
+}
+.card-footer { 
+  @apply flex items-center p-6 pt-0; 
+}
+
+/* Inputs - Ensure visibility */
+.input {
+  @apply w-full rounded-md border border-gray-300 bg-white text-gray-900 px-3 py-2 text-sm ring-offset-background transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 hover:border-primary-300;
+}
+
+/* Ensure all input elements are visible */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+textarea,
+select {
+  @apply bg-white text-gray-900 border-gray-300;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus {
+  @apply bg-white border-primary-500 ring-2 ring-primary-500;
+}
+
+/* Form elements */
+.form-label {
+  @apply text-sm font-medium text-foreground mb-2 block;
+}
+
+.form-error {
+  @apply text-sm text-destructive mt-1;
+}
+
+/* Navigation */
+.nav-link {
+  @apply text-foreground hover:text-primary-600 transition-colors duration-200 font-medium;
+}
+
+.nav-link-active {
+  @apply text-primary-600 font-semibold;
+}
+
+/* Professional spacing utilities */
+.section-padding {
+  @apply py-16 md:py-24;
+}
+
+.container-padding {
+  @apply px-4 sm:px-6 lg:px-8;
+}
+
+/* Microsoft-style animations - using standard Tailwind utilities */
+.hover-lift {
+  @apply transition-transform duration-200 hover:-translate-y-1;
+}
+
+/* Carousel utilities */
+.carousel-slide {
+  @apply transition-opacity duration-1000 ease-in-out;
+}
+
+.carousel-slide.active {
+  @apply opacity-100;
+}
+
+.carousel-slide.inactive {
+  @apply opacity-0;
+}
+
+/* Session card utilities */
+.session-card {
+  @apply cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+}
+
+.live-badge {
+  @apply px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full flex items-center;
+}
+
+.seats-badge {
+  @apply px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full;
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Icon base styles */
+svg {
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  /* Ensure tables are scrollable on mobile */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Stack grid columns on mobile - more specific selectors */
+  .grid[class*="md:grid-cols-2"],
+  .grid[class*="md:grid-cols-3"],
+  .grid[class*="md:grid-cols-4"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Adjust padding on mobile */
+  .container-padding {
+    @apply px-4;
+  }
+  
+  /* Make buttons full width on mobile */
+  .btn-mobile-full,
+  button.inline-flex {
+    @apply w-full;
+    justify-content: center;
+  }
+  
+  /* Adjust card spacing on mobile */
+  .card {
+    @apply mb-4;
+  }
+  
+  /* Responsive tables - make them scrollable */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+  
+  /* Responsive table cells */
+  td, th {
+    min-width: 120px;
+    padding: 0.5rem !important;
+    font-size: 0.875rem;
+  }
+  
+  /* Stack action buttons on mobile */
+  .space-x-2 > *,
+  .space-x-3 > *,
+  .space-x-4 > * {
+    margin-left: 0.25rem !important;
+    margin-right: 0.25rem !important;
+  }
+  
+  /* Make filter grids stack on mobile */
+  [class*="md:grid-cols-4"],
+  [class*="md:grid-cols-3"],
+  [class*="md:grid-cols-2"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Responsive header buttons - more specific */
+  .flex.justify-between.items-center {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
+  }
+  
+  .flex.justify-between.items-center > button,
+  .flex.justify-between.items-center > div:last-child {
+    width: 100% !important;
+  }
+  
+  /* Responsive form grids */
+  .grid.grid-cols-1[class*="md:grid-cols-2"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Responsive stats cards */
+  .grid.grid-cols-1[class*="md:grid-cols-2"][class*="lg:grid-cols-4"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Hide less important columns on mobile tables */
+  @media (max-width: 640px) {
+    .table-mobile-hide {
+      display: none;
+    }
+    
+    /* Further reduce table cell padding on very small screens */
+    td, th {
+      padding: 0.375rem !important;
+      font-size: 0.75rem;
+      min-width: 100px;
+    }
+    
+    /* Make action buttons smaller on very small screens */
+    button svg {
+      width: 1rem;
+      height: 1rem;
+    }
+  }
+}
+
+/* Ensure inputs are visible on all devices */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    @apply bg-white text-gray-900 border-gray-300;
+  }
+}
