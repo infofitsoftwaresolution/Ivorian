@@ -14,11 +14,11 @@ from app.core.config import settings
 from app.core.database import init_db, close_db, get_db
 from app.core.logging import app_logger
 from app.core.errors import setup_exception_handlers, get_cors_headers
-from app.api.v1 import auth, rbac, courses, users, upload, analytics, organizations
+from app.api.v1 import auth, rbac, courses, users, upload, analytics, organizations, assessments
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
 from fastapi.responses import JSONResponse
-# from app.api.v1 import assessments, ai  # TODO: Uncomment when implemented
+# from app.api.v1 import ai  # TODO: Uncomment when implemented
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -192,11 +192,11 @@ app.include_router(
     tags=["File Upload"]
 )
 
-# app.include_router(
-#     assessments.router,
-#     prefix=f"{settings.API_V1_STR}/assessments",
-#     tags=["Assessments"]
-# )
+app.include_router(
+    assessments.router,
+    prefix=f"{settings.API_V1_STR}/assessments",
+    tags=["Assessments"]
+)
 
 # app.include_router(
 #     ai.router,
