@@ -127,54 +127,43 @@ export default function TutorAnalyticsPage() {
       setLoading(true);
       setError('');
 
-      // TODO: Replace with actual API call
+      // TODO: Replace with actual API call when endpoint is available
       // const response = await apiClient.getTutorAnalytics({ period: timePeriod, instructor_id: user?.id });
       
-      // Mock data for tutor analytics
-      const mockData: TutorAnalyticsData = {
+      // Empty data structure - analytics endpoint not yet implemented
+      const emptyData: TutorAnalyticsData = {
         overview: {
-          total_courses: 12,
-          total_students: 245,
-          total_enrollments: 380,
-          total_revenue: 12500,
-          average_completion_rate: 68.5,
-          active_students: 180,
-          course_growth: 8.3,
-          enrollment_growth: 12.5
+          total_courses: 0,
+          total_students: 0,
+          total_enrollments: 0,
+          total_revenue: 0,
+          average_completion_rate: 0,
+          active_students: 0,
+          course_growth: 0,
+          enrollment_growth: 0
         },
         enrollment_trend: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-          data: [45, 52, 58, 62, 68, 75, 82, 88, 95, 102, 108, 115]
+          labels: [],
+          data: []
         },
         course_performance: {
-          labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-          data: [85, 88, 82, 90]
+          labels: [],
+          data: []
         },
         revenue_trend: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-          data: [1200, 1350, 1420, 1580, 1650, 1800]
+          labels: [],
+          data: []
         },
         student_distribution: {
-          labels: ['Active', 'Inactive', 'Completed'],
-          data: [180, 45, 20]
+          labels: [],
+          data: []
         },
-        top_courses: [
-          { id: 1, title: 'Introduction to Web Development', enrollments: 85, completion_rate: 75, revenue: 2550 },
-          { id: 2, title: 'Advanced JavaScript Concepts', enrollments: 62, completion_rate: 68, revenue: 1860 },
-          { id: 3, title: 'React Mastery Course', enrollments: 58, completion_rate: 72, revenue: 1740 },
-          { id: 4, title: 'Node.js Backend Development', enrollments: 45, completion_rate: 65, revenue: 1350 },
-          { id: 5, title: 'Full Stack Development Bootcamp', enrollments: 38, completion_rate: 70, revenue: 1140 }
-        ],
-        top_students: [
-          { id: 1, name: 'John Doe', courses_enrolled: 5, completion_rate: 95, total_progress: 92 },
-          { id: 2, name: 'Jane Smith', courses_enrolled: 4, completion_rate: 88, total_progress: 85 },
-          { id: 3, name: 'Mike Johnson', courses_enrolled: 6, completion_rate: 82, total_progress: 78 },
-          { id: 4, name: 'Sarah Williams', courses_enrolled: 3, completion_rate: 90, total_progress: 88 },
-          { id: 5, name: 'David Brown', courses_enrolled: 4, completion_rate: 75, total_progress: 72 }
-        ]
+        top_courses: [],
+        top_students: []
       };
 
-      setAnalyticsData(mockData);
+      setAnalyticsData(emptyData);
+      setError('Analytics data is not available yet. This feature will be available soon.');
     } catch (error: unknown) {
       console.error('Error loading analytics:', error);
       const errorMessage = error && typeof error === 'object' && 'response' in error

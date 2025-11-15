@@ -103,54 +103,14 @@ export default function StudentsPage() {
         created_at: student.created_at || new Date().toISOString(),
         last_login: student.last_login || null,
         enrolled_courses: student.enrolled_courses || 0,
-        completion_rate: student.completion_rate || Math.floor(Math.random() * 100) // Random for demo
+        completion_rate: student.completion_rate || 0
       }));
       
       setStudents(transformedStudents);
     } catch (error) {
       console.error('Error fetching students:', error);
       setError('Failed to load students. Please try again.');
-      
-      // Fallback to mock data for demonstration
-      const mockStudents: Student[] = [
-        {
-          id: 1,
-          first_name: 'John',
-          last_name: 'Doe',
-          email: 'john.doe@example.com',
-          phone: '+1 (555) 123-4567',
-          role: 'student',
-          created_at: '2024-01-15T10:30:00Z',
-          last_login: '2024-01-20T14:22:00Z',
-          enrolled_courses: 3,
-          completion_rate: 85
-        },
-        {
-          id: 2,
-          first_name: 'Jane',
-          last_name: 'Smith',
-          email: 'jane.smith@example.com',
-          phone: '+1 (555) 234-5678',
-          role: 'student',
-          created_at: '2024-01-10T09:15:00Z',
-          last_login: '2024-01-19T16:45:00Z',
-          enrolled_courses: 2,
-          completion_rate: 92
-        },
-        {
-          id: 3,
-          first_name: 'Mike',
-          last_name: 'Johnson',
-          email: 'mike.johnson@example.com',
-          phone: '+1 (555) 345-6789',
-          role: 'student',
-          created_at: '2024-01-08T11:20:00Z',
-          last_login: '2024-01-18T13:30:00Z',
-          enrolled_courses: 1,
-          completion_rate: 67
-        }
-      ];
-      setStudents(mockStudents);
+      setStudents([]);
     } finally {
       setLoading(false);
     }

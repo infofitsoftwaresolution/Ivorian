@@ -205,38 +205,7 @@ export default function CourseBuilder() {
           console.error('CORS or network error detected. Make sure backend is running on localhost:8000');
         }
         
-        // Create mock course for development with actual course ID
-        const mockCourse: Course = {
-          id: courseId,
-          title: `Course ${courseId}`,
-          description: 'This course is being loaded from mock data due to API error',
-          status: 'draft',
-          topics: [
-            {
-              id: 1,
-              title: 'Introduction',
-              description: 'Getting started with the course',
-              order: 1,
-              lessons: [
-                {
-                  id: 1,
-                  title: 'Welcome to the Course',
-                  description: 'Course introduction',
-                  content: 'Welcome to this amazing course!',
-                  video_url: '',
-                  content_type: 'video',
-                  order: 1,
-                  estimated_duration: 10,
-                  is_free_preview: true
-                }
-              ],
-              isExpanded: true
-            }
-          ]
-        };
-        
-        console.log('Using mock course data:', mockCourse);
-        setCourse(mockCourse);
+        setError('Failed to load course. Please try again or check if the course exists.');
       } finally {
         setLoading(false);
       }

@@ -42,44 +42,6 @@ interface Course {
   thumbnail: string;
 }
 
-// Mock course data
-const mockCourses: Course[] = [
-  {
-    id: 1,
-    title: 'Complete Web Development Bootcamp',
-    description: 'Learn HTML, CSS, JavaScript, React, Node.js and more',
-    category: 'Technology',
-    difficulty: 'Beginner',
-    price: 299,
-    currency: 'USD',
-    status: 'published',
-    students: 45,
-    lessons: 120,
-    duration: 12,
-    rating: 4.8,
-    created_at: '2024-01-15',
-    updated_at: '2024-02-20',
-    thumbnail: '/course-thumbnails/web-dev.jpg'
-  },
-  {
-    id: 2,
-    title: 'Advanced JavaScript Concepts',
-    description: 'Master closures, prototypes, async/await, and more',
-    category: 'Technology',
-    difficulty: 'Advanced',
-    price: 199,
-    currency: 'USD',
-    status: 'draft',
-    students: 0,
-    lessons: 45,
-    duration: 8,
-    rating: 0,
-    created_at: '2024-02-10',
-    updated_at: '2024-02-25',
-    thumbnail: '/course-thumbnails/js-advanced.jpg'
-  }
-];
-
 export default function TutorCourses() {
   const { user } = useAuth();
   const router = useRouter();
@@ -135,8 +97,8 @@ export default function TutorCourses() {
         setCourses(transformedCourses);
       } catch (error) {
         console.error('Error fetching courses:', error);
-        // Fallback to mock data if API fails
-        setCourses(mockCourses);
+        setError('Failed to load courses. Please try again.');
+        setCourses([]);
       } finally {
         setLoading(false);
       }

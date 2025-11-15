@@ -87,90 +87,7 @@ const upcomingSessions = [
 ];
 
 // Courses are now fetched from API - see useEffect in HomePage component
-
-const famousTutors = [
-  {
-    id: 1,
-    name: "Dr. Sarah Johnson",
-    title: "Senior Software Engineer at Google",
-    avatar: "/avatars/sarah.jpg",
-    rating: 4.9,
-    students: 45000,
-    courses: 12,
-    expertise: ["Web Development", "React", "Node.js"],
-    featured: true
-  },
-  {
-    id: 2,
-    name: "Prof. Michael Chen",
-    title: "AI Research Lead at Stanford",
-    avatar: "/avatars/michael.jpg",
-    rating: 4.8,
-    students: 32000,
-    courses: 8,
-    expertise: ["Machine Learning", "Python", "Deep Learning"],
-    featured: true
-  },
-  {
-    id: 3,
-    name: "Emma Rodriguez",
-    title: "Digital Marketing Director",
-    avatar: "/avatars/emma.jpg",
-    rating: 4.7,
-    students: 28000,
-    courses: 15,
-    expertise: ["Digital Marketing", "SEO", "Social Media"],
-    featured: true
-  },
-  {
-    id: 4,
-    name: "Alex Thompson",
-    title: "Senior UX Designer at Apple",
-    avatar: "/avatars/alex.jpg",
-    rating: 4.6,
-    students: 22000,
-    courses: 10,
-    expertise: ["UI/UX Design", "Figma", "Prototyping"],
-    featured: true
-  }
-];
-
-const stats = [
-  { label: "Active Students", value: "50K+", icon: UsersIcon },
-  { label: "Expert Instructors", value: "200+", icon: AcademicCapIcon },
-  { label: "Courses Available", value: "1000+", icon: PlayCircleIcon },
-  { label: "Success Rate", value: "95%", icon: StarIcon }
-];
-
-const testimonials = [
-  {
-    id: 1,
-    name: "Jessica Martinez",
-    role: "Software Developer",
-    avatar: "/avatars/jessica.jpg",
-    rating: 5,
-    text: "InfoFit Labs transformed my career! The courses are comprehensive and the instructors are amazing. I landed my dream job after completing the Web Development Bootcamp.",
-    company: "Tech Corp"
-  },
-  {
-    id: 2,
-    name: "David Kim",
-    role: "Data Scientist",
-    avatar: "/avatars/david.jpg",
-    rating: 5,
-    text: "The Machine Learning course exceeded my expectations. The hands-on projects and expert guidance helped me master complex concepts. Highly recommended!",
-    company: "Data Analytics Inc"
-  },
-  {
-    id: 3,
-    name: "Sophie Anderson",
-    role: "UX Designer",
-    avatar: "/avatars/sophie.jpg",
-    rating: 5,
-    text: "As a beginner, I was nervous about learning design. But the UI/UX course made everything so clear and practical. I&apos;m now working on real projects!",
-    company: "Design Studio"
-  }
-];
+// Sessions data is kept as per user requirement
 
 const howItWorks = [
   {
@@ -466,23 +383,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Stats Section - Bright & Jolly */}
-      <section className="py-16 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <stat.icon className="w-8 h-8 text-white" />
-                </div>
-                <div className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{stat.value}</div>
-                <div className="text-gray-600 text-sm md:text-base font-medium">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Featured Courses Section - Bright & Jolly */}
       <section className="py-16 bg-gradient-to-br from-white to-blue-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -594,55 +494,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Instructors Section */}
-      <section className="py-16 bg-gradient-to-br from-white to-purple-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-12 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              👨‍🏫 Expert Instructors
-            </h2>
-            <p className="text-lg text-gray-600">
-              Learn from industry leaders and certified professionals
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {famousTutors.map((tutor) => (
-              <div key={tutor.id} className="group p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <UserGroupIcon className="w-10 h-10 text-blue-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-1 text-center">{tutor.name}</h3>
-                <p className="text-sm text-blue-600 font-semibold mb-3 text-center">{tutor.title}</p>
-                <div className="flex items-center justify-center mb-3">
-                  <StarIcon className="w-4 h-4 text-yellow-400 fill-current" />
-                  <span className="text-sm font-medium ml-1">{tutor.rating}</span>
-                  <span className="text-sm text-gray-500 ml-1">({tutor.students.toLocaleString()} students)</span>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {tutor.expertise.slice(0, 2).map((skill, index) => (
-                    <span 
-                      key={index}
-                      className="px-2 py-1 bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 text-xs font-medium rounded-full border border-blue-200"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-4 text-center">
-                  <Link 
-                    href={`/instructors/${tutor.id}`}
-                    className="text-blue-600 hover:text-blue-700 text-sm font-semibold inline-flex items-center"
-                  >
-                    View Profile <ArrowRightIcon className="w-4 h-4 ml-1" />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Categories Section - Bright & Jolly */}
       <section className="py-16 bg-gradient-to-r from-purple-50 via-pink-50 to-orange-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -712,44 +563,6 @@ export default function HomePage() {
                     <ArrowRightIcon className="w-8 h-8 text-gray-300" />
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-16 bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              💬 What Our Students Say
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Join thousands of satisfied learners who have transformed their careers
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial) => (
-              <div key={testimonial.id} className="p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
-                <div className="flex items-center mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <StarIcon key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
-                </div>
-                <p className="text-gray-600 mb-6 leading-relaxed italic">
-                  &quot;{testimonial.text}&quot;
-                </p>
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 rounded-full flex items-center justify-center mr-4">
-                    <UserGroupIcon className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900">{testimonial.name}</h4>
-                    <p className="text-sm text-gray-600">{testimonial.role} at {testimonial.company}</p>
-                  </div>
-                </div>
               </div>
             ))}
           </div>

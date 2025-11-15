@@ -161,8 +161,8 @@ export default function StudentProgressPage() {
         ? enrollments.reduce((acc, e) => acc + (e.progress_percentage || 0), 0) / enrollments.length
         : 0;
 
-      // Mock data for charts (TODO: Replace with actual API data)
-      const mockProgressData: ProgressData = {
+      // Progress data - overview from actual enrollments, charts will be empty until API is implemented
+      const progressData: ProgressData = {
         overview: {
           total_courses: totalCourses,
           completed_courses: completedCourses,
@@ -171,29 +171,29 @@ export default function StudentProgressPage() {
           completed_lessons: completedLessons,
           total_study_time: 0, // TODO: Implement study time tracking
           average_score: Math.round(averageProgress),
-          current_streak: 5, // TODO: Implement streak tracking
-          longest_streak: 12, // TODO: Implement streak tracking
+          current_streak: 0, // TODO: Implement streak tracking
+          longest_streak: 0, // TODO: Implement streak tracking
           certificates_earned: completedCourses
         },
         progress_trend: {
-          labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8'],
-          data: [10, 15, 22, 28, 35, 42, 48, 55]
+          labels: [],
+          data: []
         },
         course_progress: {
           labels: enrollments.slice(0, 5).map(e => e.course?.title || 'Course').slice(0, 20),
           data: enrollments.slice(0, 5).map(e => e.progress_percentage || 0)
         },
         time_spent: {
-          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-          data: [45, 60, 30, 75, 90, 45, 60]
+          labels: [],
+          data: []
         },
         category_distribution: {
-          labels: ['Technology', 'Business', 'Design', 'Marketing', 'Science'],
-          data: [35, 25, 20, 15, 5]
+          labels: [],
+          data: []
         }
       };
 
-      setProgressData(mockProgressData);
+      setProgressData(progressData);
     } catch (error: unknown) {
       console.error('Error loading progress data:', error);
       setError('Failed to load progress data. Please try again.');

@@ -51,43 +51,14 @@ export default function StudentLogin() {
     setError('');
 
     try {
-      // For demonstration, we'll use mock credentials
-      // In production, this would be: await login(formData.email, formData.password);
+      // Use real API login
+      const result = await login(formData.email, formData.password);
       
-      // Mock student credentials for testing
-      const mockStudentCredentials = {
-        'student@example.com': 'password123',
-        'john.doe@example.com': 'password123',
-        'jane.smith@example.com': 'password123',
-        'mike.johnson@example.com': 'password123'
-      };
-
-      if (mockStudentCredentials[formData.email as keyof typeof mockStudentCredentials] === formData.password) {
-        // Simulate successful login
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Mock student user data
-        const mockStudentUser = {
-          id: 1,
-          first_name: 'John',
-          last_name: 'Doe',
-          email: formData.email,
-          role: 'student',
-          organization_id: 1,
-          organization: {
-            id: 1,
-            name: 'Demo Organization'
-          }
-        };
-
-        // Store in localStorage for demo
-        localStorage.setItem('user', JSON.stringify(mockStudentUser));
-        localStorage.setItem('token', 'mock-student-token');
-        
+      if (result.success) {
         // Redirect to student dashboard
         router.push('/student/dashboard');
       } else {
-        setError('Invalid email or password. Try: student@example.com / password123');
+        setError(result.error || 'Invalid email or password');
       }
       
     } catch (error) {
@@ -188,18 +159,6 @@ export default function StudentLogin() {
               <span>{loading ? 'Signing in...' : 'Sign in'}</span>
             </button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
-            <h3 className="text-sm font-medium text-blue-800 mb-2">Demo Credentials</h3>
-            <div className="text-sm text-blue-700 space-y-1">
-              <p><strong>Email:</strong> student@example.com</p>
-              <p><strong>Password:</strong> password123</p>
-              <p className="text-xs text-blue-600 mt-2">
-                Or try: john.doe@example.com, jane.smith@example.com, mike.johnson@example.com
-              </p>
-            </div>
-          </div>
 
           {/* Links */}
           <div className="mt-6 text-center">
