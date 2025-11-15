@@ -25,6 +25,7 @@ class AssessmentResponse(BaseModel):
         from_attributes = True
 
 
+@router.get("", summary="Get assessments", response_model=List[Dict[str, Any]])
 @router.get("/", summary="Get assessments", response_model=List[Dict[str, Any]])
 async def get_assessments(
     status: Optional[str] = Query(None, description="Filter by status (published, draft, etc.)"),
