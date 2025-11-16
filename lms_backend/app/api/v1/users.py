@@ -602,14 +602,14 @@ async def get_my_enrollments(
 ):
     """Get current user's course enrollments"""
     try:
-        print(f"🔍 Getting enrollments for user {current_user.id} with role {current_user.role}")
+        print(f"[API] Getting enrollments for user {current_user.id} with role {current_user.role}")
         enrollments = await EnrollmentService.get_user_enrollments(db, current_user.id)
-        print(f"📚 Found {len(enrollments)} enrollments for user {current_user.id}")
+        print(f"[API] Found {len(enrollments)} enrollments for user {current_user.id}")
         for enrollment in enrollments:
             print(f"  - Course {enrollment.course_id}: {enrollment.status}")
         return enrollments
     except Exception as e:
-        print(f"❌ Error fetching user enrollments: {str(e)}")
+        print(f"[API] ERROR fetching user enrollments: {str(e)}")
         import traceback
         traceback.print_exc()
         logger.error(f"Error fetching user enrollments: {str(e)}")

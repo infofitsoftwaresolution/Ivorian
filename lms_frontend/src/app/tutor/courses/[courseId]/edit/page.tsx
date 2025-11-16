@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api/client';
 import { 
@@ -24,6 +24,8 @@ import {
   QuestionMarkCircleIcon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import SuccessToast from '@/components/ui/SuccessToast';
+import ConfirmationToast from '@/components/ui/ConfirmationToast';
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import VideoUploader from '@/components/editor/VideoUploader';
 import ResourceAttachments from '@/components/editor/ResourceAttachments';
@@ -124,6 +126,7 @@ export default function CourseBuilder() {
   const { user } = useAuth();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const courseId = parseInt(params.courseId as string);
 
   const [course, setCourse] = useState<Course | null>(null);
@@ -132,6 +135,9 @@ export default function CourseBuilder() {
   const [publishing, setPublishing] = useState(false);
   const [selectedContent, setSelectedContent] = useState<SelectedContent>({ type: 'course-overview' });
   const [showCoursePreview, setShowCoursePreview] = useState(false);
+  const [showPublishConfirmation, setShowPublishConfirmation] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({ title: '', message: '' });
 
   // Load course data
   useEffect(() => {
@@ -197,6 +203,27 @@ export default function CourseBuilder() {
         
         console.log('Transformed course data:', courseData);
         setCourse(courseData);
+        
+        // Auto-select lesson if lessonId is in URL params
+        const lessonIdParam = searchParams.get('lessonId');
+        const topicIdParam = searchParams.get('topicId');
+        
+        if (lessonIdParam && topicIdParam) {
+          const lessonId = parseInt(lessonIdParam);
+          const topicId = parseInt(topicIdParam);
+          
+          // Find the lesson in the course data
+          const topic = courseData.topics.find(t => t.id === topicId);
+          if (topic) {
+            const lesson = topic.lessons.find(l => l.id === lessonId);
+            if (lesson) {
+              console.log('Auto-selecting lesson from URL params:', lesson);
+              setSelectedContent({ type: 'lesson', id: lessonId, parentId: topicId });
+              // Remove query params from URL
+              router.replace(`/tutor/courses/${courseId}/edit`, { scroll: false });
+            }
+          }
+        }
       } catch (error) {
         console.error('Error fetching course:', error);
         
@@ -217,7 +244,7 @@ export default function CourseBuilder() {
       console.error('Invalid course ID:', courseId);
       setLoading(false);
     }
-  }, [courseId]);
+  }, [courseId, searchParams, router]);
 
   const toggleTopicExpansion = (topicId: number) => {
     setCourse(prev => {
@@ -234,7 +261,25 @@ export default function CourseBuilder() {
   };
 
   const handleContentSelect = (content: SelectedContent) => {
+    console.log('handleContentSelect called with:', content);
+    
+    // If selecting a lesson, ensure its parent topic is expanded
+    if (content.type === 'lesson' && content.parentId) {
+      setCourse(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          topics: prev.topics.map(topic =>
+            topic.id === content.parentId
+              ? { ...topic, isExpanded: true }
+              : topic
+          )
+        };
+      });
+    }
+    
     setSelectedContent(content);
+    console.log('Selected content updated:', content);
   };
 
   const handleSave = async () => {
@@ -250,16 +295,17 @@ export default function CourseBuilder() {
     }
   };
 
-  const handlePublish = async () => {
+  const handlePublish = () => {
+    if (!course) return;
+    setShowPublishConfirmation(true);
+  };
+
+  const confirmPublish = async () => {
     if (!course) return;
     
-    const confirmed = window.confirm(
-      `Are you sure you want to publish "${course.title}"? Once published, students will be able to enroll in this course.`
-    );
-    
-    if (!confirmed) return;
-    
+    setShowPublishConfirmation(false);
     setPublishing(true);
+    
     try {
       console.log('Publishing course:', courseId);
       await apiClient.publishCourse(courseId);
@@ -268,10 +314,19 @@ export default function CourseBuilder() {
       // Update course status in local state
       setCourse(prev => prev ? { ...prev, status: 'published' } : null);
       
-      alert('Course published successfully! Students can now enroll in this course.');
+      // Show success toast
+      setSuccessMessage({
+        title: 'Course Published',
+        message: 'Course published successfully! Students can now enroll in this course.'
+      });
+      setShowSuccessToast(true);
     } catch (error) {
       console.error('Error publishing course:', error);
-      alert(`Failed to publish course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setSuccessMessage({
+        title: 'Publish Failed',
+        message: `Failed to publish course: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+      setShowSuccessToast(true);
     } finally {
       setPublishing(false);
     }
@@ -426,16 +481,33 @@ export default function CourseBuilder() {
                   {/* Lessons */}
                   {topic.isExpanded && (
                     <div className="border-t border-gray-200 bg-gray-50">
-                      {topic.lessons.map((lesson, lessonIndex) => (
-                        <button
-                          key={lesson.id}
-                          onClick={() => handleContentSelect({ type: 'lesson', id: lesson.id, parentId: topic.id })}
-                          className={`w-full flex items-center p-3 text-left transition-colors border-b border-gray-200 last:border-b-0 ${
-                            selectedContent.type === 'lesson' && selectedContent.id === lesson.id
-                              ? 'bg-green-50 text-green-700'
-                              : 'hover:bg-gray-100'
-                          }`}
-                        >
+                      {topic.lessons.map((lesson, lessonIndex) => {
+                        const isSelected = selectedContent.type === 'lesson' && 
+                          (selectedContent.id === lesson.id || String(selectedContent.id) === String(lesson.id));
+                        
+                        return (
+                          <button
+                            key={lesson.id}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              console.log('Lesson button clicked:', lesson.id, lesson.title);
+                              handleContentSelect({ type: 'lesson', id: lesson.id, parentId: topic.id });
+                            }}
+                            className={`w-full flex items-center p-3 text-left transition-colors border-b border-gray-200 last:border-b-0 ${
+                              isSelected
+                                ? 'bg-green-50 text-green-700 border-l-4 border-l-green-500'
+                                : 'hover:bg-gray-100'
+                            }`}
+                            ref={(el) => {
+                              // Scroll into view if this is the selected lesson
+                              if (isSelected && el) {
+                                setTimeout(() => {
+                                  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                }, 100);
+                              }
+                            }}
+                          >
                           <div className="w-6 flex justify-center mr-3">
                             {lesson.content_type === 'video' ? (
                               <PlayIcon className="h-4 w-4" />
@@ -451,8 +523,14 @@ export default function CourseBuilder() {
                               {lesson.estimated_duration || 0} min
                             </div>
                           </div>
+                          {isSelected && (
+                            <div className="ml-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            </div>
+                          )}
                         </button>
-                      ))}
+                      );
+                      })}
                       
                       {/* Add Lesson Button */}
                       <button
@@ -505,8 +583,12 @@ export default function CourseBuilder() {
               
               {/* Add Topic Button */}
               <button
-                onClick={() => handleContentSelect({ type: 'new-topic' })}
-                className="w-full flex items-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  console.log('Add Topic button clicked');
+                  handleContentSelect({ type: 'new-topic' });
+                }}
+                className="w-full flex items-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-indigo-600 hover:border-indigo-300 transition-colors cursor-pointer"
               >
                 <PlusIcon className="h-5 w-5 mr-3" />
                 <span className="font-medium">Add Topic</span>
@@ -523,6 +605,7 @@ export default function CourseBuilder() {
               selectedContent={selectedContent}
               onContentUpdate={(updatedCourse) => setCourse(updatedCourse)}
               onSave={handleSave}
+              onContentSelect={handleContentSelect}
             />
           </div>
         </div>
@@ -535,6 +618,27 @@ export default function CourseBuilder() {
           onClose={() => setShowCoursePreview(false)}
         />
       )}
+
+      {/* Confirmation Toast for Publishing */}
+      <ConfirmationToast
+        isOpen={showPublishConfirmation}
+        onClose={() => setShowPublishConfirmation(false)}
+        onConfirm={confirmPublish}
+        title="Publish Course"
+        message="Are you sure you want to publish this course? Students will be able to enroll."
+        confirmText="Publish"
+        cancelText="Cancel"
+        isLoading={publishing}
+      />
+
+      {/* Success Toast */}
+      <SuccessToast
+        isOpen={showSuccessToast}
+        onClose={() => setShowSuccessToast(false)}
+        title={successMessage.title}
+        message={successMessage.message}
+        duration={5000}
+      />
     </div>
   );
 }
@@ -545,10 +649,15 @@ interface ContentEditorProps {
   selectedContent: SelectedContent;
   onContentUpdate: (course: Course) => void;
   onSave: () => void;
+  onContentSelect?: (content: SelectedContent) => void;
 }
 
-function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: ContentEditorProps) {
+function ContentEditor({ course, selectedContent, onContentUpdate, onSave, onContentSelect }: ContentEditorProps) {
+  console.log('ContentEditor rendered with selectedContent:', selectedContent);
+  console.log('ContentEditor course:', course);
+  
   const renderContent = () => {
+    console.log('renderContent called, selectedContent.type:', selectedContent.type);
     switch (selectedContent.type) {
       case 'course-overview':
         return <CourseOverviewEditor course={course} onUpdate={onContentUpdate} />;
@@ -558,16 +667,26 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: Con
         return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} /> : null;
       
       case 'lesson':
-        const lesson = course.topics
-          .flatMap(t => t.lessons)
-          .find(l => l.id === selectedContent.id);
-        return lesson ? <LessonEditor lesson={lesson} course={course} onUpdate={onContentUpdate} /> : null;
+        return <LessonEditorWrapper 
+          lessonId={selectedContent.id!} 
+          course={course} 
+          onUpdate={onContentUpdate} 
+        />;
       
       case 'new-topic':
-        return <NewTopicEditor course={course} onUpdate={onContentUpdate} onSave={onSave} />;
+        if (!course) {
+          console.error('Course is null, cannot render NewTopicEditor');
+          return <div className="p-6 text-red-600">Error: Course data not loaded. Please refresh the page.</div>;
+        }
+        console.log('Rendering NewTopicEditor with course:', course);
+        return <NewTopicEditor course={course} onUpdate={onContentUpdate} onSave={onSave} onNavigate={onContentSelect} />;
       
       case 'new-lesson':
-        return <NewLessonEditor course={course} topicId={selectedContent.parentId!} onUpdate={onContentUpdate} onSave={onSave} />;
+        if (!course) {
+          console.error('Course is null, cannot render NewLessonEditor');
+          return <div className="p-6 text-red-600">Error: Course data not loaded. Please refresh the page.</div>;
+        }
+        return <NewLessonEditor course={course} topicId={selectedContent.parentId!} onUpdate={onContentUpdate} onSave={onSave} onNavigate={onContentSelect} />;
       
       case 'assessment':
         const assessment = course.topics
@@ -590,11 +709,21 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: Con
 // Course Overview Editor
 function CourseOverviewEditor({ course, onUpdate }: { course: Course; onUpdate: (course: Course) => void }) {
   const [localCourse, setLocalCourse] = useState(course);
+  const [showPublishConfirmation, setShowPublishConfirmation] = useState(false);
 
   const handleUpdate = (field: string, value: any) => {
     const updated = { ...localCourse, [field]: value };
     setLocalCourse(updated);
     onUpdate(updated);
+  };
+
+  const handlePublishClick = () => {
+    setShowPublishConfirmation(true);
+  };
+
+  const confirmPublish = () => {
+    setShowPublishConfirmation(false);
+    handleUpdate('status', 'published');
   };
 
   return (
@@ -648,11 +777,7 @@ function CourseOverviewEditor({ course, onUpdate }: { course: Course; onUpdate: 
             </select>
             {localCourse.status === 'draft' && (
               <button
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to publish this course? Students will be able to enroll.')) {
-                    handleUpdate('status', 'published');
-                  }
-                }}
+                onClick={handlePublishClick}
                 className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-medium"
               >
                 Publish Now
@@ -691,6 +816,17 @@ function CourseOverviewEditor({ course, onUpdate }: { course: Course; onUpdate: 
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal for Publishing */}
+      <ConfirmationToast
+        isOpen={showPublishConfirmation}
+        onClose={() => setShowPublishConfirmation(false)}
+        onConfirm={confirmPublish}
+        title="Publish Course"
+        message="Are you sure you want to publish this course? Students will be able to enroll."
+        confirmText="Publish"
+        cancelText="Cancel"
+      />
     </div>
   );
 }
@@ -775,9 +911,120 @@ function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course
   );
 }
 
+// Lesson Editor Wrapper - Fetches full lesson data
+function LessonEditorWrapper({ lessonId, course, onUpdate }: { lessonId: number | string; course: Course; onUpdate: (course: Course) => void }) {
+  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchLesson = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        
+        // First try to find lesson in course data
+        const lessonFromCourse = course.topics
+          .flatMap(t => (t.lessons || []).map(l => ({ ...l, topicId: t.id })))
+          .find(l => l.id === lessonId || String(l.id) === String(lessonId));
+        
+        if (lessonFromCourse) {
+          console.log('[LessonEditor] Found lesson in course data:', lessonFromCourse);
+          
+          // Fetch full lesson details from API
+          try {
+            const response = await apiClient.getLesson(typeof lessonId === 'string' ? parseInt(lessonId) : lessonId);
+            console.log('[LessonEditor] Full lesson data from API:', response.data);
+            
+            // Merge API data with course data
+            const fullLesson: Lesson = {
+              ...lessonFromCourse,
+              ...response.data,
+              video_url: response.data.video_url || lessonFromCourse.video_url,
+              content: response.data.content || lessonFromCourse.content || '',
+              content_type: response.data.content_type || lessonFromCourse.content_type || 'text',
+            };
+            
+            setLesson(fullLesson);
+          } catch (apiError) {
+            console.warn('[LessonEditor] Failed to fetch full lesson data, using course data:', apiError);
+            setLesson(lessonFromCourse);
+          }
+        } else {
+          // Try fetching directly from API
+          console.log('[LessonEditor] Lesson not in course data, fetching from API...');
+          const response = await apiClient.getLesson(typeof lessonId === 'string' ? parseInt(lessonId) : lessonId);
+          setLesson(response.data);
+        }
+      } catch (err) {
+        console.error('[LessonEditor] Error fetching lesson:', err);
+        setError('Failed to load lesson. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (lessonId) {
+      fetchLesson();
+    }
+  }, [lessonId, course]);
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner size="lg" />
+          <span className="ml-4 text-gray-600">Loading lesson...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!lesson) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <p className="text-gray-600">Lesson not found. Please select a lesson from the sidebar.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <LessonEditor lesson={lesson} course={course} onUpdate={onUpdate} />;
+}
+
 // Lesson Editor
 function LessonEditor({ lesson, course, onUpdate }: { lesson: Lesson; course: Course; onUpdate: (course: Course) => void }) {
   const [localLesson, setLocalLesson] = useState(lesson);
+  
+  // Update local lesson when prop changes
+  useEffect(() => {
+    console.log('[LessonEditor] Lesson prop changed:', lesson);
+    setLocalLesson(lesson);
+  }, [lesson]);
+  
+  // Debug: Log lesson data
+  useEffect(() => {
+    console.log('[LessonEditor] Current lesson data:', {
+      id: localLesson.id,
+      title: localLesson.title,
+      content_type: localLesson.content_type,
+      has_content: !!localLesson.content,
+      content_length: localLesson.content?.length || 0,
+      has_video_url: !!localLesson.video_url,
+      video_url: localLesson.video_url
+    });
+  }, [localLesson]);
   const [activeTab, setActiveTab] = useState<'content' | 'video' | 'attachments' | 'knowledge-checks'>('content');
   const [showKnowledgeCheckBuilder, setShowKnowledgeCheckBuilder] = useState(false);
   const [showStudentPreview, setShowStudentPreview] = useState(false);
@@ -1055,39 +1302,77 @@ function LessonEditor({ lesson, course, onUpdate }: { lesson: Lesson; course: Co
 }
 
 // New Topic Editor
-function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate: (course: Course) => void; onSave: () => void }) {
+function NewTopicEditor({ course, onUpdate, onSave, onNavigate }: { course: Course; onUpdate: (course: Course) => void; onSave: () => void; onNavigate?: (content: SelectedContent) => void }) {
   const [topicData, setTopicData] = useState({
     title: '',
     description: '',
-    order: course.topics.length + 1
+    order: (course?.topics?.length || 0) + 1
   });
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = async () => {
-    if (!topicData.title.trim()) {
+    console.log('handleCreate called');
+    console.log('topicData:', topicData);
+    console.log('course:', course);
+    
+    if (!topicData.title || !topicData.title.trim()) {
       alert('Please enter a topic title');
       return;
     }
 
+    if (!course || !course.id) {
+      console.error('Course is missing:', course);
+      alert('Course information is missing. Please refresh the page.');
+      return;
+    }
+    
+    console.log('All validations passed, proceeding with topic creation...');
+
+    setIsCreating(true);
     try {
       // Create topic using API client
       const topicPayload = {
-        title: topicData.title,
-        description: topicData.description,
+        title: topicData.title.trim(),
+        description: topicData.description?.trim() || '',
         order: topicData.order,
-        content: topicData.description,
+        content: topicData.description?.trim() || topicData.title.trim(),
         estimated_duration: 30,
         is_required: true
       };
 
       console.log('Creating topic with payload:', topicPayload);
+      console.log('Course ID:', course.id);
       const response = await apiClient.createTopic(course.id, topicPayload);
-      console.log('Topic created successfully:', response.data);
+      console.log('API Response:', response);
+      console.log('Response data:', response.data);
+      console.log('Response data type:', typeof response.data);
+      
+      // Handle different response structures
+      // Backend returns TopicResponse directly, which is wrapped in ApiResponse.data
+      // But it might also be wrapped in response.data.data if backend returns {message, data: {...}}
+      let topic = response.data;
+      
+      // Check if it's wrapped in another data property
+      if (topic && topic.data) {
+        topic = topic.data;
+      }
+      
+      // Check if topic is an object with id property
+      if (!topic || (typeof topic === 'object' && !topic.id)) {
+        console.error('Invalid response structure:', response);
+        console.error('Topic object:', topic);
+        throw new Error('Topic was created but no ID was returned. Response: ' + JSON.stringify(response));
+      }
+
+      const topicId = topic.id;
+      console.log('Topic created successfully:', topic);
 
       const newTopic: Topic = {
-        id: response.data.id,
-        title: response.data.title,
-        description: response.data.description,
-        order: response.data.order,
+        id: topicId,
+        title: topic.title || topicData.title,
+        description: topic.description || topicData.description,
+        order: topic.order || topicData.order,
         lessons: [],
         isExpanded: true
       };
@@ -1099,10 +1384,57 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
 
       onUpdate(updatedCourse);
       onSave();
-    } catch (error) {
+      
+      // Show success toast
+      setShowSuccessToast(true);
+      
+      // Navigate to the newly created topic after a short delay
+      setTimeout(() => {
+        if (onNavigate) {
+          onNavigate({ type: 'topic', id: topicId });
+        }
+      }, 1500);
+    } catch (error: any) {
       console.error('Error creating topic:', error);
-      alert(`Failed to create topic: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Handle session expiration
+      if (error?.status === 401 || error?.code === 'SESSION_EXPIRED' || error?.details?.requiresLogin) {
+        alert('Your session has expired. You will be redirected to the login page.');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return;
+      }
+      
+      // Extract detailed error message
+      let errorMessage = 'An unexpected error occurred';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.details?.detail) {
+        // Handle FastAPI validation errors
+        if (Array.isArray(error.details.detail)) {
+          errorMessage = error.details.detail.map((err: any) => {
+            if (typeof err === 'string') return err;
+            if (err.msg) return `${err.loc?.join('.') || 'Field'}: ${err.msg}`;
+            return JSON.stringify(err);
+          }).join('\n');
+        } else {
+          errorMessage = error.details.detail;
+        }
+      }
+      
+      alert(`Failed to create topic:\n\n${errorMessage}\n\nPlease check the console for more details.`);
+    } finally {
+      setIsCreating(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleCreate();
   };
 
   return (
@@ -1112,7 +1444,7 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
         <p className="text-gray-600">Add a new topic to organize your course content.</p>
       </div>
 
-      <div className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Topic Title *
@@ -1123,6 +1455,8 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
             onChange={(e) => setTopicData(prev => ({ ...prev, title: e.target.value }))}
             placeholder="e.g., Introduction to JavaScript"
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+            required
+            disabled={isCreating}
           />
         </div>
 
@@ -1136,30 +1470,49 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
             onChange={(e) => setTopicData(prev => ({ ...prev, description: e.target.value }))}
             placeholder="Describe what students will learn in this topic..."
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+            disabled={isCreating}
           />
         </div>
 
         <div className="flex space-x-3">
           <button
-            onClick={handleCreate}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            type="submit"
+            onClick={(e) => {
+              e.preventDefault();
+              console.log('Button clicked, calling handleCreate');
+              handleCreate();
+            }}
+            disabled={isCreating}
+            className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
-            Create Topic
+            {isCreating && <LoadingSpinner size="sm" />}
+            <span>{isCreating ? 'Creating...' : 'Create Topic'}</span>
           </button>
           <button
+            type="button"
             onClick={() => window.history.back()}
-            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            disabled={isCreating}
+            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
           >
             Cancel
           </button>
         </div>
-      </div>
+      </form>
+
+      {/* Success Toast */}
+      <SuccessToast
+        isOpen={showSuccessToast}
+        onClose={() => setShowSuccessToast(false)}
+        title="Topic Created Successfully! 🎉"
+        message="Your topic has been added to the course. You can now add lessons to it."
+        duration={4000}
+      />
     </div>
   );
 }
 
 // New Lesson Editor
-function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course; topicId: number; onUpdate: (course: Course) => void; onSave: () => void }) {
+function NewLessonEditor({ course, topicId, onUpdate, onSave, onNavigate }: { course: Course; topicId: number; onUpdate: (course: Course) => void; onSave: () => void; onNavigate?: (content: SelectedContent) => void }) {
   const topic = course.topics.find(t => t.id === topicId);
   const [lessonData, setLessonData] = useState({
     title: '',
@@ -1172,19 +1525,23 @@ function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course
     order: (topic?.lessons.length || 0) + 1
   });
 
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
   const handleCreate = async () => {
     if (!lessonData.title.trim()) {
       alert('Please enter a lesson title');
       return;
     }
 
+    setIsCreating(true);
     try {
       // Create lesson using API client
       const lessonPayload = {
-        title: lessonData.title,
-        description: lessonData.description,
-        content: lessonData.content,
-        video_url: lessonData.video_url,
+        title: lessonData.title.trim(),
+        description: lessonData.description?.trim() || '',
+        content: lessonData.content?.trim() || lessonData.title.trim(),
+        video_url: lessonData.video_url?.trim() || '',
         content_type: lessonData.content_type,
         order: lessonData.order,
         estimated_duration: lessonData.estimated_duration,
@@ -1194,18 +1551,28 @@ function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course
 
       console.log('Creating lesson with payload:', lessonPayload);
       const response = await apiClient.createLesson(topicId, lessonPayload);
-      console.log('Lesson created successfully:', response.data);
+      console.log('API Response:', response);
+      
+      // Handle different response structures
+      const lesson = response.data?.data || response.data;
+      const lessonId = lesson?.id || response.data?.id;
+
+      if (!lessonId) {
+        throw new Error('Lesson was created but no ID was returned. Response: ' + JSON.stringify(response));
+      }
+
+      console.log('Lesson created successfully:', lesson);
 
       const newLesson: Lesson = {
-        id: response.data.id,
-        title: response.data.title,
-        description: response.data.description,
-        content: response.data.content,
-        video_url: response.data.video_url,
-        content_type: response.data.content_type,
-        order: response.data.order,
-        estimated_duration: response.data.estimated_duration,
-        is_free_preview: response.data.is_free_preview
+        id: lessonId,
+        title: lesson.title || lessonData.title,
+        description: lesson.description || lessonData.description,
+        content: lesson.content || lessonData.content,
+        video_url: lesson.video_url || lessonData.video_url,
+        content_type: lesson.content_type || lessonData.content_type,
+        order: lesson.order || lessonData.order,
+        estimated_duration: lesson.estimated_duration || lessonData.estimated_duration,
+        is_free_preview: lesson.is_free_preview || lessonData.is_free_preview
       };
 
       const updatedCourse = {
@@ -1219,9 +1586,42 @@ function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course
 
       onUpdate(updatedCourse);
       onSave();
-    } catch (error) {
+      
+      // Show success toast
+      setShowSuccessToast(true);
+      
+      // Navigate to the parent topic after a short delay
+      setTimeout(() => {
+        if (onNavigate) {
+          onNavigate({ type: 'topic', id: topicId });
+        }
+      }, 1500);
+    } catch (error: any) {
       console.error('Error creating lesson:', error);
-      alert(`Failed to create lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Extract detailed error message
+      let errorMessage = 'An unexpected error occurred';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.details?.detail) {
+        // Handle FastAPI validation errors
+        if (Array.isArray(error.details.detail)) {
+          errorMessage = error.details.detail.map((err: any) => {
+            if (typeof err === 'string') return err;
+            if (err.msg) return `${err.loc?.join('.') || 'Field'}: ${err.msg}`;
+            return JSON.stringify(err);
+          }).join('\n');
+        } else {
+          errorMessage = error.details.detail;
+        }
+      }
+      
+      alert(`Failed to create lesson:\n\n${errorMessage}\n\nPlease check the console for more details.`);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -1320,18 +1720,30 @@ function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course
         <div className="flex space-x-3">
           <button
             onClick={handleCreate}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            disabled={isCreating}
+            className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
-            Create Lesson
+            {isCreating && <LoadingSpinner size="sm" />}
+            <span>{isCreating ? 'Creating...' : 'Create Lesson'}</span>
           </button>
           <button
             onClick={() => window.history.back()}
-            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            disabled={isCreating}
+            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
           >
             Cancel
           </button>
         </div>
       </div>
+
+      {/* Success Toast */}
+      <SuccessToast
+        isOpen={showSuccessToast}
+        onClose={() => setShowSuccessToast(false)}
+        title="Lesson Created Successfully! 🎉"
+        message="Your lesson has been added to the topic. You can now add content to it."
+        duration={4000}
+      />
     </div>
   );
 }

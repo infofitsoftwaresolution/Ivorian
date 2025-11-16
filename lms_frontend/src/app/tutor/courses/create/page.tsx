@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import SuccessToast from '@/components/ui/SuccessToast';
 import AdvancedQuizBuilder from '@/components/course/AdvancedQuizBuilder';
 import AdvancedAssignmentBuilder from '@/components/course/AdvancedAssignmentBuilder';
 import RichTextEditor from '@/components/editor/RichTextEditor';
@@ -78,6 +79,8 @@ export default function CourseCreateWizard() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({ title: '', message: '' });
   
   const [formData, setFormData] = useState<CourseFormData>({
     // Step 1
@@ -134,33 +137,80 @@ export default function CourseCreateWizard() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      // Validate required fields
+      if (!formData.title || formData.title.trim() === '') {
+        alert('Please enter a course title');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!user?.organization_id) {
+        alert('Organization ID is missing. Please ensure you are logged in with a valid organization.');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Transform form data to match backend API
-      const courseData = {
-        title: formData.title,
-        description: formData.shortDescription,
-        short_description: formData.shortDescription,
-        category: formData.category,
+      const filteredPrerequisites = formData.prerequisites.filter(p => p.trim() !== '');
+      const filteredObjectives = formData.learningObjectives.filter(o => o.trim() !== '');
+      const filteredTags = formData.category ? [formData.category] : [];
+
+      const courseData: any = {
+        title: formData.title.trim(),
+        description: formData.shortDescription?.trim() || formData.title.trim(),
+        short_description: formData.shortDescription?.trim() || formData.title.trim(),
         difficulty_level: formData.difficulty,
-        price: formData.price,
-        currency: formData.currency,
+        price: formData.price || 0,
+        currency: formData.currency || 'USD',
         enrollment_type: formData.price > 0 ? 'paid' : 'free',
-        duration_weeks: formData.duration,
-        prerequisites: formData.prerequisites.filter(p => p.trim() !== '').join('\n'),
-        learning_objectives: formData.learningObjectives.filter(o => o.trim() !== ''),
-        tags: [formData.category],
-        organization_id: user?.organization_id || 1, // Use user's organization
-        thumbnail_url: formData.thumbnailUrl,
-        intro_video_url: formData.introVideoUrl,
+        organization_id: user.organization_id,
       };
+
+      // Add optional fields only if they have values
+      if (formData.category && formData.category.trim() !== '') {
+        courseData.category = formData.category.trim();
+      }
+
+      if (formData.duration && formData.duration > 0) {
+        courseData.duration_weeks = formData.duration;
+      }
+
+      if (filteredPrerequisites.length > 0) {
+        courseData.prerequisites = filteredPrerequisites.join('\n');
+      }
+
+      if (filteredObjectives.length > 0) {
+        courseData.learning_objectives = filteredObjectives;
+      }
+
+      if (filteredTags.length > 0) {
+        courseData.tags = filteredTags;
+      }
+
+      if (formData.thumbnailUrl && formData.thumbnailUrl.trim() !== '') {
+        courseData.thumbnail_url = formData.thumbnailUrl.trim();
+      }
+
+      if (formData.introVideoUrl && formData.introVideoUrl.trim() !== '') {
+        courseData.intro_video_url = formData.introVideoUrl.trim();
+      }
 
       console.log('Creating course with data:', courseData);
       
       // Call backend API to create course using API client
       const response = await apiClient.createCourse(courseData);
 
-      const courseId = response.data.id;
+      console.log('API Response:', response);
+      
+      // Handle different response structures
+      const course = response.data?.data || response.data;
+      const courseId = course?.id || response.data?.id;
 
-      console.log('Course created successfully:', response.data);
+      if (!courseId) {
+        throw new Error('Course was created but no ID was returned. Response: ' + JSON.stringify(response));
+      }
+
+      console.log('Course created successfully:', course);
       
       // Now create topics and lessons if they exist
       if (formData.topics && formData.topics.length > 0) {
@@ -184,9 +234,18 @@ export default function CourseCreateWizard() {
               console.log('Topic payload:', topicPayload);
               
               const topicResponse = await apiClient.createTopic(courseId, topicPayload);
+              console.log('Topic API Response:', topicResponse);
               
-              const topicId = topicResponse.data.id;
-              console.log('Topic created successfully:', topicResponse.data);
+              // Handle different response structures
+              const topic = topicResponse.data?.data || topicResponse.data;
+              const topicId = topic?.id || topicResponse.data?.id;
+
+              if (!topicId) {
+                console.error('Topic was created but no ID was returned. Response:', topicResponse);
+                throw new Error('Topic was created but no ID was returned');
+              }
+
+              console.log('Topic created successfully:', topic);
               
               // Create lessons for this topic
               if (topicData.lessons && topicData.lessons.length > 0) {
@@ -211,10 +270,40 @@ export default function CourseCreateWizard() {
                       console.log('Lesson payload:', lessonPayload);
                       
                       const lessonResponse = await apiClient.createLesson(topicId, lessonPayload);
-                      console.log('Lesson created successfully:', lessonResponse.data);
-                    } catch (lessonError) {
+                      console.log('Lesson API Response:', lessonResponse);
+                      
+                      // Handle different response structures
+                      const lesson = lessonResponse.data?.data || lessonResponse.data;
+                      const lessonId = lesson?.id || lessonResponse.data?.id;
+
+                      if (!lessonId) {
+                        console.error('Lesson was created but no ID was returned. Response:', lessonResponse);
+                        throw new Error('Lesson was created but no ID was returned');
+                      }
+
+                      console.log('Lesson created successfully:', lesson);
+                    } catch (lessonError: any) {
                       console.error('Error creating lesson:', lessonError);
                       console.error('Lesson data that failed:', lessonData);
+                      
+                      // Extract detailed error message
+                      let errorMessage = 'An unexpected error occurred';
+                      if (lessonError instanceof Error) {
+                        errorMessage = lessonError.message;
+                      } else if (lessonError?.message) {
+                        errorMessage = lessonError.message;
+                      } else if (lessonError?.details?.detail) {
+                        if (Array.isArray(lessonError.details.detail)) {
+                          errorMessage = lessonError.details.detail.map((err: any) => {
+                            if (typeof err === 'string') return err;
+                            if (err.msg) return `${err.loc?.join('.') || 'Field'}: ${err.msg}`;
+                            return JSON.stringify(err);
+                          }).join('\n');
+                        } else {
+                          errorMessage = lessonError.details.detail;
+                        }
+                      }
+                      console.error('Lesson creation error details:', errorMessage);
                     }
                   }
                 }
@@ -230,28 +319,42 @@ export default function CourseCreateWizard() {
         console.log('All topics and lessons created successfully');
       }
       
-      // Ask user if they want to publish the course
-      const shouldPublish = window.confirm(
-        'Course created successfully! Would you like to publish it now so students can enroll?'
-      );
+      // Show success toast
+      setSuccessMessage({
+        title: 'Course Created Successfully! 🎉',
+        message: 'Your course has been created. You can now edit it or publish it to make it available to students.'
+      });
+      setShowSuccessToast(true);
       
-      if (shouldPublish) {
-        try {
-          console.log('Publishing course:', courseId);
-          await apiClient.publishCourse(courseId);
-          console.log('Course published successfully');
-          alert('Course published successfully! Students can now enroll.');
-        } catch (publishError) {
-          console.error('Error publishing course:', publishError);
-          alert('Course created but failed to publish. You can publish it later from the course editor.');
+      // Redirect to course builder after a short delay to show the toast
+      setTimeout(() => {
+        router.push(`/tutor/courses/${courseId}/edit`);
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error creating course:', error);
+      
+      // Extract detailed error message
+      let errorMessage = 'An unexpected error occurred';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.details?.detail) {
+        // Handle FastAPI validation errors
+        if (Array.isArray(error.details.detail)) {
+          errorMessage = error.details.detail.map((err: any) => {
+            if (typeof err === 'string') return err;
+            if (err.msg) return `${err.loc?.join('.') || 'Field'}: ${err.msg}`;
+            return JSON.stringify(err);
+          }).join('\n');
+        } else {
+          errorMessage = error.details.detail;
         }
       }
       
-      // Redirect to course builder to continue editing
-      router.push(`/tutor/courses/${courseId}/edit`);
-    } catch (error) {
-      console.error('Error creating course:', error);
-      alert(`Failed to create course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Show error in a more user-friendly way
+      alert(`Failed to create course:\n\n${errorMessage}\n\nPlease check the console for more details.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -350,6 +453,15 @@ export default function CourseCreateWizard() {
           )}
         </div>
       </div>
+
+      {/* Success Toast */}
+      <SuccessToast
+        isOpen={showSuccessToast}
+        onClose={() => setShowSuccessToast(false)}
+        title={successMessage.title}
+        message={successMessage.message}
+        duration={5000}
+      />
     </div>
   );
 }

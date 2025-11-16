@@ -342,27 +342,27 @@ class TopicService:
     async def create_topic(db: AsyncSession, topic_data: TopicCreate, course_id: int, user_id: int) -> Topic:
         """Create a new topic"""
         try:
-            print(f"🔍 TopicService: Creating topic for course {course_id}")
-            print(f"📝 TopicService: Topic data: {topic_data}")
-            print(f"👤 TopicService: User ID: {user_id}")
+            print(f"[TopicService] Creating topic for course {course_id}")
+            print(f"[TopicService] Topic data: {topic_data}")
+            print(f"[TopicService] User ID: {user_id}")
             
             # Verify course exists and user has access
             course = await CourseService.get_course(db, course_id)
-            print(f"📖 TopicService: Course found: {course.id if course else 'None'}")
+            print(f"[TopicService] Course found: {course.id if course else 'None'}")
             
             if not course:
                 raise ResourceNotFoundError("Course not found")
             
-            print(f"🔐 TopicService: Checking permissions - Course created by: {course.created_by}, Current user: {user_id}")
+            print(f"[TopicService] Checking permissions - Course created by: {course.created_by}, Current user: {user_id}")
             
             if course.created_by != user_id:
                 result = await db.execute(select(User).where(User.id == user_id))
                 user = result.scalar_one_or_none()
-                print(f"👤 TopicService: User role: {user.role if user else 'None'}")
+                print(f"[TopicService] User role: {user.role if user else 'None'}")
                 if not user or user.role not in ["organization_admin", "tutor"]:  # Allow tutors too
                     raise AuthorizationError("You don't have permission to create topics for this course")
             
-            print(f"✅ TopicService: Permissions OK, creating topic...")
+            print(f"[TopicService] Permissions OK, creating topic...")
             
             topic = Topic(
                 course_id=course_id,
@@ -374,17 +374,17 @@ class TopicService:
                 is_required=topic_data.is_required
             )
             
-            print(f"💾 TopicService: Adding topic to database...")
+            print(f"[TopicService] Adding topic to database...")
             db.add(topic)
             await db.commit()
             await db.refresh(topic)
             
-            print(f"✅ TopicService: Topic created successfully with ID: {topic.id}")
+            print(f"[TopicService] Topic created successfully with ID: {topic.id}")
             return topic
             
         except Exception as e:
-            print(f"❌ TopicService: Error creating topic: {str(e)}")
-            print(f"🔍 TopicService: Error type: {type(e)}")
+            print(f"[TopicService] ERROR creating topic: {str(e)}")
+            print(f"[TopicService] Error type: {type(e)}")
             import traceback
             traceback.print_exc()
             raise e
@@ -398,7 +398,7 @@ class TopicService:
     @staticmethod
     async def get_course_topics(db: AsyncSession, course_id: int) -> List[Topic]:
         """Get all topics for a course"""
-        print(f"🔍 TopicService: Getting topics for course {course_id}")
+        print(f"[TopicService] Getting topics for course {course_id}")
         result = await db.execute(
             select(Topic)
             .options(selectinload(Topic.lessons))
@@ -406,7 +406,7 @@ class TopicService:
             .order_by(Topic.order)
         )
         topics = result.scalars().all()
-        print(f"📚 TopicService: Found {len(topics)} topics for course {course_id}")
+        print(f"[TopicService] Found {len(topics)} topics for course {course_id}")
         for topic in topics:
             print(f"  - Topic {topic.id}: {topic.title} with {len(topic.lessons)} lessons")
         return topics
@@ -579,27 +579,27 @@ class EnrollmentService:
         student_id: int
     ) -> Enrollment:
         """Enroll a student in a course"""
-        print(f"🔍 EnrollmentService.enroll_in_course called with course_id={course_id}, student_id={student_id}")
+        print(f"[EnrollmentService] enroll_in_course called with course_id={course_id}, student_id={student_id}")
         
         # Verify course exists and is published
         course = await CourseService.get_course(db, course_id)
         if not course:
-            print(f"❌ Course not found: {course_id}")
+            print(f"[EnrollmentService] ERROR: Course not found: {course_id}")
             raise ResourceNotFoundError("Course not found")
         
-        print(f"📚 Course found: {course.title}, Status: {course.status}")
-        print(f"📚 Course enrollment_type: {course.enrollment_type}")
-        print(f"📚 Course price: {course.price}")
+        print(f"[EnrollmentService] Course found: {course.title}, Status: {course.status}")
+        print(f"[EnrollmentService] Course enrollment_type: {course.enrollment_type}")
+        print(f"[EnrollmentService] Course price: {course.price}")
         
         # Allow enrollment in draft courses for now (temporary fix)
         if course.status not in ["published", "draft"]:
-            print(f"❌ Course status not allowed for enrollment: {course.status}")
+            print(f"[EnrollmentService] ERROR: Course status not allowed for enrollment: {course.status}")
             raise ValidationError(f"Cannot enroll in course with status: {course.status}")
         
-        print(f"✅ Course status is valid for enrollment: {course.status}")
+        print(f"[EnrollmentService] Course status is valid for enrollment: {course.status}")
         
         # Check if already enrolled
-        print(f"🔍 Checking for existing enrollment...")
+        print(f"[EnrollmentService] Checking for existing enrollment...")
         result = await db.execute(
             select(Enrollment).where(
                 and_(Enrollment.course_id == course_id, Enrollment.student_id == student_id)
@@ -608,10 +608,10 @@ class EnrollmentService:
         existing_enrollment = result.scalar_one_or_none()
         
         if existing_enrollment:
-            print(f"⚠️ Student is already enrolled in this course: {existing_enrollment.id}")
+            print(f"[EnrollmentService] WARNING: Student is already enrolled in this course: {existing_enrollment.id}")
             raise ValidationError("Student is already enrolled in this course")
         
-        print(f"✅ No existing enrollment found, creating new enrollment...")
+        print(f"[EnrollmentService] No existing enrollment found, creating new enrollment...")
         
         # Create enrollment
         enrollment = Enrollment(
@@ -953,7 +953,7 @@ class EnrollmentService:
         user_id: int
     ) -> List[Enrollment]:
         """Get all enrollments for a user"""
-        print(f"🔍 Getting enrollments for user {user_id}")
+        print(f"[EnrollmentService] Getting enrollments for user {user_id}")
         try:
             result = await db.execute(
                 select(Enrollment)
@@ -962,7 +962,7 @@ class EnrollmentService:
                 .order_by(desc(Enrollment.enrollment_date))
             )
             enrollments = result.scalars().all()
-            print(f"📚 Found {len(enrollments)} enrollments for user {user_id}")
+            print(f"[EnrollmentService] Found {len(enrollments)} enrollments for user {user_id}")
             
             # Debug: Check course relationship
             for enrollment in enrollments:
@@ -988,7 +988,7 @@ class EnrollmentService:
             
             return enrollments
         except Exception as e:
-            print(f"❌ Error in get_user_enrollments: {str(e)}")
+            print(f"[EnrollmentService] ERROR in get_user_enrollments: {str(e)}")
             import traceback
             traceback.print_exc()
             raise e

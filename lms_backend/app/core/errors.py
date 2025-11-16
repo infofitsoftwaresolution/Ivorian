@@ -138,19 +138,19 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handle validation exceptions"""
     # DEBUG: Print the actual error structure
-    print(f"🔍 DEBUG: Validation error type: {type(exc)}")
-    print(f"🔍 DEBUG: Error errors(): {exc.errors()}")
-    print(f"🔍 DEBUG: First error: {exc.errors()[0] if exc.errors() else 'No errors'}")
-    print(f"🔍 DEBUG: First error type: {type(exc.errors()[0]) if exc.errors() else 'No errors'}")
+    print(f"[DEBUG] Validation error type: {type(exc)}")
+    print(f"[DEBUG] Error errors(): {exc.errors()}")
+    print(f"[DEBUG] First error: {exc.errors()[0] if exc.errors() else 'No errors'}")
+    print(f"[DEBUG] First error type: {type(exc.errors()[0]) if exc.errors() else 'No errors'}")
     
     # Safely extract error details
     error_details = []
     
     try:
         for i, error in enumerate(exc.errors()):
-            print(f"🔍 DEBUG: Processing error {i}: {error}")
-            print(f"🔍 DEBUG: Error type: {type(error)}")
-            print(f"🔍 DEBUG: Error dir: {dir(error)}")
+            print(f"[DEBUG] Processing error {i}: {error}")
+            print(f"[DEBUG] Error type: {type(error)}")
+            print(f"[DEBUG] Error dir: {dir(error)}")
             
             try:
                 # Handle different error structures safely
@@ -176,9 +176,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                         "type": "validation_error"
                     }
                 error_details.append(error_detail)
-                print(f"🔍 DEBUG: Added error detail: {error_detail}")
+                print(f"[DEBUG] Added error detail: {error_detail}")
             except Exception as inner_e:
-                print(f"🔍 DEBUG: Inner error processing failed: {inner_e}")
+                print(f"[DEBUG] Inner error processing failed: {inner_e}")
                 # Fallback if individual error processing fails
                 error_details.append({
                     "loc": [],
@@ -186,7 +186,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                     "type": "validation_error"
                 })
     except Exception as outer_e:
-        print(f"🔍 DEBUG: Outer error processing failed: {outer_e}")
+        print(f"[DEBUG] Outer error processing failed: {outer_e}")
         # Ultimate fallback
         error_details = [{
             "loc": [],

@@ -120,7 +120,23 @@ async def log_requests(request: Request, call_next):
         response = await call_next(request)
     except Exception as e:
         # Ensure CORS headers are added even if an exception occurs
-        app_logger.error(f"Unhandled exception in middleware: {str(e)}", exc_info=True)
+        # Handle encoding errors gracefully (e.g., emoji in error messages)
+        try:
+            error_msg = str(e)
+            # Remove any emoji or non-ASCII characters that might cause encoding issues
+            error_msg = error_msg.encode('ascii', 'ignore').decode('ascii')
+        except (UnicodeEncodeError, UnicodeDecodeError, AttributeError):
+            try:
+                error_msg = repr(e)
+                error_msg = error_msg.encode('ascii', 'ignore').decode('ascii')
+            except:
+                error_msg = "An error occurred (encoding issue)"
+        
+        try:
+            app_logger.error(f"Unhandled exception in middleware: {error_msg}", exc_info=False)
+        except:
+            # If logging itself fails, just continue
+            pass
         
         cors_headers = get_cors_headers(request)
         response = JSONResponse(

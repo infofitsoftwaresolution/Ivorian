@@ -68,46 +68,69 @@ export default function CourseDetailView() {
     const fetchCourse = async () => {
       try {
         setLoading(true);
+        console.log(`[CourseDetail] Fetching course data for course ID: ${courseId}`);
+        
         const response = await apiClient.getCourse(courseId);
-        setCourse(response.data);
-      } catch (error) {
-        console.error('Error fetching course:', error);
-        // Mock course for development
-        setCourse({
-          id: courseId,
-          title: 'Complete Web Development Bootcamp',
-          description: 'Learn HTML, CSS, JavaScript, React, Node.js and more',
-          category: 'Technology',
-          difficulty_level: 'beginner',
-          price: 299,
-          currency: 'USD',
-          status: 'published',
-          thumbnail_url: '',
-          intro_video_url: '',
-          topics: [
-            {
-              id: 1,
-              title: 'Introduction to Web Development',
-              description: 'Get started with web development basics',
-              order: 1,
-              lessons: [
-                { id: 1, title: 'What is Web Development?', content_type: 'video', estimated_duration: 15, is_free_preview: true },
-                { id: 2, title: 'Setting up Development Environment', content_type: 'video', estimated_duration: 20, is_free_preview: false }
-              ]
-            },
-            {
-              id: 2,
-              title: 'HTML Fundamentals',
-              description: 'Learn HTML structure and semantics',
-              order: 2,
-              lessons: [
-                { id: 3, title: 'HTML Structure', content_type: 'video', estimated_duration: 25, is_free_preview: false },
-                { id: 4, title: 'HTML Elements', content_type: 'text', estimated_duration: 30, is_free_preview: false }
-              ]
+        console.log('[CourseDetail] Course data received:', response.data);
+        const courseData = response.data;
+        
+        // If topics are not included in the main response, fetch them separately
+        let topics = courseData.topics || [];
+        if (!topics || topics.length === 0) {
+          console.log('[CourseDetail] No topics in course response, fetching topics separately...');
+          try {
+            const topicsResponse = await apiClient.getCourseTopics(courseId);
+            console.log('[CourseDetail] Topics fetched separately:', topicsResponse.data);
+            topics = topicsResponse.data || [];
+            
+            // Fetch lessons for each topic
+            for (let i = 0; i < topics.length; i++) {
+              try {
+                const lessonsResponse = await apiClient.getTopicLessons(topics[i].id);
+                topics[i].lessons = lessonsResponse.data || [];
+                console.log(`[CourseDetail] Lessons for topic ${topics[i].id}:`, topics[i].lessons);
+              } catch (lessonError) {
+                console.error(`[CourseDetail] Error fetching lessons for topic ${topics[i].id}:`, lessonError);
+                topics[i].lessons = [];
+              }
             }
-          ],
-          enrollments: []
-        });
+          } catch (topicsError) {
+            console.error('[CourseDetail] Error fetching topics:', topicsError);
+            topics = [];
+          }
+        } else {
+          // Topics are included, but check if lessons are included
+          for (let i = 0; i < topics.length; i++) {
+            if (!topics[i].lessons || topics[i].lessons.length === 0) {
+              try {
+                console.log(`[CourseDetail] Fetching lessons for topic ${topics[i].id}...`);
+                const lessonsResponse = await apiClient.getTopicLessons(topics[i].id);
+                topics[i].lessons = lessonsResponse.data || [];
+                console.log(`[CourseDetail] Lessons for topic ${topics[i].id}:`, topics[i].lessons);
+              } catch (lessonError) {
+                console.error(`[CourseDetail] Error fetching lessons for topic ${topics[i].id}:`, lessonError);
+                topics[i].lessons = [];
+              }
+            }
+          }
+        }
+        
+        // Ensure topics is always an array and each topic has lessons array
+        const normalizedCourse: Course = {
+          ...courseData,
+          topics: topics.map((topic: any) => ({
+            ...topic,
+            lessons: topic.lessons || []
+          })),
+          enrollments: courseData.enrollments || []
+        };
+        
+        console.log('[CourseDetail] Normalized course data:', normalizedCourse);
+        setCourse(normalizedCourse);
+      } catch (error) {
+        console.error('[CourseDetail] Error fetching course:', error);
+        // Don't set mock data, let the error state show
+        setCourse(null);
       } finally {
         setLoading(false);
       }
@@ -164,10 +187,18 @@ export default function CourseDetailView() {
     );
   }
 
-  const totalLessons = course.topics.reduce((sum, topic) => sum + topic.lessons.length, 0);
-  const totalDuration = course.topics.reduce((sum, topic) => 
-    sum + topic.lessons.reduce((lessonSum, lesson) => lessonSum + lesson.estimated_duration, 0), 0
-  );
+  // Safely calculate totals with fallbacks
+  const topics = course.topics || [];
+  const totalLessons = topics.reduce((sum, topic) => {
+    const lessons = topic.lessons || [];
+    return sum + lessons.length;
+  }, 0);
+  const totalDuration = topics.reduce((sum, topic) => {
+    const lessons = topic.lessons || [];
+    return sum + lessons.reduce((lessonSum, lesson) => {
+      return lessonSum + (lesson.estimated_duration || 0);
+    }, 0);
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -231,7 +262,7 @@ export default function CourseDetailView() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Topics</p>
-              <p className="text-2xl font-bold text-gray-900">{course.topics.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{topics.length}</p>
             </div>
           </div>
         </div>
@@ -288,7 +319,7 @@ export default function CourseDetailView() {
         </div>
         
         <div className="p-6">
-          {course.topics.length === 0 ? (
+          {topics.length === 0 ? (
             <div className="text-center py-8">
               <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No content yet</h3>
@@ -304,7 +335,7 @@ export default function CourseDetailView() {
             </div>
           ) : (
             <div className="space-y-4">
-              {course.topics.map((topic, topicIndex) => (
+              {topics.map((topic, topicIndex) => (
                 <div key={topic.id} className="border border-gray-200 rounded-lg">
                   <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                     <h3 className="text-lg font-medium text-gray-900">
@@ -316,12 +347,16 @@ export default function CourseDetailView() {
                   </div>
                   
                   <div className="p-4">
-                    {topic.lessons.length === 0 ? (
+                    {(!topic.lessons || topic.lessons.length === 0) ? (
                       <p className="text-sm text-gray-500 italic">No lessons in this topic yet.</p>
                     ) : (
                       <div className="space-y-2">
                         {topic.lessons.map((lesson, lessonIndex) => (
-                          <div key={lesson.id} className="flex items-center p-3 bg-gray-50 rounded-md">
+                          <button
+                            key={lesson.id}
+                            onClick={() => router.push(`/tutor/courses/${courseId}/edit?lessonId=${lesson.id}&topicId=${topic.id}`)}
+                            className="w-full flex items-center p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors text-left"
+                          >
                             <div className="flex items-center flex-1">
                               {lesson.content_type === 'video' ? (
                                 <PlayIcon className="h-4 w-4 mr-3 text-blue-600" />
@@ -329,18 +364,21 @@ export default function CourseDetailView() {
                                 <DocumentTextIcon className="h-4 w-4 mr-3 text-gray-600" />
                               )}
                               <div>
-                                <div className="font-medium text-sm">
+                                <div className="font-medium text-sm text-gray-900">
                                   {lessonIndex + 1}. {lesson.title}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  {lesson.estimated_duration} min
+                                  {lesson.estimated_duration || 0} min
                                   {lesson.is_free_preview && (
                                     <span className="ml-2 text-green-600 font-medium">Free Preview</span>
                                   )}
                                 </div>
                               </div>
                             </div>
-                          </div>
+                            <div className="ml-2">
+                              <PencilIcon className="h-4 w-4 text-gray-400" />
+                            </div>
+                          </button>
                         ))}
                       </div>
                     )}

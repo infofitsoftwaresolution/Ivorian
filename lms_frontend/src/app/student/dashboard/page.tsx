@@ -88,11 +88,11 @@ export default function StudentDashboard() {
         setLoadingData(true);
         
         // Debug: Log enrollment data structure
-        console.log('🔍 Fetching student enrollments...');
+        console.log('[StudentDashboard] Fetching student enrollments...');
         
         // Fetch enrolled courses
         const enrollmentsResponse = await apiClient.getMyEnrollments();
-        console.log('Enrollments response:', enrollmentsResponse);
+        console.log('[StudentDashboard] Enrollments response:', enrollmentsResponse);
         
         // Handle different response structures
         let enrollments = [];
@@ -101,12 +101,12 @@ export default function StudentDashboard() {
         } else if (enrollmentsResponse.data && Array.isArray(enrollmentsResponse.data.enrollments)) {
           enrollments = enrollmentsResponse.data.enrollments;
         } else {
-          console.log('No enrollments found or unexpected response structure');
+          console.log('[StudentDashboard] No enrollments found or unexpected response structure');
           enrollments = [];
         }
         
-        console.log('📚 Processed enrollments:', enrollments);
-        console.log('📚 First enrollment structure:', enrollments[0]);
+        console.log('[StudentDashboard] Processed enrollments:', enrollments);
+        console.log('[StudentDashboard] First enrollment structure:', enrollments[0]);
         
         setEnrolledCourses(enrollments);
         
@@ -131,9 +131,35 @@ export default function StudentDashboard() {
           studyTime: 0 // TODO: Implement study time tracking
         });
         
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching student data:', error);
-        setError('Failed to load dashboard data. Please try again.');
+        
+        // Extract detailed error message
+        let errorMessage = 'Failed to load dashboard data. Please try again.';
+        
+        if (error?.status === 401 || error?.code === 'SESSION_EXPIRED' || error?.details?.requiresLogin) {
+          errorMessage = 'Your session has expired. Please log in again.';
+          // Redirect to login after a delay
+          setTimeout(() => {
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+          }, 2000);
+        } else if (error?.message) {
+          errorMessage = error.message;
+        } else if (error?.details?.detail) {
+          if (Array.isArray(error.details.detail)) {
+            errorMessage = error.details.detail.map((err: any) => {
+              if (typeof err === 'string') return err;
+              if (err.msg) return err.msg;
+              return JSON.stringify(err);
+            }).join(', ');
+          } else {
+            errorMessage = error.details.detail;
+          }
+        }
+        
+        setError(errorMessage);
         // Set empty data to prevent crashes
         setEnrolledCourses([]);
         setStats({

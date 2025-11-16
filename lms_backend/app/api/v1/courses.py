@@ -251,21 +251,21 @@ async def create_topic(
 ):
     """Create a new topic for a course"""
     try:
-        print(f"🔍 Creating topic for course {course_id}")
-        print(f"📝 Topic data received: {topic_data}")
-        print(f"👤 Current user: {current_user.id}")
+        print(f"[API] Creating topic for course {course_id}")
+        print(f"[API] Topic data received: {topic_data}")
+        print(f"[API] Current user: {current_user.id}")
         
         # Pass course_id directly to service since it's not in TopicCreate schema
-        print(f"📋 Topic create data: {topic_data}")
+        print(f"[API] Topic create data: {topic_data}")
         
         topic = await TopicService.create_topic(db, topic_data, course_id, current_user.id)
         
-        print(f"✅ Topic created successfully: {topic.id}")
+        print(f"[API] Topic created successfully: {topic.id}")
         return topic
         
     except Exception as e:
-        print(f"❌ Error creating topic: {str(e)}")
-        print(f"🔍 Error type: {type(e)}")
+        print(f"[API] ERROR creating topic: {str(e)}")
+        print(f"[API] Error type: {type(e)}")
         import traceback
         traceback.print_exc()
         raise e
@@ -277,9 +277,9 @@ async def get_course_topics(
     db: AsyncSession = Depends(get_db)
 ):
     """Get all topics for a course"""
-    print(f"🔍 Getting topics for course {course_id}")
+    print(f"[API] Getting topics for course {course_id}")
     topics = await TopicService.get_course_topics(db, course_id)
-    print(f"📚 Found {len(topics)} topics for course {course_id}")
+    print(f"[API] Found {len(topics)} topics for course {course_id}")
     for topic in topics:
         print(f"  - Topic {topic.id}: {topic.title} with {len(topic.lessons)} lessons")
     return topics
@@ -400,27 +400,27 @@ async def enroll_in_course(
     current_user: User = Depends(get_current_user)
 ):
     """Enroll current user or specified student in a course"""
-    print(f"🔍 Enrollment request - Course ID: {course_id}, Student ID: {student_id}, Current User: {current_user.id}")
+    print(f"[API] Enrollment request - Course ID: {course_id}, Student ID: {student_id}, Current User: {current_user.id}")
     
     # Use provided student_id or current user's id
     target_student_id = student_id if student_id else current_user.id
-    print(f"🎯 Target student ID: {target_student_id}")
+    print(f"[API] Target student ID: {target_student_id}")
     
     # If enrolling someone else, check permissions
     if student_id and student_id != current_user.id:
-        print(f"🔐 Checking permissions for user {current_user.id} with role {current_user.role}")
+        print(f"[API] Checking permissions for user {current_user.id} with role {current_user.role}")
         # Check if current user is instructor, tutor, or admin
         if current_user.role not in ["instructor", "tutor", "organization_admin", "super_admin"]:
-            print(f"❌ Permission denied for role: {current_user.role}")
+            print(f"[API] ERROR: Permission denied for role: {current_user.role}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have permission to enroll other students"
             )
-        print(f"✅ Permission granted for role: {current_user.role}")
+        print(f"[API] Permission granted for role: {current_user.role}")
     
-    print(f"📝 Calling EnrollmentService.enroll_in_course with course_id={course_id}, student_id={target_student_id}")
+    print(f"[API] Calling EnrollmentService.enroll_in_course with course_id={course_id}, student_id={target_student_id}")
     enrollment = await EnrollmentService.enroll_in_course(db, course_id, target_student_id)
-    print(f"✅ Enrollment created: {enrollment.id}")
+    print(f"[API] Enrollment created: {enrollment.id}")
     return enrollment
 
 

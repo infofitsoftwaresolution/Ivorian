@@ -160,23 +160,47 @@ class ApiClient {
 
       // Handle 401 Unauthorized - try to refresh token
       if (response.status === 401 && retryCount === 0) {
+        console.log('Received 401, attempting to refresh token...');
         const refreshed = await this.refreshToken();
         if (refreshed) {
+          console.log('Token refreshed, retrying request...');
           return this.request<T>(endpoint, options, retryCount + 1);
+        } else {
+          // If refresh failed, throw a more descriptive error
+          throw new ApiError({
+            message: 'Your session has expired. Please log in again.',
+            status: 401,
+            code: 'SESSION_EXPIRED',
+            details: { requiresLogin: true }
+          });
         }
       }
 
-      // Handle other errors
+      // Read response text once (can only be read once)
+      let responseText = '';
+      try {
+        responseText = await response.text();
+      } catch (textError) {
+        console.error('[API Client] Failed to read response text:', textError);
+        responseText = '';
+      }
+
+      // Handle errors
       if (!response.ok) {
         let errorData: any = {};
-        try {
-          const text = await response.text();
-          if (text) {
-            errorData = JSON.parse(text);
+        console.log(`[API Client] Error response text: ${responseText}`);
+        console.log(`[API Client] Response status: ${response.status}`);
+        
+        if (responseText) {
+          try {
+            errorData = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error('[API Client] Failed to parse error response as JSON:', parseError);
+            errorData = { detail: responseText || 'Unknown error' };
           }
-        } catch {
-          // If response is not JSON, use empty object
         }
+        
+        console.log(`[API Client] Error data:`, errorData);
         
         // Extract detailed error message
         let errorMessage = `HTTP ${response.status}`;
@@ -197,11 +221,19 @@ class ApiClient {
         } else if (errorData.message) {
           errorMessage = errorData.message;
         } else if (errorData.error) {
-          errorMessage = typeof errorData.error === 'string' 
-            ? errorData.error 
-            : errorData.error.message || JSON.stringify(errorData.error);
+          if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else if (errorData.error.message) {
+            errorMessage = errorData.error.message;
+          } else {
+            errorMessage = JSON.stringify(errorData.error);
+          }
+        } else if (responseText) {
+          // If we couldn't parse JSON but have text, use it
+          errorMessage = responseText.substring(0, 200); // Limit length
         }
         
+        console.error(`[API Client] Throwing ApiError: ${errorMessage}`);
         throw new ApiError({
           message: errorMessage,
           status: response.status,
@@ -210,7 +242,25 @@ class ApiClient {
         });
       }
 
-      const data = await response.json();
+      // Parse successful response JSON
+      let data;
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('[API Client] Failed to parse response JSON:', parseError);
+          console.error('[API Client] Response text was:', responseText.substring(0, 500));
+          throw new ApiError({
+            message: 'Failed to parse server response',
+            status: response.status,
+            code: 'PARSE_ERROR',
+            details: { parseError: parseError instanceof Error ? parseError.message : String(parseError) }
+          });
+        }
+      } else {
+        data = {};
+      }
+      
       return {
         data,
         status: response.status,
@@ -249,8 +299,12 @@ class ApiClient {
   private async refreshToken(): Promise<boolean> {
     try {
       const refreshToken = TokenManager.getRefreshToken();
-      if (!refreshToken) return false;
+      if (!refreshToken) {
+        console.warn('No refresh token available');
+        return false;
+      }
 
+      console.log('Attempting to refresh token...');
       const response = await fetch(`${this.baseURL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -259,14 +313,36 @@ class ApiClient {
 
       if (response.ok) {
         const data = await response.json();
-        TokenManager.setTokens(data.access_token, data.refresh_token);
-        return true;
+        console.log('Token refresh response:', data);
+        
+        // Handle different response structures
+        // Backend returns: {message, data: {tokens: {access_token, refresh_token}}}
+        const tokens = data.data?.tokens || data.tokens || data.data;
+        
+        if (tokens && tokens.access_token && tokens.refresh_token) {
+          TokenManager.setTokens(tokens.access_token, tokens.refresh_token);
+          console.log('Token refreshed successfully');
+          return true;
+        } else {
+          console.error('Invalid token refresh response structure:', data);
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('Token refresh failed:', response.status, errorText);
       }
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      console.error('Token refresh error:', error);
     }
 
+    // Clear tokens and redirect to login if refresh fails
+    console.warn('Token refresh failed, clearing tokens');
     TokenManager.clearTokens();
+    
+    // Redirect to login page if we're in the browser
+    if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+      window.location.href = '/login';
+    }
+    
     return false;
   }
 
@@ -471,7 +547,7 @@ class ApiClient {
       console.log('✅ API Client: Courses response received:', response);
       return response;
     } catch (error) {
-      console.error('❌ API Client: Error fetching courses:', error);
+      console.error('[API Client] ERROR fetching courses:', error);
       throw error;
     }
   }
@@ -540,6 +616,10 @@ class ApiClient {
     return this.request(`/api/v1/courses/topics/${topicId}/lessons`);
   }
 
+  async getLesson(lessonId: number): Promise<ApiResponse> {
+    return this.request(`/api/v1/lessons/${lessonId}`);
+  }
+
   async updateLesson(lessonId: number, lessonData: any): Promise<ApiResponse> {
     return this.request(`/api/v1/lessons/${lessonId}`, {
       method: 'PUT',
@@ -561,7 +641,7 @@ class ApiClient {
   }
 
   async getMyEnrollments(): Promise<ApiResponse> {
-    console.log('🌐 API Client: Getting my enrollments');
+    console.log('[API Client] Getting my enrollments');
     return this.request('/api/v1/users/me/enrollments');
   }
 

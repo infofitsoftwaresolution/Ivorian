@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { 
   XMarkIcon,
@@ -273,9 +274,12 @@ export default function Sidebar({ user, isOpen, isCollapsed = false, onClose, on
           {/* Header */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
             {!isCollapsed && (
-              <h1 className="text-xl font-semibold text-gray-900">
-                Edumetry
-              </h1>
+              <Link href="/" className="flex items-center space-x-2">
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">Edu</span>
+                </div>
+                <span className="text-xl font-bold text-gray-900">Edumetry</span>
+              </Link>
             )}
             <div className="flex items-center space-x-2">
               {!isCollapsed && (

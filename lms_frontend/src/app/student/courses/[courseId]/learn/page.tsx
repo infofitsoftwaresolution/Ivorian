@@ -55,7 +55,8 @@ interface Lesson {
   description: string;
   content: string;
   content_type: 'video' | 'text' | 'interactive';
-  duration: number;
+  duration?: number;
+  estimated_duration?: number;
   order: number;
   is_completed: boolean;
   video_url?: string;
@@ -86,6 +87,7 @@ export default function CourseLearningPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notes, setNotes] = useState('');
   const [bookmarks, setBookmarks] = useState<number[]>([]);
+  const [loadingLesson, setLoadingLesson] = useState(false);
 
   // Video player refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -102,33 +104,71 @@ export default function CourseLearningPage() {
         setLoading(true);
         
         // Fetch course details
+        console.log('[CourseLearning] Fetching course details for course ID:', courseId);
         const courseResponse = await apiClient.getCourse(parseInt(courseId));
+        console.log('[CourseLearning] Course response:', courseResponse.data);
         setCourse(courseResponse.data);
 
-        // Fetch course topics and lessons
-        console.log('🔍 Fetching topics for course:', courseId);
+        // Fetch course topics
+        console.log('[CourseLearning] Fetching topics for course:', courseId);
         const topicsResponse = await apiClient.getCourseTopics(parseInt(courseId));
-        console.log('📚 Topics response:', topicsResponse);
-        const topicsData = topicsResponse.data || [];
-        console.log('📚 Topics data:', topicsData);
+        console.log('[CourseLearning] Topics response:', topicsResponse);
+        let topicsData = topicsResponse.data || [];
+        console.log('[CourseLearning] Topics data:', topicsData);
+
+        // Fetch lessons for each topic if not included
+        for (let i = 0; i < topicsData.length; i++) {
+          if (!topicsData[i].lessons || topicsData[i].lessons.length === 0) {
+            try {
+              console.log(`[CourseLearning] Fetching lessons for topic ${topicsData[i].id}...`);
+              const lessonsResponse = await apiClient.getTopicLessons(topicsData[i].id);
+              topicsData[i].lessons = lessonsResponse.data || [];
+              console.log(`[CourseLearning] Lessons for topic ${topicsData[i].id}:`, topicsData[i].lessons);
+            } catch (lessonError) {
+              console.error(`[CourseLearning] Error fetching lessons for topic ${topicsData[i].id}:`, lessonError);
+              topicsData[i].lessons = [];
+            }
+          } else {
+            console.log(`[CourseLearning] Topic ${topicsData[i].id} already has ${topicsData[i].lessons.length} lessons`);
+          }
+        }
+
+        // Ensure all topics have lessons array
+        topicsData = topicsData.map((topic: any) => ({
+          ...topic,
+          lessons: topic.lessons || []
+        }));
+
+        console.log('[CourseLearning] Final topics data with lessons:', topicsData);
         setTopics(topicsData);
 
         // Set first lesson as current if available
-        if (topicsData.length > 0 && topicsData[0].lessons && topicsData[0].lessons.length > 0) {
-          setCurrentLesson(topicsData[0].lessons[0]);
+        const firstLesson = topicsData
+          .flatMap((topic: any) => topic.lessons || [])
+          .find((lesson: any) => lesson);
+        
+        if (firstLesson) {
+          console.log('[CourseLearning] Setting first lesson as current:', firstLesson);
+          setCurrentLesson(firstLesson);
+        } else {
+          console.log('[CourseLearning] No lessons found in any topic');
         }
+
+        // Calculate total lessons
+        const totalLessons = topicsData.reduce((acc: number, topic: any) => acc + (topic.lessons?.length || 0), 0);
+        console.log('[CourseLearning] Total lessons:', totalLessons);
 
         // Fetch course progress
         // TODO: Implement progress tracking API
         setProgress({
           course_id: parseInt(courseId),
-          total_lessons: topicsData.reduce((acc: number, topic: any) => acc + (topic.lessons?.length || 0), 0),
+          total_lessons: totalLessons,
           completed_lessons: 0,
           progress_percentage: 0
         });
 
       } catch (error) {
-        console.error('Error fetching course data:', error);
+        console.error('[CourseLearning] Error fetching course data:', error);
         setError('Failed to load course. Please try again.');
       } finally {
         setLoading(false);
@@ -187,19 +227,113 @@ export default function CourseLearningPage() {
 
   // Lesson navigation
   const goToNextLesson = () => {
-    // TODO: Implement next lesson logic
-    console.log('Next lesson');
+    if (!currentLesson) return;
+    
+    // Flatten all lessons from all topics
+    const allLessons = topics.flatMap(topic => topic.lessons || []);
+    const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
+    
+    if (currentIndex < allLessons.length - 1) {
+      const nextLesson = allLessons[currentIndex + 1];
+      setCurrentLesson(nextLesson);
+      setIsPlaying(false);
+      // Reset video player
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+      }
+    }
   };
 
   const goToPreviousLesson = () => {
-    // TODO: Implement previous lesson logic
-    console.log('Previous lesson');
+    if (!currentLesson) return;
+    
+    // Flatten all lessons from all topics
+    const allLessons = topics.flatMap(topic => topic.lessons || []);
+    const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
+    
+    if (currentIndex > 0) {
+      const prevLesson = allLessons[currentIndex - 1];
+      setCurrentLesson(prevLesson);
+      setIsPlaying(false);
+      // Reset video player
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+      }
+    }
   };
 
-  const selectLesson = (lesson: Lesson) => {
-    setCurrentLesson(lesson);
-    setIsPlaying(false);
+  const selectLesson = async (lesson: Lesson) => {
+    try {
+      setLoadingLesson(true);
+      console.log('[CourseLearning] Selecting lesson:', lesson);
+      
+      // Fetch full lesson details to ensure we have all data (video_url, content, etc.)
+      console.log('[CourseLearning] Fetching full lesson details for lesson ID:', lesson.id);
+      console.log('[CourseLearning] Current lesson data before fetch:', {
+        id: lesson.id,
+        title: lesson.title,
+        content_type: lesson.content_type,
+        video_url: lesson.video_url,
+        has_content: !!lesson.content
+      });
+      
+      const lessonResponse = await apiClient.getLesson(lesson.id);
+      console.log('[CourseLearning] Full lesson data received:', JSON.stringify(lessonResponse.data, null, 2));
+      console.log('[CourseLearning] Video URL from API:', lessonResponse.data.video_url);
+      console.log('[CourseLearning] Content type from API:', lessonResponse.data.content_type);
+      
+      // Merge the fetched lesson data with the existing lesson data
+      const fullLesson: Lesson = {
+        ...lesson,
+        ...lessonResponse.data,
+        // Ensure video_url is set (check multiple possible field names)
+        video_url: lessonResponse.data.video_url || lessonResponse.data.videoUrl || lesson.video_url || undefined,
+        // Ensure content is set
+        content: lessonResponse.data.content || lesson.content || '',
+        // Ensure content_type is set
+        content_type: lessonResponse.data.content_type || lessonResponse.data.contentType || lesson.content_type || 'text',
+      };
+      
+      console.log('[CourseLearning] Merged lesson data:', {
+        id: fullLesson.id,
+        title: fullLesson.title,
+        content_type: fullLesson.content_type,
+        video_url: fullLesson.video_url,
+        has_content: !!fullLesson.content
+      });
+      console.log('[CourseLearning] Setting current lesson with full data:', fullLesson);
+      setCurrentLesson(fullLesson);
+      setIsPlaying(false);
+      
+      // Reset video player when switching lessons
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.pause();
+      }
+    } catch (error) {
+      console.error('[CourseLearning] Error fetching lesson details:', error);
+      // Fallback to using the lesson data we already have
+      console.log('[CourseLearning] Using lesson data from topics list as fallback');
+      setCurrentLesson(lesson);
+      setIsPlaying(false);
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.pause();
+      }
+    } finally {
+      setLoadingLesson(false);
+    }
   };
+
+  // Reload video when lesson changes
+  useEffect(() => {
+    if (currentLesson && videoRef.current && currentLesson.content_type === 'video' && currentLesson.video_url) {
+      console.log('[CourseLearning] Loading video for lesson:', currentLesson.id, currentLesson.video_url);
+      videoRef.current.load();
+      setIsPlaying(false);
+      setCurrentTime(0);
+    }
+  }, [currentLesson?.id, currentLesson?.video_url]);
 
   const toggleBookmark = (lessonId: number) => {
     setBookmarks(prev => 
@@ -339,7 +473,9 @@ export default function CourseLearningPage() {
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-900">{lesson.title}</p>
-                              <p className="text-xs text-gray-500">{formatTime(lesson.duration)}</p>
+                              <p className="text-xs text-gray-500">
+                                {formatTime((lesson.duration || lesson.estimated_duration || 0) * 60)}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -372,10 +508,48 @@ export default function CourseLearningPage() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
-          {currentLesson ? (
+          {loadingLesson ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <LoadingSpinner size="lg" />
+                <p className="mt-4 text-gray-600">Loading lesson content...</p>
+              </div>
+            </div>
+          ) : currentLesson ? (
             <>
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 p-4 mb-4 mx-6 mt-4 rounded">
+                  <p className="text-sm text-red-800">{error}</p>
+                  <button
+                    onClick={() => setError('')}
+                    className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {/* Debug Info - Remove in production */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 mb-4 mx-6 mt-4 rounded">
+                  <p className="text-xs font-mono text-gray-700">
+                    <strong>Debug Info:</strong><br/>
+                    Content Type: {currentLesson.content_type || 'NOT SET'}<br/>
+                    Video URL: {currentLesson.video_url ? (
+                      <a href={currentLesson.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                        {currentLesson.video_url}
+                      </a>
+                    ) : 'NOT SET'}<br/>
+                    Lesson ID: {currentLesson.id}<br/>
+                    Has Content: {currentLesson.content ? 'Yes' : 'No'}<br/>
+                    Content Length: {currentLesson.content?.length || 0} chars
+                  </p>
+                </div>
+              )}
+
               {/* Video Player */}
-              {currentLesson.content_type === 'video' && currentLesson.video_url && (
+              {currentLesson.content_type === 'video' && currentLesson.video_url ? (
                 <div className="bg-black relative">
                   <video
                     ref={videoRef}
@@ -383,8 +557,43 @@ export default function CourseLearningPage() {
                     className="w-full h-96 object-contain"
                     onTimeUpdate={handleTimeUpdate}
                     onLoadedMetadata={handleLoadedMetadata}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
+                    onPlay={() => {
+                      console.log('[CourseLearning] Video started playing');
+                      setIsPlaying(true);
+                    }}
+                    onPause={() => {
+                      console.log('[CourseLearning] Video paused');
+                      setIsPlaying(false);
+                    }}
+                    onError={(e) => {
+                      const video = e.currentTarget;
+                      console.error('[CourseLearning] Video playback error:', {
+                        error: video.error,
+                        code: video.error?.code,
+                        message: video.error?.message,
+                        networkState: video.networkState,
+                        readyState: video.readyState,
+                        videoURL: currentLesson.video_url
+                      });
+                      setError(`Failed to load video: ${video.error?.message || 'Unknown error'}. URL: ${currentLesson.video_url}`);
+                    }}
+                    onLoadStart={() => {
+                      console.log('[CourseLearning] Video loading started:', currentLesson.video_url);
+                    }}
+                    onCanPlay={() => {
+                      console.log('[CourseLearning] Video can play:', currentLesson.video_url);
+                    }}
+                    onLoadedData={() => {
+                      console.log('[CourseLearning] Video data loaded');
+                    }}
+                    onWaiting={() => {
+                      console.log('[CourseLearning] Video waiting for data');
+                    }}
+                    onStalled={() => {
+                      console.warn('[CourseLearning] Video stalled');
+                    }}
+                    controls
+                    preload="auto"
                   />
                   
                   {/* Video Controls */}
@@ -419,7 +628,24 @@ export default function CourseLearningPage() {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : currentLesson.content_type === 'video' && !currentLesson.video_url ? (
+                <div className="bg-gray-900 flex items-center justify-center h-96">
+                  <div className="text-center text-white">
+                    <VideoCameraIcon className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg font-medium">No video URL available</p>
+                    <p className="text-sm text-gray-400 mt-2">This lesson doesn't have a video attached.</p>
+                    <p className="text-xs text-gray-500 mt-4 font-mono">Lesson ID: {currentLesson.id}</p>
+                  </div>
+                </div>
+              ) : currentLesson.content_type !== 'video' ? (
+                <div className="bg-gray-50 flex items-center justify-center h-96">
+                  <div className="text-center text-gray-600">
+                    <DocumentTextIcon className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg font-medium">Text Content Lesson</p>
+                    <p className="text-sm text-gray-500 mt-2">This is a text-based lesson. Content is shown below.</p>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Lesson Content */}
               <div className="flex-1 p-6 overflow-y-auto">
@@ -433,9 +659,22 @@ export default function CourseLearningPage() {
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
                     <div className="prose max-w-none">
                       {currentLesson.content_type === 'text' ? (
-                        <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
+                        currentLesson.content ? (
+                          <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
+                        ) : (
+                          <p className="text-gray-600">No content available for this lesson.</p>
+                        )
+                      ) : currentLesson.content_type === 'video' ? (
+                        currentLesson.content ? (
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Lesson Notes</h3>
+                            <div dangerouslySetInnerHTML={{ __html: currentLesson.content }} />
+                          </div>
+                        ) : (
+                          <p className="text-gray-600">Video content is playing above.</p>
+                        )
                       ) : (
-                        <p className="text-gray-600">Video content is playing above.</p>
+                        <p className="text-gray-600">Content for this lesson is not available.</p>
                       )}
                     </div>
                   </div>
