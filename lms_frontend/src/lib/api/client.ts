@@ -732,6 +732,11 @@ class ApiClient {
     return this.request('/api/v1/analytics/platform/stats');
   }
 
+  async getTutorAnalytics(params?: { period?: string }): Promise<ApiResponse> {
+    const period = params?.period || '30d';
+    return this.request(`/api/v1/analytics/tutor?period=${period}`);
+  }
+
   async uploadAvatar(file: File, onProgress?: (progress: number) => void): Promise<ApiResponse<{ url: string }>> {
     const formData = new FormData();
     formData.append('file', file);
