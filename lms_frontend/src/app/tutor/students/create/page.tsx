@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import SuccessToast from '@/components/ui/SuccessToast';
 
 interface StudentFormData {
   first_name: string;
@@ -57,7 +58,8 @@ export default function AddStudent() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState({ title: '', message: '' });
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [courseSearchTerm, setCourseSearchTerm] = useState('');
@@ -174,8 +176,21 @@ export default function AddStudent() {
       setError('Passwords do not match');
       return false;
     }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    // Backend requires: at least 8 chars, uppercase, lowercase, and digit
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return false;
+    }
+    if (!/[A-Z]/.test(formData.password)) {
+      setError('Password must contain at least one uppercase letter');
+      return false;
+    }
+    if (!/[a-z]/.test(formData.password)) {
+      setError('Password must contain at least one lowercase letter');
+      return false;
+    }
+    if (!/[0-9]/.test(formData.password)) {
+      setError('Password must contain at least one digit');
       return false;
     }
     return true;
@@ -199,48 +214,99 @@ export default function AddStudent() {
       console.log('Using organization_id:', organizationId);
       
       // Create student account
+      // Note: Backend expects 'roles' (array) not 'role' (string)
       const studentData = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        phone: formData.phone,
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone?.trim() || undefined,
         organization_id: organizationId,
-        role: formData.role,
-        password: formData.password
+        roles: [formData.role || 'student'], // Backend expects roles as array
+        password: formData.password // Must be at least 8 chars with uppercase, lowercase, and digit
       };
 
-      console.log('Creating student with data:', studentData);
+      console.log('[AddStudent] Creating student with data:', studentData);
+      console.log('[AddStudent] API endpoint: POST /api/v1/users/');
       
       // Create user via API
-      const response = await apiClient.createUser(studentData);
-      console.log('Student created successfully:', response.data);
+      let response;
+      try {
+        response = await apiClient.createUser(studentData);
+        console.log('[AddStudent] Student created successfully:', response.data);
+      } catch (createError: any) {
+        console.error('[AddStudent] Error creating user:', createError);
+        console.error('[AddStudent] Error status:', createError?.status);
+        console.error('[AddStudent] Error message:', createError?.message);
+        console.error('[AddStudent] Error details:', createError?.details);
+        console.error('[AddStudent] Full error object:', JSON.stringify(createError, null, 2));
+        
+        // Extract the actual error message
+        let errorMessage = 'Unknown error occurred';
+        if (createError?.message) {
+          errorMessage = createError.message;
+        } else if (createError?.details?.detail) {
+          errorMessage = typeof createError.details.detail === 'string' 
+            ? createError.details.detail 
+            : JSON.stringify(createError.details.detail);
+        } else if (createError?.details) {
+          errorMessage = JSON.stringify(createError.details);
+        }
+        
+        // If it's a 404, the endpoint might not exist or there's a routing issue
+        if (createError?.status === 404) {
+          setError('The user creation endpoint was not found. Please check if the backend is running and the endpoint is available.');
+        } else if (createError?.status === 401) {
+          setError('Your session has expired. Please log in again.');
+        } else if (createError?.status === 403) {
+          setError('You do not have permission to create users. Please check your account permissions.');
+        } else if (createError?.status === 400) {
+          setError(`Validation error: ${errorMessage}`);
+        } else if (createError?.status === 500) {
+          setError(`Server error: ${errorMessage}. Please check the backend logs for more details.`);
+        } else {
+          setError(`Failed to create student: ${errorMessage}`);
+        }
+        setLoading(false);
+        return;
+      }
       
       // If courses are selected, enroll the student in those courses
       if (formData.course_ids.length > 0) {
-        console.log('🎓 Enrolling student in courses:', formData.course_ids);
-        console.log('👤 Student ID:', response.data.id);
+        console.log('[AddStudent] Enrolling student in courses:', formData.course_ids);
+        console.log('[AddStudent] Student ID:', response.data.id);
         
         // Enroll student in each selected course
         for (const courseId of formData.course_ids) {
           try {
-            console.log(`🔄 Enrolling student ${response.data.id} in course ${courseId}`);
+            console.log(`[AddStudent] Enrolling student ${response.data.id} in course ${courseId}`);
             const enrollmentResponse = await apiClient.enrollStudentInCourse(response.data.id, courseId);
-            console.log(`✅ Successfully enrolled student in course ${courseId}:`, enrollmentResponse);
+            console.log(`[AddStudent] Successfully enrolled student in course ${courseId}:`, enrollmentResponse);
           } catch (enrollmentError) {
-            console.error(`❌ Failed to enroll student in course ${courseId}:`, enrollmentError);
-            console.error('Enrollment error details:', enrollmentError);
+            console.error(`[AddStudent] Failed to enroll student in course ${courseId}:`, enrollmentError);
+            console.error('[AddStudent] Enrollment error details:', enrollmentError);
             // Continue with other enrollments even if one fails
           }
         }
       } else {
-        console.log('ℹ️ No courses selected for enrollment');
+        console.log('[AddStudent] No courses selected for enrollment');
       }
       
-      setSuccess(true);
+      // Show success toast
+      const enrolledMessage = formData.course_ids.length > 0 
+        ? `Student has been created and enrolled in ${formData.course_ids.length} course(s).`
+        : 'Student has been created successfully.';
+      
+      setSuccessMessage({
+        title: 'Student Created Successfully!',
+        message: `${formData.first_name} ${formData.last_name} (${formData.email}) ${enrolledMessage}`
+      });
+      setShowSuccessToast(true);
       setLoading(false);
+      
+      // Redirect after showing toast
       setTimeout(() => {
         router.push('/tutor/students?created=true');
-      }, 1500);
+      }, 3000);
       
     } catch (error) {
       console.error('Error creating student:', error);
@@ -254,33 +320,6 @@ export default function AddStudent() {
     }
   };
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-            <UserPlusIcon className="h-6 w-6 text-green-600" />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Student Created Successfully!</h2>
-          <p className="text-gray-600 mb-4">
-            {formData.first_name} {formData.last_name} has been added as a student.
-          </p>
-          <p className="text-sm text-gray-500">
-            They can now log in with their email: <strong>{formData.email}</strong>
-          </p>
-          {formData.course_ids.length > 0 && (
-            <p className="text-sm text-green-600 mt-2">
-              ✓ Enrolled in {formData.course_ids.length} course(s)
-            </p>
-          )}
-          <div className="mt-6">
-            <LoadingSpinner size="sm" />
-            <p className="text-sm text-gray-500 mt-2">Redirecting to students list...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -594,7 +633,7 @@ export default function AddStudent() {
                   value={formData.password}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter password (min 6 characters)"
+                  placeholder="Enter password (min 8 characters, uppercase, lowercase, digit)"
                   required
                 />
               </div>
@@ -654,6 +693,15 @@ export default function AddStudent() {
           </div>
         </div>
       </div>
+
+      {/* Success Toast */}
+      <SuccessToast
+        isOpen={showSuccessToast}
+        onClose={() => setShowSuccessToast(false)}
+        title={successMessage.title}
+        message={successMessage.message}
+        duration={5000}
+      />
     </div>
   );
 }

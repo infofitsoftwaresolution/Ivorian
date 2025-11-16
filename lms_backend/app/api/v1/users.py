@@ -243,6 +243,45 @@ async def change_current_user_password(
             detail=f"Error changing password: {str(e)}"
         )
 
+@router.post("/", response_model=UserResponse, summary="Create new user (Admin only)")
+# @require_permission("user", "manage")  # Temporarily disabled
+async def create_user(
+    user_data: UserCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a new user.
+    
+    This endpoint is restricted to users with user management permissions.
+    """
+    try:
+        logger.info(f"[API] Creating user with data: email={user_data.email}, roles={user_data.roles}, organization_id={user_data.organization_id}")
+        user = await UserService.create_user(db, user_data, current_user)
+        logger.info(f"[API] User created successfully: id={user.id}, email={user.email}")
+        return user_to_response(user)
+        
+    except ValidationError as e:
+        logger.error(f"[API] Validation error creating user: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Validation error: {str(e)}"
+        )
+    except AuthorizationError as e:
+        logger.error(f"[API] Authorization error creating user: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"[API] Error creating user: {str(e)}\n{error_traceback}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating user: {str(e)}"
+        )
+
 @router.get("/", response_model=UserListResponse, summary="List users (Admin only)")
 # @require_permission("user", "manage")  # Temporarily disabled
 async def list_users(
@@ -334,28 +373,6 @@ async def get_user_by_id(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving user: {str(e)}"
-        )
-
-@router.post("/", response_model=UserResponse, summary="Create new user (Admin only)")
-# @require_permission("user", "manage")  # Temporarily disabled
-async def create_user(
-    user_data: UserCreate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Create a new user.
-    
-    This endpoint is restricted to users with user management permissions.
-    """
-    try:
-        user = await UserService.create_user(db, user_data, current_user)
-        return user_to_response(user)
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error creating user: {str(e)}"
         )
 
 @router.put("/{user_id}", response_model=UserResponse, summary="Update user (Admin only)")

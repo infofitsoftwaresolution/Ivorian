@@ -451,10 +451,20 @@ class ApiClient {
   }
 
   async createUser(data: any): Promise<ApiResponse> {
-    return this.request('/api/v1/users', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    console.log('[API Client] Creating user with data:', data);
+    console.log('[API Client] Endpoint: POST /api/v1/users/');
+    try {
+      // Backend route is defined as @router.post("/", ...) which requires trailing slash
+      const response = await this.request('/api/v1/users/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      console.log('[API Client] User created successfully:', response);
+      return response;
+    } catch (error) {
+      console.error('[API Client] Error in createUser:', error);
+      throw error;
+    }
   }
 
   async updateUser(id: string, data: any): Promise<ApiResponse> {
@@ -617,18 +627,18 @@ class ApiClient {
   }
 
   async getLesson(lessonId: number): Promise<ApiResponse> {
-    return this.request(`/api/v1/lessons/${lessonId}`);
+    return this.request(`/api/v1/courses/lessons/${lessonId}`);
   }
 
   async updateLesson(lessonId: number, lessonData: any): Promise<ApiResponse> {
-    return this.request(`/api/v1/lessons/${lessonId}`, {
+    return this.request(`/api/v1/courses/lessons/${lessonId}`, {
       method: 'PUT',
       body: JSON.stringify(lessonData),
     });
   }
 
   async deleteLesson(lessonId: number): Promise<ApiResponse> {
-    return this.request(`/api/v1/lessons/${lessonId}`, {
+    return this.request(`/api/v1/courses/lessons/${lessonId}`, {
       method: 'DELETE',
     });
   }

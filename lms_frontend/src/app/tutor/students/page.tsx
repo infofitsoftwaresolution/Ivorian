@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api/client';
@@ -22,6 +22,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import ConfirmationToast from '@/components/ui/ConfirmationToast';
 
 interface Student {
   id: number;
@@ -46,6 +47,10 @@ export default function StudentsPage() {
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const hasProcessedUrlParam = useRef(false);
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -134,15 +139,34 @@ export default function StudentsPage() {
 
   // Check for success message from URL params and refresh data
   useEffect(() => {
+    // Only process URL parameter once per component mount
+    if (hasProcessedUrlParam.current) return;
+    
     const urlParams = new URLSearchParams(window.location.search);
     const created = urlParams.get('created');
+    
     if (created === 'true') {
+      // Mark as processed immediately to prevent re-processing
+      hasProcessedUrlParam.current = true;
+      
+      // Remove the 'created' parameter from URL FIRST to prevent showing message on reload
+      urlParams.delete('created');
+      const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '');
+      window.history.replaceState({}, '', newUrl);
+      
+      // Then show the success message
       setSuccessMessage('Student created successfully!');
-      setTimeout(() => setSuccessMessage(''), 5000);
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+      }, 5000);
+      
       // Refresh students data when returning from create page
       fetchStudents();
+      
+      // Cleanup timer on unmount
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, []); // Empty dependency array - only run once on mount
 
   const filteredStudents = students.filter(student =>
     `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -163,6 +187,69 @@ export default function StudentsPage() {
     } else {
       setSelectedStudents(filteredStudents.map(s => s.id));
     }
+  };
+
+  const handleDeleteClick = (studentId: number) => {
+    setStudentToDelete(studentId);
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleBulkDeleteClick = () => {
+    if (selectedStudents.length === 0) return;
+    setStudentToDelete(null); // null means bulk delete
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!studentToDelete && selectedStudents.length === 0) {
+      setShowDeleteConfirmation(false);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const studentsToDelete = studentToDelete ? [studentToDelete] : selectedStudents;
+      
+      // Delete each student
+      for (const studentId of studentsToDelete) {
+        try {
+          await apiClient.deleteUser(studentId.toString());
+          console.log(`Student ${studentId} deleted successfully`);
+        } catch (error) {
+          console.error(`Error deleting student ${studentId}:`, error);
+          // Continue with other deletions even if one fails
+        }
+      }
+
+      // Refresh the students list
+      await fetchStudents();
+      
+      // Clear selections
+      setSelectedStudents([]);
+      setSuccessMessage(
+        studentsToDelete.length === 1 
+          ? 'Student deleted successfully!' 
+          : `${studentsToDelete.length} students deleted successfully!`
+      );
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: any) {
+      console.error('Error deleting student(s):', error);
+      setError(
+        studentToDelete 
+          ? 'Failed to delete student. Please try again.' 
+          : 'Failed to delete some students. Please try again.'
+      );
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirmation(false);
+      setStudentToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirmation(false);
+    setStudentToDelete(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -330,6 +417,16 @@ export default function StudentsPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-gray-900">All Students</h2>
             <div className="flex items-center space-x-4">
+              {selectedStudents.length > 0 && (
+                <button
+                  onClick={handleBulkDeleteClick}
+                  className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center space-x-2"
+                  disabled={isDeleting}
+                >
+                  <TrashIcon className="h-5 w-5" />
+                  <span>Delete Selected ({selectedStudents.length})</span>
+                </button>
+              )}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
@@ -461,8 +558,10 @@ export default function StudentsPage() {
                         <PencilIcon className="h-4 w-4" />
                       </button>
                       <button
+                        onClick={() => handleDeleteClick(student.id)}
                         className="text-red-600 hover:text-red-900"
                         title="Delete Student"
+                        disabled={isDeleting}
                       >
                         <TrashIcon className="h-4 w-4" />
                       </button>
@@ -494,6 +593,22 @@ export default function StudentsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationToast
+        isOpen={showDeleteConfirmation}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title={studentToDelete ? "Delete Student" : "Delete Selected Students"}
+        message={
+          studentToDelete
+            ? `Are you sure you want to delete this student? This action cannot be undone.`
+            : `Are you sure you want to delete ${selectedStudents.length} selected student(s)? This action cannot be undone.`
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

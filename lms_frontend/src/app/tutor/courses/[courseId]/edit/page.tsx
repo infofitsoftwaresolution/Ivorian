@@ -946,15 +946,28 @@ function LessonEditorWrapper({ lessonId, course, onUpdate }: { lessonId: number 
             };
             
             setLesson(fullLesson);
-          } catch (apiError) {
+          } catch (apiError: any) {
             console.warn('[LessonEditor] Failed to fetch full lesson data, using course data:', apiError);
+            // If it's a 404, the lesson might not exist in the backend yet, use course data
+            if (apiError?.status === 404) {
+              console.log('[LessonEditor] Lesson not found in backend (404), using course data only');
+            }
             setLesson(lessonFromCourse);
           }
         } else {
           // Try fetching directly from API
           console.log('[LessonEditor] Lesson not in course data, fetching from API...');
-          const response = await apiClient.getLesson(typeof lessonId === 'string' ? parseInt(lessonId) : lessonId);
-          setLesson(response.data);
+          try {
+            const response = await apiClient.getLesson(typeof lessonId === 'string' ? parseInt(lessonId) : lessonId);
+            setLesson(response.data);
+          } catch (apiError: any) {
+            console.error('[LessonEditor] Failed to fetch lesson from API:', apiError);
+            if (apiError?.status === 404) {
+              setError(`Lesson with ID ${lessonId} not found. It may have been deleted.`);
+            } else {
+              setError('Failed to load lesson. Please try again.');
+            }
+          }
         }
       } catch (err) {
         console.error('[LessonEditor] Error fetching lesson:', err);
