@@ -356,6 +356,48 @@ export default function CourseLearningPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Helper function to check if URL is a YouTube URL
+  const isYouTubeUrl = (url: string): boolean => {
+    if (!url) return false;
+    return url.includes('youtube.com') || url.includes('youtu.be');
+  };
+
+  // Helper function to convert YouTube URL to embed URL
+  const getYouTubeEmbedUrl = (url: string): string | null => {
+    if (!url) return null;
+    
+    // Handle different YouTube URL formats
+    let videoId = '';
+    
+    // Format: https://www.youtube.com/watch?v=VIDEO_ID
+    const watchMatch = url.match(/[?&]v=([^&]+)/);
+    if (watchMatch) {
+      videoId = watchMatch[1];
+    }
+    // Format: https://youtu.be/VIDEO_ID
+    else {
+      const shortMatch = url.match(/youtu\.be\/([^?]+)/);
+      if (shortMatch) {
+        videoId = shortMatch[1];
+      }
+      // Format: https://www.youtube.com/embed/VIDEO_ID
+      else {
+        const embedMatch = url.match(/embed\/([^?]+)/);
+        if (embedMatch) {
+          videoId = embedMatch[1];
+        }
+      }
+    }
+    
+    if (videoId) {
+      // Extract video ID (remove any additional parameters)
+      videoId = videoId.split('&')[0].split('?')[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -530,104 +572,169 @@ export default function CourseLearningPage() {
                 </div>
               )}
 
-              {/* Debug Info - Remove in production */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="bg-yellow-50 border border-yellow-200 p-4 mb-4 mx-6 mt-4 rounded">
-                  <p className="text-xs font-mono text-gray-700">
-                    <strong>Debug Info:</strong><br/>
-                    Content Type: {currentLesson.content_type || 'NOT SET'}<br/>
-                    Video URL: {currentLesson.video_url ? (
-                      <a href={currentLesson.video_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
-                        {currentLesson.video_url}
-                      </a>
-                    ) : 'NOT SET'}<br/>
-                    Lesson ID: {currentLesson.id}<br/>
-                    Has Content: {currentLesson.content ? 'Yes' : 'No'}<br/>
-                    Content Length: {currentLesson.content?.length || 0} chars
-                  </p>
-                </div>
-              )}
 
               {/* Video Player */}
               {currentLesson.content_type === 'video' && currentLesson.video_url ? (
-                <div className="bg-black relative">
-                  <video
-                    ref={videoRef}
-                    src={currentLesson.video_url}
-                    className="w-full h-96 object-contain"
-                    onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onPlay={() => {
-                      console.log('[CourseLearning] Video started playing');
-                      setIsPlaying(true);
-                    }}
-                    onPause={() => {
-                      console.log('[CourseLearning] Video paused');
-                      setIsPlaying(false);
-                    }}
-                    onError={(e) => {
-                      const video = e.currentTarget;
-                      console.error('[CourseLearning] Video playback error:', {
-                        error: video.error,
-                        code: video.error?.code,
-                        message: video.error?.message,
-                        networkState: video.networkState,
-                        readyState: video.readyState,
-                        videoURL: currentLesson.video_url
-                      });
-                      setError(`Failed to load video: ${video.error?.message || 'Unknown error'}. URL: ${currentLesson.video_url}`);
-                    }}
-                    onLoadStart={() => {
-                      console.log('[CourseLearning] Video loading started:', currentLesson.video_url);
-                    }}
-                    onCanPlay={() => {
-                      console.log('[CourseLearning] Video can play:', currentLesson.video_url);
-                    }}
-                    onLoadedData={() => {
-                      console.log('[CourseLearning] Video data loaded');
-                    }}
-                    onWaiting={() => {
-                      console.log('[CourseLearning] Video waiting for data');
-                    }}
-                    onStalled={() => {
-                      console.warn('[CourseLearning] Video stalled');
-                    }}
-                    controls
-                    preload="auto"
-                  />
-                  
-                  {/* Video Controls */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                    <div className="flex items-center space-x-4">
-                      <button
-                        onClick={handlePlayPause}
-                        className="text-white hover:text-gray-300"
-                      >
-                        {isPlaying ? <PauseIcon className="h-6 w-6" /> : <PlayIcon className="h-6 w-6" />}
-                      </button>
-                      
-                      <div className="flex-1">
-                        <div className="w-full bg-gray-600 rounded-full h-1">
-                          <div 
-                            className="bg-white h-1 rounded-full transition-all duration-200"
-                            style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                          />
+                // Check if it's a YouTube URL - use iframe for YouTube
+                isYouTubeUrl(currentLesson.video_url) ? (
+                  <div className="bg-black relative w-full" style={{ paddingBottom: '56.25%', height: 0 }}>
+                    <iframe
+                      src={getYouTubeEmbedUrl(currentLesson.video_url) || currentLesson.video_url}
+                      className="absolute top-0 left-0 w-full h-full"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title={currentLesson.title}
+                      onLoad={() => {
+                        console.log('[CourseLearning] YouTube video iframe loaded');
+                        setError('');
+                      }}
+                      onError={() => {
+                        console.error('[CourseLearning] YouTube video iframe error');
+                        setError('Failed to load YouTube video. Please check the video URL.');
+                      }}
+                    />
+                  </div>
+                ) : (
+                  // Regular video file - use HTML5 video element
+                  <div className="bg-black relative">
+                    <video
+                      ref={videoRef}
+                      src={currentLesson.video_url}
+                      className="w-full h-96 object-contain"
+                      onTimeUpdate={handleTimeUpdate}
+                      onLoadedMetadata={handleLoadedMetadata}
+                      onPlay={() => {
+                        console.log('[CourseLearning] Video started playing');
+                        setIsPlaying(true);
+                        // Clear any previous errors when video starts playing
+                        setError('');
+                      }}
+                      onPause={() => {
+                        console.log('[CourseLearning] Video paused');
+                        setIsPlaying(false);
+                      }}
+                      onError={(e) => {
+                        const video = e.currentTarget;
+                        const error = video.error;
+                        
+                        // Get detailed error information
+                        let errorMessage = 'Unknown video error';
+                        let errorCode = error?.code;
+                        
+                        // Check if video URL is valid
+                        if (!currentLesson.video_url || currentLesson.video_url.trim() === '') {
+                          errorMessage = 'Video URL is empty or invalid';
+                        } else if (error) {
+                          // Map MediaError codes to user-friendly messages
+                          switch (error.code) {
+                            case MediaError.MEDIA_ERR_ABORTED:
+                              errorMessage = 'Video loading was aborted. Please try again.';
+                              break;
+                            case MediaError.MEDIA_ERR_NETWORK:
+                              errorMessage = 'Network error while loading video. Please check your internet connection and try again.';
+                              break;
+                            case MediaError.MEDIA_ERR_DECODE:
+                              errorMessage = 'Video decoding error. The video file may be corrupted or in an unsupported format.';
+                              break;
+                            case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                              errorMessage = 'Video format not supported or video source is invalid. The video URL may be incorrect or the format is not supported by your browser.';
+                              break;
+                            default:
+                              errorMessage = error.message || 'Unknown video playback error';
+                          }
+                        } else {
+                          // If error object is null, check network state
+                          if (video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+                            errorMessage = 'No video source available. The video URL may be invalid.';
+                          } else if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) {
+                            errorMessage = 'Video source is empty. Please check the video URL.';
+                          } else if (video.networkState === HTMLMediaElement.NETWORK_IDLE) {
+                            errorMessage = 'Video failed to load. The video URL may be inaccessible or invalid.';
+                          } else {
+                            errorMessage = 'Failed to load video. Please check the video URL and try again.';
+                          }
+                        }
+                        
+                        const errorDetails = {
+                          errorCode: errorCode,
+                          errorMessage: error?.message,
+                          networkState: video.networkState,
+                          readyState: video.readyState,
+                          videoURL: currentLesson.video_url,
+                          src: video.src,
+                          networkStateNames: {
+                            0: 'NETWORK_EMPTY',
+                            1: 'NETWORK_IDLE',
+                            2: 'NETWORK_LOADING',
+                            3: 'NETWORK_NO_SOURCE'
+                          }
+                        };
+                        
+                        console.error('[CourseLearning] Video playback error:', errorDetails);
+                        console.error('[CourseLearning] Video error object:', error);
+                        console.error('[CourseLearning] MediaError codes:', {
+                          MEDIA_ERR_ABORTED: MediaError.MEDIA_ERR_ABORTED,
+                          MEDIA_ERR_NETWORK: MediaError.MEDIA_ERR_NETWORK,
+                          MEDIA_ERR_DECODE: MediaError.MEDIA_ERR_DECODE,
+                          MEDIA_ERR_SRC_NOT_SUPPORTED: MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+                        });
+                        
+                        const fullErrorMessage = `${errorMessage}${currentLesson.video_url ? ` Video URL: ${currentLesson.video_url}` : ''}`;
+                        setError(fullErrorMessage);
+                      }}
+                      onLoadStart={() => {
+                        console.log('[CourseLearning] Video loading started:', currentLesson.video_url);
+                      }}
+                      onCanPlay={() => {
+                        console.log('[CourseLearning] Video can play:', currentLesson.video_url);
+                      }}
+                      onLoadedData={() => {
+                        console.log('[CourseLearning] Video data loaded');
+                      }}
+                      onWaiting={() => {
+                        console.log('[CourseLearning] Video waiting for data');
+                      }}
+                      onStalled={() => {
+                        console.warn('[CourseLearning] Video stalled');
+                      }}
+                      controls
+                      preload="auto"
+                    />
+                    
+                    {/* Video Controls */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+                      <div className="flex items-center space-x-4">
+                        <button
+                          onClick={handlePlayPause}
+                          className="text-white hover:text-gray-300"
+                        >
+                          {isPlaying ? <PauseIcon className="h-6 w-6" /> : <PlayIcon className="h-6 w-6" />}
+                        </button>
+                        
+                        <div className="flex-1">
+                          <div className="w-full bg-gray-600 rounded-full h-1">
+                            <div 
+                              className="bg-white h-1 rounded-full transition-all duration-200"
+                              style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                            />
+                          </div>
                         </div>
+                        
+                        <span className="text-white text-sm">
+                          {formatTime(currentTime)} / {formatTime(duration)}
+                        </span>
+                        
+                        <button
+                          onClick={handleMuteToggle}
+                          className="text-white hover:text-gray-300"
+                        >
+                          {isMuted ? <SpeakerXMarkIcon className="h-5 w-5" /> : <SpeakerWaveIcon className="h-5 w-5" />}
+                        </button>
                       </div>
-                      
-                      <span className="text-white text-sm">
-                        {formatTime(currentTime)} / {formatTime(duration)}
-                      </span>
-                      
-                      <button
-                        onClick={handleMuteToggle}
-                        className="text-white hover:text-gray-300"
-                      >
-                        {isMuted ? <SpeakerXMarkIcon className="h-5 w-5" /> : <SpeakerWaveIcon className="h-5 w-5" />}
-                      </button>
                     </div>
                   </div>
-                </div>
+                )
               ) : currentLesson.content_type === 'video' && !currentLesson.video_url ? (
                 <div className="bg-gray-900 flex items-center justify-center h-96">
                   <div className="text-center text-white">
