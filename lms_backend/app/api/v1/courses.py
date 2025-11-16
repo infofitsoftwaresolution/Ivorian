@@ -434,8 +434,56 @@ async def get_course_enrollments(
     current_user: User = Depends(get_current_user)
 ):
     """Get enrollments for a course (instructor/organization admin only)"""
-    enrollments, _ = await EnrollmentService.get_course_enrollments(db, course_id, skip, limit)
-    return enrollments
+    try:
+        print(f"[API] Getting enrollments for course {course_id}, user {current_user.id}, role {current_user.role}")
+        enrollments, total = await EnrollmentService.get_course_enrollments(db, course_id, skip, limit)
+        print(f"[API] Found {len(enrollments)} enrollments for course {course_id}")
+        
+        # Convert enrollments to dicts to avoid SQLAlchemy relationship access issues
+        # This prevents the "MissingGreenlet" error when Pydantic tries to access relationships
+        from app.schemas.course import EnrollmentResponse
+        
+        enrollment_dicts = []
+        for enrollment in enrollments:
+            # Convert to dict, excluding the course relationship
+            enrollment_dict = {
+                "id": enrollment.id,
+                "course_id": enrollment.course_id,
+                "student_id": enrollment.student_id,
+                "enrollment_date": enrollment.enrollment_date,
+                "completion_date": enrollment.completion_date,
+                "status": enrollment.status,
+                "progress_percentage": enrollment.progress_percentage,
+                "completed_lessons": enrollment.completed_lessons,
+                "total_lessons": enrollment.total_lessons,
+                "last_accessed_at": enrollment.last_accessed_at,
+                "payment_status": enrollment.payment_status,
+                "payment_amount": enrollment.payment_amount,
+                "payment_currency": enrollment.payment_currency,
+                "payment_method": enrollment.payment_method,
+                "payment_transaction_id": enrollment.payment_transaction_id,
+                "certificate_issued": enrollment.certificate_issued,
+                "certificate_url": enrollment.certificate_url,
+                "certificate_issued_at": enrollment.certificate_issued_at,
+                "created_at": enrollment.created_at,
+                "updated_at": enrollment.updated_at,
+                "course": None  # Explicitly set to None to avoid relationship access
+            }
+            enrollment_dicts.append(EnrollmentResponse.model_validate(enrollment_dict))
+        
+        print(f"[API] Successfully serialized {len(enrollment_dicts)} enrollments")
+        return enrollment_dicts
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is
+        raise
+    except Exception as e:
+        print(f"[API] ERROR getting enrollments for course {course_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving enrollments: {str(e)}"
+        )
 
 
 @router.put("/enrollments/{enrollment_id}", response_model=EnrollmentResponse)

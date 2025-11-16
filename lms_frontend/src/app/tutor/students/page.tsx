@@ -81,35 +81,62 @@ export default function StudentsPage() {
           console.log('Sample users from database:', allUsers);
           
           // Show all users as students for now (temporary fix)
-          const transformedStudents: Student[] = users.slice(0, 10).map((user: any) => ({
-            id: user.id,
-            first_name: user.first_name || 'Unknown',
-            last_name: user.last_name || 'User',
-            email: user.email || 'No email',
-            phone: user.phone || null,
-            role: user.role || 'student',
-            created_at: user.created_at || new Date().toISOString(),
-            last_login: user.last_login || null,
-            enrolled_courses: user.enrolled_courses || 0,
-            completion_rate: user.completion_rate || Math.floor(Math.random() * 100)
-          }));
+          const transformedStudents: Student[] = users.slice(0, 10).map((user: any) => {
+            // If no enrolled courses, completion rate should be 0
+            const enrolledCourses = user.enrolled_courses || 0;
+            const completionRate = enrolledCourses > 0 ? (user.completion_rate || 0) : 0;
+            
+            return {
+              id: user.id,
+              first_name: user.first_name || 'Unknown',
+              last_name: user.last_name || 'User',
+              email: user.email || 'No email',
+              phone: user.phone || null,
+              role: user.role || 'student',
+              created_at: user.created_at || new Date().toISOString(),
+              last_login: (user.last_login && user.last_login.trim() !== '') ? user.last_login : null,
+              enrolled_courses: enrolledCourses,
+              completion_rate: completionRate
+            };
+          });
           
           setStudents(transformedStudents);
           return;
         }
         
-        const transformedStudents: Student[] = studentUsers.map((student: any) => ({
-        id: student.id,
-        first_name: student.first_name || 'Unknown',
-        last_name: student.last_name || 'User',
-        email: student.email || 'No email',
-        phone: student.phone || null,
-        role: student.role || 'student',
-        created_at: student.created_at || new Date().toISOString(),
-        last_login: student.last_login || null,
-        enrolled_courses: student.enrolled_courses || 0,
-        completion_rate: student.completion_rate || 0
-      }));
+        const transformedStudents: Student[] = studentUsers.map((student: any) => {
+          // If no enrolled courses, completion rate should be 0
+          const enrolledCourses = student.enrolled_courses || 0;
+          const completionRate = enrolledCourses > 0 ? (student.completion_rate || 0) : 0;
+          
+          // Normalize last_login - ensure it's either a valid date string or null
+          let lastLogin = null;
+          if (student.last_login) {
+            const loginStr = String(student.last_login).trim();
+            if (loginStr !== '' && loginStr !== 'null' && loginStr !== 'undefined') {
+              const testDate = new Date(loginStr);
+              if (!isNaN(testDate.getTime())) {
+                lastLogin = loginStr;
+              } else {
+                console.log(`[StudentsPage] Invalid last_login date for student ${student.id}:`, loginStr);
+              }
+            }
+          }
+          console.log(`[StudentsPage] Student ${student.id} (${student.email}): last_login =`, student.last_login, 'normalized =', lastLogin);
+          
+          return {
+            id: student.id,
+            first_name: student.first_name || 'Unknown',
+            last_name: student.last_name || 'User',
+            email: student.email || 'No email',
+            phone: student.phone || null,
+            role: student.role || 'student',
+            created_at: student.created_at || new Date().toISOString(),
+            last_login: lastLogin,
+            enrolled_courses: enrolledCourses,
+            completion_rate: completionRate
+          };
+        });
       
       setStudents(transformedStudents);
     } catch (error) {
@@ -261,13 +288,22 @@ export default function StudentsPage() {
   };
 
   const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Never';
+      }
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Never';
+    }
   };
 
   if (loading) {
@@ -523,15 +559,27 @@ export default function StudentsPage() {
                     <div className="text-sm text-gray-500">enrolled</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                        <div 
-                          className="bg-indigo-600 h-2 rounded-full" 
-                          style={{ width: `${student.completion_rate}%` }}
-                        ></div>
+                    {student.enrolled_courses > 0 ? (
+                      <div className="flex items-center">
+                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                          <div 
+                            className="bg-indigo-600 h-2 rounded-full" 
+                            style={{ width: `${student.completion_rate}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-900">{student.completion_rate}%</span>
                       </div>
-                      <span className="text-sm text-gray-900">{student.completion_rate}%</span>
-                    </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                          <div 
+                            className="bg-gray-300 h-2 rounded-full" 
+                            style={{ width: '0%' }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-500">—</span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">

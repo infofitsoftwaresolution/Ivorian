@@ -308,13 +308,23 @@ async def pydantic_validation_exception_handler(request: Request, exc: Validatio
 
 async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle general exceptions"""
+    # Get detailed error message
+    error_message = str(exc) if exc else "An unexpected error occurred"
+    error_type = type(exc).__name__
+    
+    # In debug mode, include the actual error message
+    if settings.DEBUG:
+        detailed_message = f"{error_type}: {error_message}"
+    else:
+        detailed_message = "An unexpected error occurred"
+    
     app_logger.error(
-        "Unhandled Exception: {}".format(str(exc)),
+        f"Unhandled Exception: {error_type} - {error_message}",
         extra={
             "path": request.url.path,
             "method": request.method,
-            "exception_type": type(exc).__name__,
-            "exception": str(exc),
+            "exception_type": error_type,
+            "exception": error_message,
         },
         exc_info=True,
     )
@@ -327,8 +337,9 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
         content={
             "error": {
                 "code": "INTERNAL_SERVER_ERROR",
-                "message": "An unexpected error occurred",
+                "message": detailed_message,
                 "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "type": error_type,
             }
         },
         headers=headers,

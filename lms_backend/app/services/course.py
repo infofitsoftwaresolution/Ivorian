@@ -643,22 +643,57 @@ class EnrollmentService:
         limit: int = 100
     ) -> tuple[List[Enrollment], int]:
         """Get enrollments for a course"""
-        # Get total count
-        count_result = await db.execute(
-            select(func.count(Enrollment.id)).where(Enrollment.course_id == course_id)
-        )
-        total = count_result.scalar()
-        
-        # Get enrollments
-        result = await db.execute(
-            select(Enrollment)
-            .where(Enrollment.course_id == course_id)
-            .offset(skip)
-            .limit(limit)
-        )
-        enrollments = result.scalars().all()
-        
-        return enrollments, total
+        try:
+            print(f"[EnrollmentService] Getting enrollments for course {course_id}, skip={skip}, limit={limit}")
+            
+            # Get total count
+            count_result = await db.execute(
+                select(func.count(Enrollment.id)).where(Enrollment.course_id == course_id)
+            )
+            total = count_result.scalar() or 0
+            print(f"[EnrollmentService] Total enrollments: {total}")
+            
+            # Get enrollments - don't load course relationship to avoid async serialization issues
+            # The course field is optional in EnrollmentResponse, so it will be None
+            result = await db.execute(
+                select(Enrollment)
+                .where(Enrollment.course_id == course_id)
+                .offset(skip)
+                .limit(limit)
+            )
+            enrollments = result.scalars().all()
+            print(f"[EnrollmentService] Retrieved {len(enrollments)} enrollments")
+            
+            # Ensure required fields have default values to prevent serialization errors
+            for enrollment in enrollments:
+                # Set defaults for required fields that might be None
+                if enrollment.payment_currency is None or enrollment.payment_currency == '':
+                    enrollment.payment_currency = "USD"
+                if enrollment.total_lessons is None:
+                    enrollment.total_lessons = 0
+                if enrollment.completed_lessons is None:
+                    enrollment.completed_lessons = 0
+                if enrollment.status is None or enrollment.status == '':
+                    enrollment.status = "active"
+                if enrollment.payment_status is None or enrollment.payment_status == '':
+                    enrollment.payment_status = "pending"
+                if enrollment.progress_percentage is None:
+                    enrollment.progress_percentage = 0.0
+                if enrollment.certificate_issued is None:
+                    enrollment.certificate_issued = False
+                # Ensure enrollment_date is set
+                if enrollment.enrollment_date is None:
+                    enrollment.enrollment_date = datetime.utcnow()
+                # Ensure created_at is set
+                if enrollment.created_at is None:
+                    enrollment.created_at = datetime.utcnow()
+            
+            return enrollments, total
+        except Exception as e:
+            print(f"[EnrollmentService] ERROR in get_course_enrollments: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     @staticmethod
     async def update_enrollment(
