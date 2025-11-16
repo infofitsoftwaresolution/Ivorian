@@ -356,10 +356,21 @@ export default function ProfilePage() {
                         }
                       } catch (error: unknown) {
                         console.error('Error uploading avatar:', error);
-                        const errorMessage = error && typeof error === 'object' && 'response' in error
-                          ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-                          : undefined;
-                        setError(errorMessage || 'Failed to upload avatar. Please try again.');
+                        let errorMessage = 'Failed to upload avatar. Please try again.';
+                        
+                        if (error && typeof error === 'object') {
+                          // Handle ApiError from apiClient
+                          if ('message' in error && typeof error.message === 'string') {
+                            errorMessage = error.message;
+                          } else if ('details' in error && error.details && typeof error.details === 'object') {
+                            // Check for detail in error.details
+                            if ('detail' in error.details && typeof error.details.detail === 'string') {
+                              errorMessage = error.details.detail;
+                            }
+                          }
+                        }
+                        
+                        setError(errorMessage);
                       }
                     }}
                   />

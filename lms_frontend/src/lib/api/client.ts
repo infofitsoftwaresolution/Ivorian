@@ -780,15 +780,18 @@ class ApiClient {
         } else {
           try {
             const errorData = JSON.parse(xhr.responseText);
+            const errorMessage = errorData.detail || errorData.message || `HTTP ${xhr.status}`;
+            console.error('[API Client] Upload error:', errorMessage, errorData);
             reject(new ApiError({
-              message: errorData.detail || `HTTP ${xhr.status}`,
+              message: errorMessage,
               status: xhr.status,
               code: `HTTP_${xhr.status}`,
               details: errorData,
             }));
-          } catch {
+          } catch (parseError) {
+            console.error('[API Client] Failed to parse error response:', xhr.responseText);
             reject(new ApiError({
-              message: `HTTP ${xhr.status}`,
+              message: xhr.responseText || `HTTP ${xhr.status}`,
               status: xhr.status,
               code: `HTTP_${xhr.status}`,
             }));

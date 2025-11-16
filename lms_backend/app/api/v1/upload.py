@@ -1,7 +1,7 @@
 """
 File Upload API endpoints for S3 storage
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, status
 from fastapi.responses import JSONResponse
 
 from app.core.dependencies import get_current_user
@@ -19,6 +19,15 @@ ALLOWED_VIDEO_TYPES = {
     "video/quicktime",
     "video/x-msvideo",  # AVI
     "video/x-matroska",  # MKV
+}
+
+# Allowed image MIME types for avatars
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
 }
 
 # Maximum file size: 500MB
@@ -109,25 +118,32 @@ async def upload_video(
 @router.post("/file", status_code=status.HTTP_201_CREATED)
 async def upload_file(
     file: UploadFile = File(...),
-    folder: str = "files",
+    folder: str = Form("files"),
     current_user: User = Depends(get_current_user)
 ):
     """
     Upload a general file to S3
     
     - **file**: File to upload (max 100MB)
-    - **folder**: S3 folder prefix (default: "files")
+    - **folder**: S3 folder prefix (default: "files") - sent as form data
     - Returns: S3 URL of the uploaded file
     """
     # Check if S3 is configured
     if not s3_service.is_configured():
+        error_detail = (
+            "S3 storage is not configured. Please set AWS_S3_BUCKET, AWS_ACCESS_KEY_ID, "
+            "AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables. "
+            "Contact your administrator for assistance."
+        )
+        app_logger.error(f"❌ {error_detail}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="S3 storage is not configured. Please contact administrator."
+            detail=error_detail
         )
     
     # Maximum file size for general files: 100MB
-    max_size = 100 * 1024 * 1024
+    # For avatars, limit to 5MB
+    max_size = 5 * 1024 * 1024 if folder == "avatars" else 100 * 1024 * 1024
     
     try:
         # Read file content
@@ -147,41 +163,66 @@ async def upload_file(
                 detail="File is empty"
             )
         
-        # Upload to S3
-        s3_url = await s3_service.upload_file(
-            file_content=file_content,
-            file_name=file.filename or "file",
-            content_type=file.content_type or "application/octet-stream",
-            folder=folder,
-            make_public=True
-        )
+        # Validate image type for avatars
+        if folder == "avatars":
+            if file.content_type not in ALLOWED_IMAGE_TYPES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid file type for avatar. Allowed types: {', '.join(ALLOWED_IMAGE_TYPES)}"
+                )
         
-        if not s3_url:
+        # Upload to S3
+        try:
+            s3_url = await s3_service.upload_file(
+                file_content=file_content,
+                file_name=file.filename or "file",
+                content_type=file.content_type or "application/octet-stream",
+                folder=folder,
+                make_public=True
+            )
+            
+            if not s3_url:
+                error_msg = "Failed to upload file to S3. Please check S3 configuration."
+                app_logger.error(f"❌ {error_msg}")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=error_msg
+                )
+            
+            app_logger.info(f"✅ File uploaded by user {current_user.id}: {file.filename}")
+            
+            return JSONResponse(
+                status_code=status.HTTP_201_CREATED,
+                content={
+                    "message": "File uploaded successfully",
+                    "url": s3_url,
+                    "filename": file.filename,
+                    "size": file_size,
+                    "content_type": file.content_type
+                }
+            )
+        except HTTPException:
+            raise
+        except Exception as upload_error:
+            error_msg = f"Error uploading file to S3: {str(upload_error)}"
+            app_logger.error(f"❌ {error_msg}")
+            import traceback
+            traceback.print_exc()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to upload file to S3"
+                detail=error_msg
             )
-        
-        app_logger.info(f"✅ File uploaded by user {current_user.id}: {file.filename}")
-        
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content={
-                "message": "File uploaded successfully",
-                "url": s3_url,
-                "filename": file.filename,
-                "size": file_size,
-                "content_type": file.content_type
-            }
-        )
         
     except HTTPException:
         raise
     except Exception as e:
-        app_logger.error(f"❌ Error uploading file: {str(e)}")
+        error_msg = f"Error uploading file: {str(e)}"
+        app_logger.error(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error uploading file: {str(e)}"
+            detail=error_msg
         )
 
 
