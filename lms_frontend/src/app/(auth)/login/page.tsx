@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle, CheckCircle2, GraduationCap } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function LoginPage() {
@@ -100,8 +100,8 @@ export default function LoginPage() {
             transition={{ duration: 0.6 }}
           >
             <div className="flex items-center gap-3 mb-8">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <GraduationCap className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">Edu</span>
               </div>
               <h2 className="text-2xl font-bold">Edumentry</h2>
             </div>
@@ -146,8 +146,8 @@ export default function LoginPage() {
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
             <div className="inline-flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">Edu</span>
               </div>
               <span className="text-xl font-bold text-gray-900">Edumentry</span>
             </div>
