@@ -181,8 +181,8 @@ export default function ProfilePage() {
         return;
       }
 
-      // Change password via API
-      await apiClient.updateUserProfile({
+      // Change password via API - use the dedicated password change endpoint
+      await apiClient.changeUserPassword({
         current_password: passwordData.current_password,
         new_password: passwordData.new_password
       });
@@ -194,8 +194,8 @@ export default function ProfilePage() {
         confirm_password: ''
       });
 
-      setSuccessMessage('Password changed successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setSuccessMessage('Password changed successfully! You can now use your new password to log in.');
+      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error: unknown) {
       console.error('Error changing password:', error);
       const errorMessage = error && typeof error === 'object' && 'response' in error

@@ -455,6 +455,13 @@ class ApiClient {
     });
   }
 
+  async changeUserPassword(data: { current_password: string; new_password: string }): Promise<ApiResponse> {
+    return this.request('/api/v1/users/me/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getUsers(params?: any): Promise<ApiResponse> {
     if (!params) {
       return this.request(`/api/v1/users/`);

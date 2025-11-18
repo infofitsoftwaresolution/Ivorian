@@ -423,7 +423,10 @@ class UserService:
             user.password_change_required = False  # Clear password change requirement
             user.updated_at = datetime.utcnow()
             
+            # Commit the changes
             await db.commit()
+            # Refresh the user object to ensure changes are persisted
+            await db.refresh(user)
             
             logger.info(f"Password changed for user: {user.email} (ID: {user.id})")
             return True
