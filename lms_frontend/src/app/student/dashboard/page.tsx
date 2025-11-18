@@ -106,18 +106,35 @@ export default function StudentDashboard() {
         }
         
         console.log('📚 Processed enrollments:', enrollments);
-        console.log('📚 First enrollment structure:', enrollments[0]);
+        if (enrollments.length > 0) {
+          console.log('📚 First enrollment structure:', enrollments[0]);
+          console.log('📚 Enrollment fields:', {
+            id: enrollments[0].id,
+            completed_lessons: enrollments[0].completed_lessons,
+            total_lessons: enrollments[0].total_lessons,
+            progress_percentage: enrollments[0].progress_percentage,
+            course: enrollments[0].course
+          });
+        }
         
         setEnrolledCourses(enrollments);
         
-        // Calculate stats
+        // Calculate stats using actual enrollment data
         const totalCourses = enrollments.length;
-        const totalLessons = enrollments.reduce((acc: number, enrollment: any) => 
-          acc + (enrollment.course?.total_lessons || 0), 0
-        );
-        const completedLessons = enrollments.reduce((acc: number, enrollment: any) => 
-          acc + Math.floor((enrollment.progress_percentage || 0) * (enrollment.course?.total_lessons || 0) / 100), 0
-        );
+        const totalLessons = enrollments.reduce((acc: number, enrollment: any) => {
+          // Use enrollment.total_lessons if available, otherwise course.total_lessons
+          const total = enrollment.total_lessons || enrollment.course?.total_lessons || 0;
+          return acc + total;
+        }, 0);
+        const completedLessons = enrollments.reduce((acc: number, enrollment: any) => {
+          // Use enrollment.completed_lessons if available, otherwise calculate from percentage
+          if (enrollment.completed_lessons !== undefined && enrollment.completed_lessons !== null) {
+            return acc + (parseInt(String(enrollment.completed_lessons)) || 0);
+          }
+          // Fallback: calculate from percentage
+          const total = enrollment.total_lessons || enrollment.course?.total_lessons || 0;
+          return acc + Math.floor((enrollment.progress_percentage || 0) * total / 100);
+        }, 0);
         const averageProgress = enrollments.length > 0 
           ? enrollments.reduce((acc: number, enrollment: any) => acc + (enrollment.progress_percentage || 0), 0) / enrollments.length
           : 0;
@@ -292,10 +309,46 @@ export default function StudentDashboard() {
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {enrolledCourses.length > 0 ? enrolledCourses.map((enrollment) => {
+            {enrolledCourses.length > 0 ? enrolledCourses.map((enrollment: any) => {
               const course = enrollment.course;
               const progress = enrollment.progress_percentage || 0;
-              const completedLessons = Math.floor((progress / 100) * (course?.total_lessons || 0));
+              
+              // Use actual enrollment data from backend
+              // The backend EnrollmentResponse includes completed_lessons and total_lessons directly
+              let completedLessons = 0;
+              let totalLessons = 0;
+              
+              // Get total_lessons - prioritize course.total_lessons (most accurate)
+              // Enrollment.total_lessons might be outdated, so use course data if available
+              if (course?.total_lessons !== undefined && course?.total_lessons !== null && course.total_lessons > 0) {
+                totalLessons = parseInt(String(course.total_lessons)) || 0;
+              } else if (enrollment.total_lessons !== undefined && enrollment.total_lessons !== null && enrollment.total_lessons > 0) {
+                totalLessons = parseInt(String(enrollment.total_lessons)) || 0;
+              }
+              
+              // Get completed_lessons - use enrollment data if available and valid
+              if (enrollment.completed_lessons !== undefined && enrollment.completed_lessons !== null) {
+                completedLessons = parseInt(String(enrollment.completed_lessons)) || 0;
+              } else if (totalLessons > 0 && progress > 0) {
+                // Fallback: calculate from percentage
+                completedLessons = Math.floor((progress / 100) * totalLessons);
+              }
+              
+              // Ensure completed doesn't exceed total
+              if (totalLessons > 0) {
+                completedLessons = Math.min(completedLessons, totalLessons);
+              }
+              
+              // Debug logging for this specific enrollment
+              console.log(`📊 Course "${course?.title}":`, {
+                enrollment_id: enrollment.id,
+                enrollment_completed: enrollment.completed_lessons,
+                enrollment_total: enrollment.total_lessons,
+                course_total: course?.total_lessons,
+                calculated_completed: completedLessons,
+                calculated_total: totalLessons,
+                progress_percentage: progress
+              });
               
               // Skip if course data is missing
               if (!course) {
@@ -306,11 +359,19 @@ export default function StudentDashboard() {
               return (
               <div key={enrollment.id || course.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                 <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                  <BookOpenIcon className="h-12 w-12 text-white" />
+                  {course.thumbnail_url ? (
+                    <img 
+                      src={course.thumbnail_url} 
+                      alt={course.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <BookOpenIcon className="h-12 w-12 text-white" />
+                  )}
                 </div>
                 <div className="p-4">
                   <h3 className="text-lg font-medium text-gray-900 mb-1">{course?.title || 'Course Title'}</h3>
-                  <p className="text-sm text-gray-500 mb-3">by Instructor</p>
+                  <p className="text-sm text-gray-500 mb-3">by {course?.instructor || 'Instructor'}</p>
                   
                   {/* Progress Bar */}
                   <div className="mb-3">
@@ -321,14 +382,14 @@ export default function StudentDashboard() {
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${progress}%` }}
+                        style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
                       ></div>
                     </div>
                   </div>
                   
                   <div className="text-sm text-gray-600 mb-3">
-                    <p>{completedLessons} of {course?.total_lessons || 0} lessons completed</p>
-                    <p className="text-gray-400">Status: {enrollment.status}</p>
+                    <p>{completedLessons} of {totalLessons} lessons completed</p>
+                    <p className="text-gray-400">Status: {enrollment.status || 'active'}</p>
                   </div>
                   
                   <div className="flex space-x-2">

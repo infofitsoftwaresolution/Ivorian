@@ -221,6 +221,10 @@ class ApiClient {
         const refreshed = await this.refreshToken();
         if (refreshed) {
           return this.request<T>(endpoint, options, retryCount + 1);
+        } else {
+          // Token refresh failed - clear tokens and throw authentication error
+          TokenManager.clearTokens();
+          // Continue to error handling below to throw proper error
         }
       }
 

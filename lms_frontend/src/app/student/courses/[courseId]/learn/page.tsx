@@ -25,7 +25,15 @@ import {
   AcademicCapIcon,
   ArrowLeftIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  ArrowsPointingOutIcon,
+  ArrowsPointingInIcon,
+  ForwardIcon,
+  BackwardIcon,
+  Cog6ToothIcon,
+  RectangleStackIcon,
+  LanguageIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
@@ -55,7 +63,9 @@ interface Lesson {
   description: string;
   content: string;
   content_type: 'video' | 'text' | 'interactive';
-  duration: number;
+  duration?: number; // Legacy field, prefer video_duration or estimated_duration
+  video_duration?: number; // Duration in seconds (from backend)
+  estimated_duration?: number; // Duration in minutes (from backend)
   order: number;
   is_completed: boolean;
   video_url?: string;
@@ -73,7 +83,7 @@ interface CourseProgress {
 export default function CourseLearningPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const courseId = params.courseId as string;
 
   // State management
@@ -81,6 +91,8 @@ export default function CourseLearningPage() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [progress, setProgress] = useState<CourseProgress | null>(null);
+  const [enrollment, setEnrollment] = useState<any>(null);
+  const [enrollmentId, setEnrollmentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -89,17 +101,47 @@ export default function CourseLearningPage() {
 
   // Video player refs
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showControls, setShowControls] = useState(true);
+  const [isHovering, setIsHovering] = useState(false);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [isTheaterMode, setIsTheaterMode] = useState(false);
+  const [isPictureInPicture, setIsPictureInPicture] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [bufferedRanges, setBufferedRanges] = useState<{ start: number; end: number }[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewTime, setPreviewTime] = useState(0);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      console.log('User not authenticated, redirecting to login...');
+      router.push('/login?redirect=' + encodeURIComponent(`/student/courses/${courseId}/learn`));
+    }
+  }, [authLoading, isAuthenticated, router, courseId]);
 
   // Fetch course data
   useEffect(() => {
+    // Don't fetch if not authenticated or still loading auth
+    if (authLoading || !isAuthenticated) {
+      return;
+    }
+
     const fetchCourseData = async () => {
       try {
         setLoading(true);
+        setError('');
         
         // Fetch course details
         const courseResponse = await apiClient.getCourse(parseInt(courseId));
@@ -111,25 +153,212 @@ export default function CourseLearningPage() {
         console.log('📚 Topics response:', topicsResponse);
         const topicsData = topicsResponse.data || [];
         console.log('📚 Topics data:', topicsData);
+        
+        // Log lesson structure for debugging
+        if (topicsData.length > 0 && topicsData[0].lessons && topicsData[0].lessons.length > 0) {
+          const firstLesson = topicsData[0].lessons[0];
+          console.log('📖 First lesson structure:', {
+            id: firstLesson.id,
+            title: firstLesson.title,
+            video_duration: firstLesson.video_duration,
+            estimated_duration: firstLesson.estimated_duration,
+            duration: firstLesson.duration,
+            content_type: firstLesson.content_type
+          });
+        }
+        
         setTopics(topicsData);
 
-        // Set first lesson as current if available
-        if (topicsData.length > 0 && topicsData[0].lessons && topicsData[0].lessons.length > 0) {
-          setCurrentLesson(topicsData[0].lessons[0]);
+        // Fetch enrollment data to get progress
+        try {
+          console.log('🔍 Fetching enrollment data for course:', courseId);
+          const enrollmentsResponse = await apiClient.getMyEnrollments();
+          console.log('📊 Enrollment response:', enrollmentsResponse);
+          
+          let enrollments: any[] = [];
+          
+          if (Array.isArray(enrollmentsResponse.data)) {
+            enrollments = enrollmentsResponse.data;
+          } else if (enrollmentsResponse.data?.enrollments && Array.isArray(enrollmentsResponse.data.enrollments)) {
+            enrollments = enrollmentsResponse.data.enrollments;
+          }
+
+          console.log('📚 Processed enrollments:', enrollments);
+          console.log('🔍 Looking for course ID:', parseInt(courseId));
+
+          // Find enrollment for this course
+          // Backend returns course_id directly, not nested course object
+          const courseEnrollment = enrollments.find(
+            (e: any) => {
+              const match = e.course_id === parseInt(courseId) || e.course?.id === parseInt(courseId);
+              if (match) {
+                console.log('✅ Found enrollment:', e);
+              }
+              return match;
+            }
+          );
+
+          console.log('🎯 Course enrollment found:', courseEnrollment);
+
+          if (courseEnrollment) {
+            console.log('✅ Using enrollment data:', {
+              id: courseEnrollment.id,
+              course_id: courseEnrollment.course_id,
+              progress_percentage: courseEnrollment.progress_percentage,
+              completed_lessons: courseEnrollment.completed_lessons,
+              total_lessons: courseEnrollment.total_lessons
+            });
+            
+            setEnrollment(courseEnrollment);
+            setEnrollmentId(courseEnrollment.id);
+            
+            // Always calculate total_lessons from actual topics data (most accurate)
+            const totalLessons = topicsData.reduce((acc: number, topic: any) => {
+              return acc + (Array.isArray(topic.lessons) ? topic.lessons.length : 0);
+            }, 0);
+
+            // Get progress percentage from enrollment (ensure it's a number)
+            const progressPercentage = typeof courseEnrollment.progress_percentage === 'number' 
+              ? courseEnrollment.progress_percentage 
+              : parseFloat(String(courseEnrollment.progress_percentage || 0)) || 0;
+
+            // Use completed_lessons from enrollment if available and valid, otherwise calculate from percentage
+            let completedLessons = 0;
+            if (courseEnrollment.completed_lessons !== undefined && courseEnrollment.completed_lessons !== null) {
+              completedLessons = parseInt(String(courseEnrollment.completed_lessons)) || 0;
+            } else if (totalLessons > 0 && progressPercentage > 0) {
+              // Calculate from percentage if completed_lessons is not available
+              completedLessons = Math.round((progressPercentage / 100) * totalLessons);
+            }
+            
+            // Ensure completed_lessons doesn't exceed total_lessons
+            completedLessons = Math.min(completedLessons, totalLessons);
+
+            console.log('📊 Progress calculation:', {
+              totalLessons,
+              completedLessons,
+              progressPercentage
+            });
+
+
+            // Mark lessons as completed based on enrollment progress
+            // First, try to fetch actual lesson progress from backend if available
+            // Otherwise, estimate from completed_lessons count
+            let lessonCounter = 0;
+            const updatedTopics = topicsData.map((topic: any) => {
+              const updatedLessons = (topic.lessons || []).map((lesson: any) => {
+                // Keep existing is_completed status if it's already set
+                // Otherwise, estimate based on completed_lessons count
+                const currentIndex = lessonCounter;
+                lessonCounter++;
+                const estimatedCompleted = currentIndex < completedLessons;
+                
+                return {
+                  ...lesson,
+                  // Preserve existing completion status, or use estimated if not set
+                  is_completed: lesson.is_completed === true ? true : (lesson.is_completed === false ? false : estimatedCompleted)
+                };
+              });
+              
+              return {
+                ...topic,
+                lessons: updatedLessons
+              };
+            });
+
+            setTopics(updatedTopics);
+
+            // Recalculate progress percentage based on actual completed/total ratio
+            const actualProgressPercentage = totalLessons > 0 
+              ? Math.round((completedLessons / totalLessons) * 100)
+              : 0;
+            
+            const finalProgress = {
+              course_id: parseInt(courseId),
+              total_lessons: totalLessons,
+              completed_lessons: completedLessons,
+              progress_percentage: Math.max(0, Math.min(100, actualProgressPercentage)) // Clamp between 0-100
+            };
+            
+            console.log('📈 Setting progress from backend:', finalProgress);
+            console.log('📊 Enrollment data used:', {
+              enrollment_completed: courseEnrollment.completed_lessons,
+              enrollment_total: courseEnrollment.total_lessons,
+              enrollment_percentage: courseEnrollment.progress_percentage,
+              calculated_total: totalLessons,
+              calculated_completed: completedLessons,
+              calculated_percentage: actualProgressPercentage
+            });
+            setProgress(finalProgress);
+
+            // Set first lesson as current if available (use updated topics)
+            if (updatedTopics.length > 0 && updatedTopics[0].lessons && updatedTopics[0].lessons.length > 0) {
+              setCurrentLesson(updatedTopics[0].lessons[0]);
+            }
+          } else {
+            // No enrollment found - set default progress
+            console.warn('⚠️ No enrollment found for course:', courseId);
+            console.log('📋 Available enrollments:', enrollments.map((e: any) => ({ 
+              id: e.id, 
+              course_id: e.course_id,
+              course: e.course?.id 
+            })));
+            
+            const totalLessons = topicsData.reduce((acc: number, topic: any) => {
+              return acc + (Array.isArray(topic.lessons) ? topic.lessons.length : 0);
+            }, 0);
+
+            setProgress({
+              course_id: parseInt(courseId),
+              total_lessons: totalLessons,
+              completed_lessons: 0,
+              progress_percentage: 0
+            });
+
+            // Set first lesson as current if available
+            if (topicsData.length > 0 && topicsData[0].lessons && topicsData[0].lessons.length > 0) {
+              setCurrentLesson(topicsData[0].lessons[0]);
+            }
+          }
+        } catch (enrollmentError) {
+          console.error('Error fetching enrollment data:', enrollmentError);
+          // Continue without enrollment data - set default progress
+          const totalLessons = topicsData.reduce((acc: number, topic: any) => {
+            return acc + (Array.isArray(topic.lessons) ? topic.lessons.length : 0);
+          }, 0);
+
+          setProgress({
+            course_id: parseInt(courseId),
+            total_lessons: totalLessons,
+            completed_lessons: 0,
+            progress_percentage: 0
+          });
+
+          // Set first lesson as current if available
+          if (topicsData.length > 0 && topicsData[0].lessons && topicsData[0].lessons.length > 0) {
+            setCurrentLesson(topicsData[0].lessons[0]);
+          }
         }
 
-        // Fetch course progress
-        // TODO: Implement progress tracking API
-        setProgress({
-          course_id: parseInt(courseId),
-          total_lessons: topicsData.reduce((acc: number, topic: any) => acc + (topic.lessons?.length || 0), 0),
-          completed_lessons: 0,
-          progress_percentage: 0
-        });
-
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching course data:', error);
-        setError('Failed to load course. Please try again.');
+        
+        // Handle authentication errors
+        if (error?.status === 401 || error?.message?.includes('Could not validate credentials') || error?.message?.includes('Unauthorized')) {
+          console.log('Authentication error detected, redirecting to login...');
+          // Clear any invalid tokens
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('lms_access_token');
+            localStorage.removeItem('lms_refresh_token');
+          }
+          // Redirect to login with return URL
+          router.push('/login?redirect=' + encodeURIComponent(`/student/courses/${courseId}/learn`));
+          return;
+        }
+        
+        // Handle other errors
+        const errorMessage = error?.message || 'Failed to load course. Please try again.';
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -138,7 +367,7 @@ export default function CourseLearningPage() {
     if (courseId) {
       fetchCourseData();
     }
-  }, [courseId]);
+  }, [courseId, authLoading, isAuthenticated, router]);
 
   // Video player controls
   const handlePlayPause = () => {
@@ -161,22 +390,132 @@ export default function CourseLearningPage() {
 
   const handleVolumeChange = (newVolume: number) => {
     if (videoRef.current) {
-      videoRef.current.volume = newVolume;
-      setVolume(newVolume);
+      const clampedVolume = Math.max(0, Math.min(1, newVolume));
+      videoRef.current.volume = clampedVolume;
+      setVolume(clampedVolume);
+      if (clampedVolume > 0 && isMuted) {
+        setIsMuted(false);
+        videoRef.current.muted = false;
+      }
     }
+  };
+
+  // Helper function to get lesson duration in seconds
+  // Priority: video_duration (from backend or video metadata) > estimated_duration > duration
+  const getLessonDuration = (lesson: Lesson): number => {
+    // Try video_duration first (in seconds) - this is the actual video file duration
+    if (lesson.video_duration && typeof lesson.video_duration === 'number' && lesson.video_duration > 0) {
+      return lesson.video_duration;
+    } 
+    // Fallback to estimated_duration (in minutes) - convert to seconds
+    else if (lesson.estimated_duration && typeof lesson.estimated_duration === 'number' && lesson.estimated_duration > 0) {
+      return lesson.estimated_duration * 60;
+    } 
+    // Legacy duration field
+    else if (lesson.duration && typeof lesson.duration === 'number' && lesson.duration > 0) {
+      return lesson.duration;
+    }
+    return 0;
   };
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
+      resetControlsTimeout();
     }
   };
 
   const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
+    if (videoRef.current && currentLesson) {
+      const videoDuration = videoRef.current.duration;
+      
+      // Always use the actual video duration from the video element (most accurate)
+      if (videoDuration > 0 && !isNaN(videoDuration)) {
+        setDuration(videoDuration);
+        
+        const roundedDuration = Math.round(videoDuration);
+        
+        // Update the current lesson with the actual video duration
+        setCurrentLesson((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            video_duration: roundedDuration
+          };
+        });
+        
+        // Also update in topics array so sidebar shows correct duration
+        setTopics((prevTopics) => 
+          prevTopics.map((topic: any) => ({
+            ...topic,
+            lessons: (topic.lessons || []).map((l: any) =>
+              l.id === currentLesson.id
+                ? { ...l, video_duration: roundedDuration }
+                : l
+            )
+          }))
+        );
+        
+        console.log('📹 Video duration loaded from video metadata:', roundedDuration, 'seconds');
+        console.log('📹 Updated lesson:', currentLesson.id, 'with duration:', roundedDuration);
+      }
     }
   };
+
+  const handleWaiting = () => {
+    setIsBuffering(true);
+  };
+
+  const handleCanPlay = () => {
+    setIsBuffering(false);
+  };
+
+  const handleProgress = () => {
+    if (videoRef.current) {
+      const buffered = videoRef.current.buffered;
+      const ranges: { start: number; end: number }[] = [];
+      for (let i = 0; i < buffered.length; i++) {
+        ranges.push({
+          start: buffered.start(i),
+          end: buffered.end(i)
+        });
+      }
+      setBufferedRanges(ranges);
+    }
+  };
+
+  const handlePictureInPicture = async () => {
+    if (!videoRef.current) return;
+    
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        setIsPictureInPicture(false);
+      } else {
+        await videoRef.current.requestPictureInPicture();
+        setIsPictureInPicture(true);
+      }
+    } catch (error) {
+      console.error('Picture-in-picture error:', error);
+    }
+  };
+
+  // Picture-in-picture event listeners
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleEnterPictureInPicture = () => setIsPictureInPicture(true);
+    const handleLeavePictureInPicture = () => setIsPictureInPicture(false);
+
+    video.addEventListener('enterpictureinpicture', handleEnterPictureInPicture);
+    video.addEventListener('leavepictureinpicture', handleLeavePictureInPicture);
+
+    return () => {
+      video.removeEventListener('enterpictureinpicture', handleEnterPictureInPicture);
+      video.removeEventListener('leavepictureinpicture', handleLeavePictureInPicture);
+    };
+  }, []);
 
   const handleSeek = (time: number) => {
     if (videoRef.current) {
@@ -184,6 +523,408 @@ export default function CourseLearningPage() {
       setCurrentTime(time);
     }
   };
+
+  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (progressBarRef.current && videoRef.current) {
+      const rect = progressBarRef.current.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      const newTime = percent * duration;
+      handleSeek(newTime);
+    }
+  };
+
+  const handleProgressBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (progressBarRef.current && duration > 0) {
+      const rect = progressBarRef.current.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      const hoverTime = Math.max(0, Math.min(duration, percent * duration));
+      setPreviewTime(hoverTime);
+      setShowPreview(true);
+    }
+  };
+
+  const handleProgressBarLeave = () => {
+    setShowPreview(false);
+  };
+
+  const handleFullscreen = () => {
+    if (!videoContainerRef.current) return;
+    
+    if (!isFullscreen) {
+      if (videoContainerRef.current.requestFullscreen) {
+        videoContainerRef.current.requestFullscreen();
+      } else if ((videoContainerRef.current as any).webkitRequestFullscreen) {
+        (videoContainerRef.current as any).webkitRequestFullscreen();
+      } else if ((videoContainerRef.current as any).msRequestFullscreen) {
+        (videoContainerRef.current as any).msRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
+    }
+  };
+
+  const handlePlaybackRateChange = (rate: number) => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = rate;
+      setPlaybackRate(rate);
+      setShowSpeedMenu(false);
+    }
+  };
+
+  const skipForward = (seconds: number = 10) => {
+    if (videoRef.current) {
+      handleSeek(Math.min(currentTime + seconds, duration));
+    }
+  };
+
+  const skipBackward = (seconds: number = 10) => {
+    if (videoRef.current) {
+      handleSeek(Math.max(currentTime - seconds, 0));
+    }
+  };
+
+  const handleVideoClick = () => {
+    handlePlayPause();
+  };
+
+  const resetControlsTimeout = () => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    setShowControls(true);
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) {
+        setShowControls(false);
+      }
+    }, 3000);
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (!videoRef.current) return;
+      
+      // Don't trigger if user is typing in an input
+      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') {
+        return;
+      }
+
+      switch (e.key) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          handlePlayPause();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          skipBackward(10);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          skipForward(10);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          handleVolumeChange(Math.min(volume + 0.1, 1));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          handleVolumeChange(Math.max(volume - 0.1, 0));
+          break;
+        case 'm':
+          e.preventDefault();
+          handleMuteToggle();
+          break;
+        case 'f':
+          e.preventDefault();
+          handleFullscreen();
+          break;
+        case 't':
+          e.preventDefault();
+          setIsTheaterMode(!isTheaterMode);
+          break;
+        case 'i':
+          e.preventDefault();
+          handlePictureInPicture();
+          break;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          e.preventDefault();
+          const percent = parseInt(e.key) / 10;
+          handleSeek(percent * duration);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [isPlaying, volume, duration, currentTime]);
+
+  // Fullscreen change listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('msfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (showSpeedMenu && !target.closest('[data-speed-menu]')) {
+        setShowSpeedMenu(false);
+      }
+      if (showSettingsMenu && !target.closest('[data-settings-menu]')) {
+        setShowSettingsMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSpeedMenu, showSettingsMenu]);
+
+  // Preload metadata for all video lessons to get their actual durations
+  // Use a ref to track if we've already started preloading to prevent re-running
+  const preloadStartedRef = useRef<Set<number>>(new Set());
+  const topicsInitializedRef = useRef<string>(''); // Track which courseId we've initialized for
+  const topicsHashRef = useRef<string>(''); // Track a hash of topic IDs to detect new topics
+  
+  // Reset refs when courseId changes
+  useEffect(() => {
+    preloadStartedRef.current.clear();
+    topicsInitializedRef.current = '';
+    topicsHashRef.current = '';
+  }, [courseId]);
+  
+  useEffect(() => {
+    if (!topics || topics.length === 0) return;
+    
+    // Create a hash of topic and lesson IDs to detect if topics have actually changed
+    const topicsHash = topics.map((t: any) => 
+      `${t.id}-${(t.lessons || []).map((l: any) => l.id).join(',')}`
+    ).join('|');
+    
+    // Only run if topics hash has changed (new topics loaded) or courseId changed
+    if (topicsHashRef.current === topicsHash && topicsInitializedRef.current === courseId) {
+      return; // Topics haven't changed, skip
+    }
+    
+    // Mark as initialized for this course and store hash
+    topicsInitializedRef.current = courseId;
+    topicsHashRef.current = topicsHash;
+
+    // Collect ALL video lessons - always preload to get actual video duration
+    // This ensures we get the real duration even if estimated_duration exists
+    const videoLessons: Array<{ lessonId: number; videoUrl: string; topicIndex: number; lessonIndex: number }> = [];
+    topics.forEach((topic: any, topicIdx: number) => {
+      if (topic.lessons && Array.isArray(topic.lessons)) {
+        topic.lessons.forEach((lesson: any, lessonIdx: number) => {
+          if (lesson.content_type === 'video' && lesson.video_url) {
+            // Only add if we haven't started preloading this lesson yet
+            if (!preloadStartedRef.current.has(lesson.id)) {
+              videoLessons.push({
+                lessonId: lesson.id,
+                videoUrl: lesson.video_url,
+                topicIndex: topicIdx,
+                lessonIndex: lessonIdx
+              });
+            }
+          }
+        });
+      }
+    });
+
+    if (videoLessons.length === 0) {
+      return; // No new lessons to preload
+    }
+
+    console.log(`📹 Preloading metadata for ${videoLessons.length} video lessons...`);
+
+    // Create hidden video elements to preload metadata
+    const videoElements: HTMLVideoElement[] = [];
+    const timeouts: NodeJS.Timeout[] = [];
+    const processedLessons = new Set<number>(); // Track which lessons have been processed
+
+    videoLessons.forEach(({ lessonId, videoUrl, topicIndex, lessonIndex }) => {
+      // Mark as started to prevent re-processing
+      preloadStartedRef.current.add(lessonId);
+      
+      // Skip if already processed
+      if (processedLessons.has(lessonId)) {
+        return;
+      }
+
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.src = videoUrl;
+      video.style.display = 'none';
+      document.body.appendChild(video);
+      videoElements.push(video);
+
+      let hasProcessed = false; // Flag to prevent duplicate processing
+
+      const handleLoadedMetadata = () => {
+        // Prevent duplicate processing
+        if (hasProcessed || processedLessons.has(lessonId)) {
+          return;
+        }
+
+        const videoDuration = video.duration;
+        if (videoDuration > 0 && !isNaN(videoDuration)) {
+          hasProcessed = true;
+          processedLessons.add(lessonId);
+          
+          const roundedDuration = Math.round(videoDuration);
+          
+          console.log(`📹 Metadata loaded for lesson ${lessonId}: ${roundedDuration} seconds (${Math.floor(roundedDuration / 60)}:${String(roundedDuration % 60).padStart(2, '0')})`);
+          
+          // Update in topics array - this will trigger a re-render of the sidebar
+          // Use functional update to avoid dependency on topics
+          setTopics((prevTopics) => {
+            const updatedTopics = prevTopics.map((topic: any, tIdx: number) => {
+              if (tIdx === topicIndex && topic.lessons) {
+                return {
+                  ...topic,
+                  lessons: topic.lessons.map((l: any, lIdx: number) =>
+                    lIdx === lessonIndex
+                      ? { ...l, video_duration: roundedDuration }
+                      : l
+                  )
+                };
+              }
+              return topic;
+            });
+            return updatedTopics;
+          });
+          
+          // Also update currentLesson if it's the same lesson
+          setCurrentLesson((prev) => {
+            if (prev && prev.id === lessonId) {
+              return { ...prev, video_duration: roundedDuration };
+            }
+            return prev;
+          });
+          
+          console.log(`✅ Updated duration for lesson ${lessonId} in topics array`);
+        } else {
+          console.warn(`⚠️ Invalid duration for lesson ${lessonId}: ${videoDuration}`);
+        }
+      };
+
+      const handleError = () => {
+        if (!hasProcessed) {
+          console.warn(`⚠️ Failed to load metadata for lesson ${lessonId}`);
+        }
+      };
+
+      // Use only loadedmetadata event to avoid duplicates
+      video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+      video.addEventListener('error', handleError, { once: true });
+      
+      // Start loading metadata immediately
+      video.load();
+      
+      // Backup: check if metadata is already available after a short delay
+      const timeout = setTimeout(() => {
+        if (!hasProcessed && video.readyState >= 1 && video.duration > 0) { // HAVE_METADATA
+          handleLoadedMetadata();
+        }
+      }, 200);
+      timeouts.push(timeout);
+    });
+
+    // Cleanup function
+    return () => {
+      // Clear all timeouts
+      timeouts.forEach(timeout => clearTimeout(timeout));
+      
+      // Remove all video elements
+      videoElements.forEach((video) => {
+        // Remove from DOM if it has a parent
+        if (video.parentNode) {
+          video.parentNode.removeChild(video);
+        }
+      });
+    };
+  }, [topics, courseId]); // Run when topics are first loaded for a course
+
+  // Update duration from video when lesson changes
+  useEffect(() => {
+    if (videoRef.current && currentLesson && currentLesson.video_url) {
+      // Reset duration when lesson changes
+      setDuration(0);
+      
+      // Wait a bit for video to load, then check duration
+      const checkDuration = () => {
+        if (videoRef.current && videoRef.current.duration) {
+          const videoDuration = videoRef.current.duration;
+          if (videoDuration > 0 && !isNaN(videoDuration)) {
+            const roundedDuration = Math.round(videoDuration);
+            setDuration(videoDuration);
+            
+            // Update lesson with actual video duration
+            setCurrentLesson((prev) => {
+              if (!prev || prev.id !== currentLesson.id) return prev;
+              return { ...prev, video_duration: roundedDuration };
+            });
+            
+            // Update in topics array
+            setTopics((prevTopics) => 
+              prevTopics.map((topic: any) => ({
+                ...topic,
+                lessons: (topic.lessons || []).map((l: any) =>
+                  l.id === currentLesson.id
+                    ? { ...l, video_duration: roundedDuration }
+                    : l
+                )
+              }))
+            );
+            
+            console.log('📹 Duration synced from video for lesson:', currentLesson.id, '=', roundedDuration, 'seconds');
+          }
+        }
+      };
+      
+      // Check immediately and also after a delay
+      checkDuration();
+      const timeout = setTimeout(checkDuration, 500);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [currentLesson?.id, currentLesson?.video_url]);
 
   // Lesson navigation
   const goToNextLesson = () => {
@@ -197,8 +938,29 @@ export default function CourseLearningPage() {
   };
 
   const selectLesson = (lesson: Lesson) => {
-    setCurrentLesson(lesson);
+    // Find the full lesson data from topics to ensure we have all fields including duration
+    let fullLesson = lesson;
+    for (const topic of topics) {
+      const foundLesson = topic.lessons?.find((l: any) => l.id === lesson.id);
+      if (foundLesson) {
+        fullLesson = foundLesson;
+        break;
+      }
+    }
+    setCurrentLesson(fullLesson);
     setIsPlaying(false);
+    
+    // Reset video player state
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      setCurrentTime(0);
+      setDuration(0); // Reset duration, will be set when video metadata loads
+      
+      // Force video to reload to get fresh metadata and actual duration
+      if (fullLesson.video_url) {
+        videoRef.current.load(); // This will trigger onLoadedMetadata with actual video duration
+      }
+    }
   };
 
   const toggleBookmark = (lessonId: number) => {
@@ -209,14 +971,134 @@ export default function CourseLearningPage() {
     );
   };
 
-  const markLessonComplete = () => {
-    if (currentLesson) {
-      // TODO: Implement lesson completion API
-      console.log('Mark lesson complete:', currentLesson.id);
+  const markLessonComplete = async () => {
+    if (!currentLesson || !enrollmentId) {
+      console.warn('Cannot mark lesson complete: missing lesson or enrollment');
+      return;
+    }
+
+    // Don't mark again if already completed
+    if (currentLesson.is_completed) {
+      console.log('Lesson already completed');
+      return;
+    }
+
+    try {
+      // Update lesson completion status in local state
+      const updatedTopics = topics.map((topic: any) => ({
+        ...topic,
+        lessons: (topic.lessons || []).map((lesson: any) =>
+          lesson.id === currentLesson.id
+            ? { ...lesson, is_completed: true }
+            : lesson
+        )
+      }));
+      setTopics(updatedTopics);
+
+      // Update current lesson
+      setCurrentLesson({ ...currentLesson, is_completed: true });
+
+      // Calculate new progress
+      const totalLessons = updatedTopics.reduce((acc: number, topic: any) => {
+        return acc + (Array.isArray(topic.lessons) ? topic.lessons.length : 0);
+      }, 0);
+
+      const completedLessons = updatedTopics.reduce((acc: number, topic: any) => {
+        return acc + (Array.isArray(topic.lessons)
+          ? topic.lessons.filter((l: any) => l.is_completed).length
+          : 0);
+      }, 0);
+
+      const newProgressPercentage = totalLessons > 0
+        ? Math.round((completedLessons / totalLessons) * 100)
+        : 0;
+
+      // Update local progress state
+      setProgress({
+        course_id: parseInt(courseId),
+        total_lessons: totalLessons,
+        completed_lessons: completedLessons,
+        progress_percentage: newProgressPercentage
+      });
+
+      // Update enrollment on backend
+      if (enrollmentId) {
+        console.log('📤 Updating enrollment:', {
+          enrollmentId,
+          completedLessons,
+          progressPercentage: newProgressPercentage
+        });
+
+        try {
+          // Ensure progress_percentage is a float between 0 and 100
+          const progressPercentage = Math.max(0, Math.min(100, parseFloat(newProgressPercentage.toFixed(2))));
+          
+          const updateData = {
+            completed_lessons: parseInt(String(completedLessons)),
+            progress_percentage: progressPercentage
+          };
+          
+          console.log('📤 Sending update data:', updateData);
+          
+          const updateResponse = await apiClient.updateEnrollment(enrollmentId, updateData);
+          console.log('✅ Enrollment updated successfully:', updateResponse);
+
+          // Refresh enrollment data
+          const enrollmentsResponse = await apiClient.getMyEnrollments();
+          let enrollments: any[] = [];
+          
+          if (Array.isArray(enrollmentsResponse.data)) {
+            enrollments = enrollmentsResponse.data;
+          } else if (enrollmentsResponse.data?.enrollments && Array.isArray(enrollmentsResponse.data.enrollments)) {
+            enrollments = enrollmentsResponse.data.enrollments;
+          }
+
+          const courseEnrollment = enrollments.find(
+            (e: any) => e.course_id === parseInt(courseId) || e.course?.id === parseInt(courseId)
+          );
+
+          if (courseEnrollment) {
+            setEnrollment(courseEnrollment);
+            console.log('✅ Enrollment data refreshed');
+          }
+        } catch (updateError: any) {
+          console.error('❌ Error updating enrollment:', updateError);
+          console.error('Error details:', {
+            message: updateError?.message,
+            status: updateError?.status,
+            details: updateError?.details
+          });
+          // Don't throw - we've already updated local state
+          // The user will see the progress update even if backend save fails
+        }
+      } else {
+        console.warn('⚠️ No enrollmentId available, skipping backend update');
+      }
+
+      console.log('✅ Lesson marked as complete:', currentLesson.id);
+    } catch (error: any) {
+      console.error('❌ Error marking lesson complete:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        status: error?.status,
+        details: error?.details
+      });
+      // Revert local state on error if needed
+      // For now, we'll keep the optimistic update
     }
   };
 
+  const handleVideoEnded = () => {
+    console.log('Video ended, marking lesson as complete');
+    setIsPlaying(false);
+    setShowControls(true);
+    markLessonComplete();
+  };
+
   const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds) || seconds < 0) {
+      return '0:00';
+    }
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -290,12 +1172,19 @@ export default function CourseLearningPage() {
         
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-600">
-            Progress: {progress?.progress_percentage || 0}%
+            {progress ? (
+              <>
+                {progress.completed_lessons} of {progress.total_lessons} lessons completed
+                <span className="ml-2">({Math.round(progress.progress_percentage)}%)</span>
+              </>
+            ) : (
+              'Loading progress...'
+            )}
           </div>
           <div className="w-32 bg-gray-200 rounded-full h-2">
             <div 
               className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress?.progress_percentage || 0}%` }}
+              style={{ width: `${Math.max(0, Math.min(100, progress?.progress_percentage || 0))}%` }}
             />
           </div>
         </div>
@@ -313,7 +1202,7 @@ export default function CourseLearningPage() {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium text-gray-900">{topic.title}</h3>
                     <span className="text-sm text-gray-500">
-                      {topic.lessons?.filter(lesson => lesson.is_completed).length || 0}/{topic.lessons?.length || 0}
+                      {Array.isArray(topic.lessons) ? topic.lessons.filter((lesson: any) => lesson.is_completed).length : 0}/{Array.isArray(topic.lessons) ? topic.lessons.length : 0}
                     </span>
                   </div>
                   
@@ -339,7 +1228,9 @@ export default function CourseLearningPage() {
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-900">{lesson.title}</p>
-                              <p className="text-xs text-gray-500">{formatTime(lesson.duration)}</p>
+                              <p className="text-xs text-gray-500">
+                                {formatTime(getLessonDuration(lesson))}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -371,52 +1262,349 @@ export default function CourseLearningPage() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        <div className={`flex-1 flex flex-col ${isTheaterMode ? 'max-w-7xl mx-auto w-full' : ''}`}>
           {currentLesson ? (
             <>
-              {/* Video Player */}
+              {/* Enhanced Video Player */}
               {currentLesson.content_type === 'video' && currentLesson.video_url && (
-                <div className="bg-black relative">
-                  <video
-                    ref={videoRef}
-                    src={currentLesson.video_url}
-                    className="w-full h-96 object-contain"
-                    onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                  />
+                <div 
+                  ref={videoContainerRef}
+                  className={`bg-black relative group ${isTheaterMode ? 'rounded-lg overflow-hidden' : ''} ${isTheaterMode ? 'h-[70vh]' : 'h-96'} flex flex-col`}
+                  onMouseEnter={() => {
+                    setIsHovering(true);
+                    setShowControls(true);
+                    resetControlsTimeout();
+                  }}
+                  onMouseLeave={() => {
+                    setIsHovering(false);
+                    if (isPlaying) {
+                      resetControlsTimeout();
+                    }
+                  }}
+                  onMouseMove={resetControlsTimeout}
+                >
+                  <div className="relative flex-1 flex items-center justify-center min-h-0">
+                    <video
+                      key={currentLesson.id} // Force remount when lesson changes to reload metadata
+                      ref={videoRef}
+                      src={currentLesson.video_url}
+                      className="w-full h-full max-w-full max-h-full object-contain cursor-pointer"
+                      preload="metadata"
+                      onTimeUpdate={handleTimeUpdate}
+                      onLoadedMetadata={handleLoadedMetadata}
+                      onLoadedData={() => {
+                        // Also capture duration when data is loaded (backup)
+                        if (videoRef.current && videoRef.current.duration && currentLesson) {
+                          const videoDuration = videoRef.current.duration;
+                          if (videoDuration > 0 && !isNaN(videoDuration)) {
+                            const roundedDuration = Math.round(videoDuration);
+                            setDuration(videoDuration);
+                            
+                            // Update lesson with actual video duration
+                            setCurrentLesson((prev) => {
+                              if (!prev) return prev;
+                              return { ...prev, video_duration: roundedDuration };
+                            });
+                            
+                            // Update in topics array
+                            setTopics((prevTopics) => 
+                              prevTopics.map((topic: any) => ({
+                                ...topic,
+                                lessons: (topic.lessons || []).map((l: any) =>
+                                  l.id === currentLesson.id
+                                    ? { ...l, video_duration: roundedDuration }
+                                    : l
+                                )
+                              }))
+                            );
+                            
+                            console.log('📹 Video duration from onLoadedData:', roundedDuration, 'seconds');
+                          }
+                        }
+                      }}
+                      onWaiting={handleWaiting}
+                      onCanPlay={handleCanPlay}
+                      onProgress={handleProgress}
+                      onPlay={() => {
+                        setIsPlaying(true);
+                        resetControlsTimeout();
+                      }}
+                      onPause={() => {
+                        setIsPlaying(false);
+                        setShowControls(true);
+                      }}
+                      onEnded={handleVideoEnded}
+                      onClick={handleVideoClick}
+                    />
+                  </div>
+
+                  {/* Buffering Indicator */}
+                  {isBuffering && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+                    </div>
+                  )}
                   
-                  {/* Video Controls */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                    <div className="flex items-center space-x-4">
+                  {/* Enhanced Video Controls */}
+                  <div 
+                    className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300 ${
+                      showControls || isHovering ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  >
+                    {/* Enhanced Progress Bar with Buffering */}
+                    <div 
+                      ref={progressBarRef}
+                      className="w-full h-2 bg-gray-600/50 cursor-pointer group/progress relative"
+                      onClick={handleProgressBarClick}
+                      onMouseMove={handleProgressBarHover}
+                      onMouseLeave={handleProgressBarLeave}
+                    >
+                      {/* Buffered ranges */}
+                      {bufferedRanges.map((range, index) => (
+                        <div
+                          key={index}
+                          className="absolute h-full bg-gray-500/30"
+                          style={{
+                            left: `${(range.start / duration) * 100}%`,
+                            width: `${((range.end - range.start) / duration) * 100}%`
+                          }}
+                        />
+                      ))}
+                      
+                      {/* Progress */}
+                      <div 
+                        className="h-full bg-indigo-500 transition-all duration-200 relative group-hover/progress:bg-indigo-400 z-10"
+                        style={{ 
+                          width: `${duration && duration > 0 
+                            ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) 
+                            : 0}%` 
+                        }}
+                      >
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover/progress:opacity-100 transition-opacity shadow-lg" />
+                      </div>
+
+                      {/* Preview Tooltip */}
+                      {showPreview && duration > 0 && (
+                        <div 
+                          className="absolute bottom-full mb-2 transform -translate-x-1/2 bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-20"
+                          style={{ left: `${(previewTime / duration) * 100}%` }}
+                        >
+                          {formatTime(previewTime)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Control Buttons */}
+                    <div className="px-4 py-3 flex items-center space-x-4">
+                      {/* Play/Pause */}
                       <button
                         onClick={handlePlayPause}
-                        className="text-white hover:text-gray-300"
+                        className="text-white hover:text-gray-300 transition-colors"
+                        aria-label={isPlaying ? 'Pause' : 'Play'}
                       >
                         {isPlaying ? <PauseIcon className="h-6 w-6" /> : <PlayIcon className="h-6 w-6" />}
                       </button>
-                      
-                      <div className="flex-1">
-                        <div className="w-full bg-gray-600 rounded-full h-1">
-                          <div 
-                            className="bg-white h-1 rounded-full transition-all duration-200"
-                            style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                          />
-                        </div>
-                      </div>
-                      
-                      <span className="text-white text-sm">
-                        {formatTime(currentTime)} / {formatTime(duration)}
-                      </span>
-                      
+
+                      {/* Skip Backward */}
                       <button
-                        onClick={handleMuteToggle}
-                        className="text-white hover:text-gray-300"
+                        onClick={() => skipBackward(10)}
+                        className="text-white hover:text-gray-300 transition-colors"
+                        aria-label="Skip backward 10 seconds"
                       >
-                        {isMuted ? <SpeakerXMarkIcon className="h-5 w-5" /> : <SpeakerWaveIcon className="h-5 w-5" />}
+                        <BackwardIcon className="h-5 w-5" />
                       </button>
+
+                      {/* Skip Forward */}
+                      <button
+                        onClick={() => skipForward(10)}
+                        className="text-white hover:text-gray-300 transition-colors"
+                        aria-label="Skip forward 10 seconds"
+                      >
+                        <ForwardIcon className="h-5 w-5" />
+                      </button>
+
+                      {/* Volume Control */}
+                      <div 
+                        className="relative flex items-center space-x-2"
+                        onMouseEnter={() => setShowVolumeSlider(true)}
+                        onMouseLeave={() => setShowVolumeSlider(false)}
+                      >
+                        <button
+                          onClick={handleMuteToggle}
+                          className="text-white hover:text-gray-300 transition-colors"
+                          aria-label={isMuted ? 'Unmute' : 'Mute'}
+                        >
+                          {isMuted || volume === 0 ? (
+                            <SpeakerXMarkIcon className="h-5 w-5" />
+                          ) : volume < 0.5 ? (
+                            <SpeakerWaveIcon className="h-5 w-5" />
+                          ) : (
+                            <SpeakerWaveIcon className="h-5 w-5" />
+                          )}
+                        </button>
+                        {showVolumeSlider && (
+                          <div className="absolute bottom-full left-0 mb-2 bg-black/80 rounded px-2 py-1">
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              value={isMuted ? 0 : volume}
+                              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                              className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                              style={{
+                                background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(isMuted ? 0 : volume) * 100}%, #4b5563 ${(isMuted ? 0 : volume) * 100}%, #4b5563 100%)`
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Time Display */}
+                      <span className="text-white text-sm font-mono">
+                        {formatTime(isNaN(currentTime) ? 0 : currentTime)} / {formatTime(isNaN(duration) ? 0 : duration)}
+                      </span>
+
+                      <div className="flex-1" />
+
+                      {/* Playback Speed */}
+                      <div className="relative" data-speed-menu>
+                        <button
+                          onClick={() => setShowSpeedMenu(!showSpeedMenu)}
+                          className="text-white hover:text-gray-300 transition-colors text-sm font-medium px-2 py-1"
+                        >
+                          {playbackRate}x
+                        </button>
+                        {showSpeedMenu && (
+                          <div className="absolute bottom-full right-0 mb-2 bg-black/90 rounded shadow-lg overflow-hidden z-50">
+                            {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                              <button
+                                key={rate}
+                                onClick={() => handlePlaybackRateChange(rate)}
+                                className={`block w-full text-left px-4 py-2 text-sm text-white hover:bg-indigo-600 transition-colors ${
+                                  playbackRate === rate ? 'bg-indigo-600' : ''
+                                }`}
+                              >
+                                {rate}x
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Theater Mode */}
+                      <button
+                        onClick={() => setIsTheaterMode(!isTheaterMode)}
+                        className={`text-white hover:text-gray-300 transition-colors ${isTheaterMode ? 'text-indigo-400' : ''}`}
+                        aria-label={isTheaterMode ? 'Exit theater mode' : 'Enter theater mode'}
+                        title="Theater mode (t)"
+                      >
+                        <RectangleStackIcon className="h-5 w-5" />
+                      </button>
+
+                      {/* Picture-in-Picture */}
+                      {document.pictureInPictureEnabled && (
+                        <button
+                          onClick={handlePictureInPicture}
+                          className={`text-white hover:text-gray-300 transition-colors ${isPictureInPicture ? 'text-indigo-400' : ''}`}
+                          aria-label={isPictureInPicture ? 'Exit picture-in-picture' : 'Enter picture-in-picture'}
+                          title="Picture-in-picture (i)"
+                        >
+                          <PhotoIcon className="h-5 w-5" />
+                        </button>
+                      )}
+
+                      {/* Fullscreen */}
+                      <button
+                        onClick={handleFullscreen}
+                        className="text-white hover:text-gray-300 transition-colors"
+                        aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                        title="Fullscreen (f)"
+                      >
+                        {isFullscreen ? (
+                          <ArrowsPointingInIcon className="h-5 w-5" />
+                        ) : (
+                          <ArrowsPointingOutIcon className="h-5 w-5" />
+                        )}
+                      </button>
+
+                      {/* Settings Menu */}
+                      <div className="relative" data-settings-menu>
+                        <button
+                          onClick={() => {
+                            setShowSettingsMenu(!showSettingsMenu);
+                            setShowSpeedMenu(false);
+                          }}
+                          className="text-white hover:text-gray-300 transition-colors"
+                          aria-label="Settings"
+                          title="Settings"
+                        >
+                          <Cog6ToothIcon className="h-5 w-5" />
+                        </button>
+                        {showSettingsMenu && (
+                          <div className="absolute bottom-full right-0 mb-2 bg-black/95 rounded shadow-xl overflow-hidden z-50 min-w-[200px]">
+                            {/* Playback Speed */}
+                            <div className="px-4 py-2 border-b border-gray-700">
+                              <div className="text-xs text-gray-400 mb-2">Playback Speed</div>
+                              <div className="space-y-1">
+                                {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                                  <button
+                                    key={rate}
+                                    onClick={() => {
+                                      handlePlaybackRateChange(rate);
+                                      setShowSettingsMenu(false);
+                                    }}
+                                    className={`block w-full text-left px-3 py-1.5 text-sm text-white hover:bg-gray-700 rounded transition-colors ${
+                                      playbackRate === rate ? 'bg-indigo-600' : ''
+                                    }`}
+                                  >
+                                    {rate}x {rate === 1 && '(Normal)'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Quality (placeholder) */}
+                            <div className="px-4 py-2 border-b border-gray-700">
+                              <div className="text-xs text-gray-400 mb-2">Quality</div>
+                              <button className="block w-full text-left px-3 py-1.5 text-sm text-white hover:bg-gray-700 rounded transition-colors">
+                                Auto
+                              </button>
+                            </div>
+
+                            {/* Captions (placeholder) */}
+                            <div className="px-4 py-2">
+                              <div className="text-xs text-gray-400 mb-2">Subtitles/CC</div>
+                              <button className="block w-full text-left px-3 py-1.5 text-sm text-gray-400 rounded transition-colors cursor-not-allowed">
+                                <LanguageIcon className="h-4 w-4 inline mr-2" />
+                                None available
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Keyboard Shortcuts Hint */}
+                    {isHovering && (
+                      <div className="px-4 pb-2 text-xs text-gray-400 flex flex-wrap gap-x-2 gap-y-1">
+                        <span>Space/K: Play/Pause</span>
+                        <span>•</span>
+                        <span>← →: Skip 10s</span>
+                        <span>•</span>
+                        <span>↑ ↓: Volume</span>
+                        <span>•</span>
+                        <span>M: Mute</span>
+                        <span>•</span>
+                        <span>F: Fullscreen</span>
+                        <span>•</span>
+                        <span>T: Theater</span>
+                        <span>•</span>
+                        <span>I: PiP</span>
+                        <span>•</span>
+                        <span>0-9: Jump to %</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -463,10 +1651,15 @@ export default function CourseLearningPage() {
 
                     <button
                       onClick={markLessonComplete}
-                      className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 flex items-center"
+                      disabled={currentLesson.is_completed}
+                      className={`px-6 py-2 rounded-md flex items-center transition-colors ${
+                        currentLesson.is_completed
+                          ? 'bg-green-500 text-white cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
                     >
                       <CheckCircleIcon className="h-5 w-5 mr-2" />
-                      Mark Complete
+                      {currentLesson.is_completed ? 'Completed' : 'Mark Complete'}
                     </button>
 
                     <button
