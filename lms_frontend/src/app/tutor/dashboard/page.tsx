@@ -89,10 +89,12 @@ export default function TutorDashboard() {
         setCourses(coursesData.slice(0, 5)); // Show only recent 5 courses
         
         // Fetch students
-        const studentsResponse = await apiClient.getUsers();
+        // Backend automatically filters by organization_id for tutors
+        const studentsResponse = await apiClient.getUsers({ role: 'student' });
         const studentsData = Array.isArray(studentsResponse.data) 
           ? studentsResponse.data 
           : studentsResponse.data?.users || [];
+        // Backend already filters by organization and role, so we just need to transform
         const studentUsers = studentsData.filter((user: any) => user.role === 'student');
         setStudents(studentUsers.slice(0, 5)); // Show only recent 5 students
         
