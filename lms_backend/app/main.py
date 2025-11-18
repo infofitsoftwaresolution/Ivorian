@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.database import init_db, close_db, get_db
 from app.core.logging import app_logger
 from app.core.errors import setup_exception_handlers, get_cors_headers
-from app.api.v1 import auth, rbac, courses, users, upload, analytics, organizations, assessments
+from app.api.v1 import auth, rbac, courses, users, upload, analytics, organizations, assessments, contact
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
 from fastapi.responses import JSONResponse
@@ -214,6 +214,12 @@ app.include_router(
     organizations.router,
     prefix=f"{settings.API_V1_STR}/organizations",
     tags=["Organizations"]
+)
+
+app.include_router(
+    contact.router,
+    prefix=f"{settings.API_V1_STR}",
+    tags=["Contact"]
 )
 
 

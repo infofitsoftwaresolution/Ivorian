@@ -12,39 +12,40 @@ import {
 import Link from 'next/link';
 import HomeHeader from '@/components/layout/HomeHeader';
 import HomeFooter from '@/components/layout/HomeFooter';
+import { apiClient } from '@/lib/api/client';
 
 const contactMethods = [
   {
     name: 'Email',
     description: 'Send us an email anytime',
-    value: 'support@infofitlabs.com',
+    value: 'info@infofitsoftware.com',
     icon: EnvelopeIcon,
     color: 'from-blue-500 to-cyan-500',
-    href: 'mailto:support@infofitlabs.com'
+    href: 'mailto:info@infofitsoftware.com'
   },
   {
     name: 'Phone',
-    description: 'Mon-Fri from 8am to 6pm',
-    value: '+1 (555) 123-4567',
+    description: 'Mon-Fri from 8am to 6pm IST',
+    value: '+91-9205493889',
     icon: PhoneIcon,
     color: 'from-purple-500 to-pink-500',
-    href: 'tel:+15551234567'
+    href: 'tel:+919205493889'
   },
   {
     name: 'Address',
     description: 'Visit our office',
-    value: '123 Education Street, Tech City, TC 12345',
+    value: 'A22,dayalbagh colony,faridabad,haryana,India 121009',
     icon: MapPinIcon,
     color: 'from-green-500 to-emerald-500',
-    href: '#'
+    href: 'https://maps.app.goo.gl/Brk364u2TndvqieA8'
   },
   {
     name: 'Support Hours',
-    description: 'We&apos;re here to help',
-    value: 'Monday - Friday: 8:00 AM - 6:00 PM EST',
+    description: "We're here to help",
+    value: '8 AM - 6 PM IST',
     icon: ClockIcon,
     color: 'from-orange-500 to-red-500',
-    href: '#'
+    href: 'mailto:info@infofitsoftware.com'
   }
 ];
 
@@ -70,17 +71,37 @@ export default function ContactPage() {
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
-    // Simulate form submission
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmitStatus('success');
-      setFormData({ name: '', email: '', subject: '', message: '' });
-      
-      // Reset success message after 5 seconds
+    try {
+      const response = await apiClient.submitContactForm({
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message
+      });
+
+      if (response.status === 200 && response.data?.success) {
+        setSubmitStatus('success');
+        setFormData({ name: '', email: '', subject: '', message: '' });
+        
+        // Reset success message after 5 seconds
+        setTimeout(() => {
+          setSubmitStatus('idle');
+        }, 5000);
+      } else {
+        setSubmitStatus('error');
+        setTimeout(() => {
+          setSubmitStatus('idle');
+        }, 5000);
+      }
+    } catch (error: unknown) {
+      console.error('Error submitting contact form:', error);
+      setSubmitStatus('error');
       setTimeout(() => {
         setSubmitStatus('idle');
       }, 5000);
-    }, 1000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

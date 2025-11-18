@@ -88,10 +88,10 @@ export default function HomeHeader() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">IL</span>
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">Edu</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">InfoFit Labs</span>
+              <span className="text-xl font-bold text-gray-900">Edumentry</span>
             </Link>
           </div>
 

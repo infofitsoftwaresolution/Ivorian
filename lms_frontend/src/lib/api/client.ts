@@ -893,6 +893,19 @@ class ApiClient {
     const token = TokenManager.getAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
+
+  // Contact Methods
+  async submitContactForm(data: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): Promise<ApiResponse> {
+    return this.request('/api/v1/contact', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 // Custom Error Class

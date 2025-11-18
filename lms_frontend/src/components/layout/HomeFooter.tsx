@@ -13,10 +13,10 @@ export default function HomeFooter() {
           {/* Company Info */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">IL</span>
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">Edu</span>
               </div>
-              <span className="text-xl font-bold">InfoFit Labs</span>
+              <span className="text-xl font-bold">Edumentry</span>
             </div>
             <p className="text-gray-300 mb-4 max-w-md">
               Modern AI-Integrated Learning Management System. Transform your learning experience with personalized content and expert instructors.
@@ -106,7 +106,7 @@ export default function HomeFooter() {
         <div className="mt-8 pt-8 border-t border-gray-800">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2024 InfoFit Labs. All rights reserved.
+              © 2024 infofit software solutions private limited. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
