@@ -54,46 +54,22 @@ export default function StudentsPage() {
       console.log('Fetching students for organization:', user?.organization_id);
       
       // Fetch students from API
+      // Backend automatically filters by organization_id for tutors
       const response = await apiClient.getUsers({ role: 'student' });
       console.log('Students fetched:', response.data);
       
       // Extract users from the response (response.data.users)
-      const users = response.data.users || response.data;
+      const users = response.data.users || response.data || [];
       console.log('Users array:', users);
-      console.log('First user sample:', users[0]);
       
-        // Filter for students only and transform API data
-        const studentUsers = users.filter((user: any) => {
-          console.log('User role check:', user.email, 'role:', user.role);
-          return user.role === 'student';
-        });
-        console.log('Filtered students:', studentUsers);
-        
-        // If no students found, show all users for debugging
-        if (studentUsers.length === 0) {
-          console.log('No students found, showing all users for debugging');
-          const allUsers = users.slice(0, 5); // Show first 5 users
-          console.log('Sample users from database:', allUsers);
-          
-          // Show all users as students for now (temporary fix)
-          const transformedStudents: Student[] = users.slice(0, 10).map((user: any) => ({
-            id: user.id,
-            first_name: user.first_name || 'Unknown',
-            last_name: user.last_name || 'User',
-            email: user.email || 'No email',
-            phone: user.phone || null,
-            role: user.role || 'student',
-            created_at: user.created_at || new Date().toISOString(),
-            last_login: user.last_login || null,
-            enrolled_courses: user.enrolled_courses || 0,
-            completion_rate: user.completion_rate || Math.floor(Math.random() * 100)
-          }));
-          
-          setStudents(transformedStudents);
-          return;
-        }
-        
-        const transformedStudents: Student[] = studentUsers.map((student: any) => ({
+      // Filter for students only and transform API data
+      // Backend already filters by organization_id for tutors, so we just filter by role
+      const studentUsers = users.filter((user: any) => {
+        return user.role === 'student';
+      });
+      console.log('Filtered students:', studentUsers);
+      
+      const transformedStudents: Student[] = studentUsers.map((student: any) => ({
         id: student.id,
         first_name: student.first_name || 'Unknown',
         last_name: student.last_name || 'User',
