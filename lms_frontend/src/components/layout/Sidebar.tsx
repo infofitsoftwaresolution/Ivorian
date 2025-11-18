@@ -133,12 +133,6 @@ export default function Sidebar({ user, isOpen, isCollapsed = false, onClose, on
       return [
         ...baseItems,
         {
-          name: 'Organization Dashboard',
-          href: '/admin/organization',
-          icon: BuildingOfficeIcon,
-          current: pathname.startsWith('/admin/organization')
-        },
-        {
           name: 'Tutors',
           href: '/admin/tutors',
           icon: AcademicCapIcon,
