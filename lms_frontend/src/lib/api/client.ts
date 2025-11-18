@@ -4,17 +4,30 @@
  */
 
 // Environment-based configuration
-// Get base URL with runtime HTTPS detection
+// Get base URL with runtime HTTPS detection and smart fallback
 function getBaseURL(): string {
   const envURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
-  // If running in browser and page is HTTPS, convert HTTP backend URLs to HTTPS
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    // Convert http:// to https:// for production backend (but not localhost)
-    if (envURL.startsWith('http://') && !envURL.includes('localhost') && !envURL.includes('127.0.0.1')) {
+  // If running in browser
+  if (typeof window !== 'undefined') {
+    const isHTTPS = window.location.protocol === 'https:';
+    const currentHost = window.location.host;
+    
+    // If frontend is HTTPS and backend URL is HTTP
+    if (isHTTPS && envURL.startsWith('http://') && !envURL.includes('localhost') && !envURL.includes('127.0.0.1')) {
+      // Option 1: If backend is on same domain, use relative URL (best solution)
+      // This works if Nginx routes /api to backend
+      if (envURL.includes(currentHost) || envURL.includes('edumentry.com')) {
+        // Use relative URL - Nginx will route /api to backend
+        console.log(`[API Client] Using relative URL for same-domain backend`);
+        return ''; // Empty string means relative URL
+      }
+      
+      // Option 2: Try to convert to HTTPS (requires backend to support HTTPS)
       const httpsURL = envURL.replace('http://', 'https://');
       console.warn(`[API Client] Converting HTTP to HTTPS: ${envURL} -> ${httpsURL}`);
-      console.warn(`[API Client] Note: Backend must support HTTPS for this to work. If backend doesn't support HTTPS, configure a reverse proxy or update NEXT_PUBLIC_API_URL.`);
+      console.warn(`[API Client] ⚠️  If you get ERR_SSL_PROTOCOL_ERROR, the backend doesn't support HTTPS.`);
+      console.warn(`[API Client] 💡 Solution: Set up Nginx reverse proxy with SSL, or use same-domain routing.`);
       return httpsURL;
     }
   }
