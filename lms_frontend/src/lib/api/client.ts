@@ -4,7 +4,7 @@
  */
 
 // Environment-based configuration
-// Auto-detect HTTPS and convert HTTP backend URLs to HTTPS for security
+// Get base URL with runtime HTTPS detection
 function getBaseURL(): string {
   const envURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
@@ -23,7 +23,8 @@ function getBaseURL(): string {
 }
 
 const API_CONFIG = {
-  baseURL: getBaseURL(),
+  // Don't call getBaseURL() here - it will be called in constructor for runtime evaluation
+  baseURL: '', // Will be set in constructor
   timeout: 10000,
   retries: 3,
   retryDelay: 1000,
@@ -138,10 +139,16 @@ class ApiClient {
   private retryDelay: number;
 
   constructor(config = API_CONFIG) {
-    this.baseURL = config.baseURL;
+    // Evaluate baseURL at runtime to properly detect HTTPS
+    this.baseURL = config.baseURL || getBaseURL();
     this.timeout = config.timeout;
     this.retries = config.retries;
     this.retryDelay = config.retryDelay;
+  }
+
+  // Get base URL with runtime HTTPS detection (called on each request)
+  private getRuntimeBaseURL(): string {
+    return getBaseURL();
   }
 
   private async request<T>(
@@ -149,15 +156,18 @@ class ApiClient {
     options: RequestInit = {},
     retryCount = 0
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`;
+    // Get baseURL at runtime to ensure HTTPS detection works
+    const runtimeBaseURL = this.getRuntimeBaseURL();
+    const url = `${runtimeBaseURL}${endpoint}`;
     const accessToken = TokenManager.getAccessToken();
     
     // Log request details in development or when there are errors
     if (process.env.NODE_ENV === 'development' || retryCount === 0) {
       console.log(`[API Client] ${options.method || 'GET'} ${url}`);
-      console.log(`[API Client] Base URL: ${this.baseURL}`);
+      console.log(`[API Client] Base URL: ${runtimeBaseURL}`);
       if (typeof window !== 'undefined') {
         console.log(`[API Client] Frontend Protocol: ${window.location.protocol}`);
+        console.log(`[API Client] Environment URL: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}`);
       }
     }
 
@@ -261,13 +271,13 @@ class ApiClient {
         if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
           // This usually means CORS, mixed content, or backend not reachable
           const isHTTPS = typeof window !== 'undefined' && window.location.protocol === 'https:';
-          const backendURL = this.baseURL;
+          const backendURL = this.getRuntimeBaseURL();
           if (isHTTPS && backendURL.startsWith('http://')) {
-            errorMessage = `Mixed Content Error: Frontend is HTTPS but backend is HTTP. Please configure HTTPS for backend at ${backendURL} or update NEXT_PUBLIC_API_URL to use HTTPS.`;
+            errorMessage = `Mixed Content Error: Frontend is HTTPS but backend is HTTP. The code attempted to convert to HTTPS, but the backend at ${backendURL} may not support HTTPS. Please: 1) Set up HTTPS for backend, 2) Configure a reverse proxy with SSL, or 3) Update NEXT_PUBLIC_API_URL environment variable to use HTTPS URL.`;
           } else if (backendURL.includes('localhost')) {
             errorMessage = `Cannot connect to backend at ${backendURL}. Please ensure the backend server is running.`;
           } else {
-            errorMessage = `Cannot connect to backend at ${backendURL}. Please check: 1) Backend server is running, 2) CORS is configured, 3) Network connectivity.`;
+            errorMessage = `Cannot connect to backend at ${backendURL}. Please check: 1) Backend server is running, 2) CORS is configured, 3) Network connectivity, 4) Backend supports HTTPS if frontend is HTTPS.`;
           }
         }
       }
@@ -277,9 +287,10 @@ class ApiClient {
         status: 0,
         code: 'NETWORK_ERROR',
         details: {
-          baseURL: this.baseURL,
+          baseURL: this.getRuntimeBaseURL(),
           endpoint,
           protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
+          envURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
         },
       });
     }
@@ -302,7 +313,8 @@ class ApiClient {
       const refreshToken = TokenManager.getRefreshToken();
       if (!refreshToken) return false;
 
-      const response = await fetch(`${this.baseURL}/api/v1/auth/refresh`, {
+      const runtimeBaseURL = this.getRuntimeBaseURL();
+      const response = await fetch(`${runtimeBaseURL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),
