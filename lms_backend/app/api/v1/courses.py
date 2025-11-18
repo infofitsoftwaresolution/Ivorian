@@ -418,10 +418,17 @@ async def enroll_in_course(
             )
         print(f"✅ Permission granted for role: {current_user.role}")
     
-    print(f"📝 Calling EnrollmentService.enroll_in_course with course_id={course_id}, student_id={target_student_id}")
-    enrollment = await EnrollmentService.enroll_in_course(db, course_id, target_student_id)
-    print(f"✅ Enrollment created: {enrollment.id}")
-    return enrollment
+    try:
+        print(f"📝 Calling EnrollmentService.enroll_in_course with course_id={course_id}, student_id={target_student_id}")
+        enrollment = await EnrollmentService.enroll_in_course(db, course_id, target_student_id)
+        print(f"✅ Enrollment created: {enrollment.id}")
+        return enrollment
+    except Exception as e:
+        print(f"❌ Error in enroll_in_course endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Re-raise the exception so it's handled by the exception handler
+        raise
 
 
 @router.get("/{course_id}/enrollments", response_model=List[EnrollmentResponse])

@@ -613,27 +613,45 @@ class EnrollmentService:
         
         print(f"✅ No existing enrollment found, creating new enrollment...")
         
-        # Create enrollment
-        enrollment = Enrollment(
-            student_id=student_id,
-            course_id=course_id,
-            status="active",
-            progress_percentage=0.0,
-            payment_status="pending" if course.enrollment_type == "paid" else "paid"
+        # Verify student exists
+        student_result = await db.execute(
+            select(User).where(User.id == student_id)
         )
+        student = student_result.scalar_one_or_none()
+        if not student:
+            print(f"❌ Student not found: {student_id}")
+            raise ResourceNotFoundError(f"Student with ID {student_id} not found")
         
-        print(f"📝 Created enrollment object: student_id={enrollment.student_id}, course_id={enrollment.course_id}")
+        print(f"✅ Student found: {student.email} (ID: {student.id})")
         
-        db.add(enrollment)
-        print(f"💾 Added enrollment to database session")
-        
-        await db.commit()
-        print(f"✅ Committed enrollment to database")
-        
-        await db.refresh(enrollment)
-        print(f"🔄 Refreshed enrollment: {enrollment.id}")
-        
-        return enrollment
+        try:
+            # Create enrollment
+            enrollment = Enrollment(
+                student_id=student_id,
+                course_id=course_id,
+                status="active",
+                progress_percentage=0.0,
+                payment_status="pending" if course.enrollment_type == "paid" else "paid"
+            )
+            
+            print(f"📝 Created enrollment object: student_id={enrollment.student_id}, course_id={enrollment.course_id}")
+            
+            db.add(enrollment)
+            print(f"💾 Added enrollment to database session")
+            
+            await db.commit()
+            print(f"✅ Committed enrollment to database")
+            
+            await db.refresh(enrollment)
+            print(f"🔄 Refreshed enrollment: {enrollment.id}")
+            
+            return enrollment
+        except Exception as e:
+            print(f"❌ Error creating enrollment: {str(e)}")
+            await db.rollback()
+            import traceback
+            traceback.print_exc()
+            raise ValidationError(f"Failed to create enrollment: {str(e)}")
     
     @staticmethod
     async def get_course_enrollments(
