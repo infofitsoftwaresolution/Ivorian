@@ -752,15 +752,27 @@ export default function CourseLearningPage() {
     topics.forEach((topic: any, topicIdx: number) => {
       if (topic.lessons && Array.isArray(topic.lessons)) {
         topic.lessons.forEach((lesson: any, lessonIdx: number) => {
+          // Validate video_url before attempting to preload
           if (lesson.content_type === 'video' && lesson.video_url) {
-            // Only add if we haven't started preloading this lesson yet
-            if (!preloadStartedRef.current.has(lesson.id)) {
-              videoLessons.push({
-                lessonId: lesson.id,
-                videoUrl: lesson.video_url,
-                topicIndex: topicIdx,
-                lessonIndex: lessonIdx
-              });
+            // Check if video_url is a valid non-empty string
+            const videoUrl = String(lesson.video_url).trim();
+            if (videoUrl && videoUrl.length > 0) {
+              // Basic URL validation
+              try {
+                new URL(videoUrl);
+                // Only add if we haven't started preloading this lesson yet
+                if (!preloadStartedRef.current.has(lesson.id)) {
+                  videoLessons.push({
+                    lessonId: lesson.id,
+                    videoUrl: videoUrl,
+                    topicIndex: topicIdx,
+                    lessonIndex: lessonIdx
+                  });
+                }
+              } catch (e) {
+                // Invalid URL, skip preloading
+                console.warn(`⚠️ Invalid video URL for lesson ${lesson.id}: ${videoUrl}`);
+              }
             }
           }
         });
@@ -844,9 +856,27 @@ export default function CourseLearningPage() {
         }
       };
 
-      const handleError = () => {
+      const handleError = (e: Event) => {
         if (!hasProcessed) {
-          console.warn(`⚠️ Failed to load metadata for lesson ${lessonId}`);
+          const error = e.target as HTMLVideoElement;
+          const errorCode = error.error?.code;
+          const errorMessage = error.error?.message || 'Unknown error';
+          console.warn(`⚠️ Failed to load metadata for lesson ${lessonId}:`, {
+            code: errorCode,
+            message: errorMessage,
+            videoUrl: videoUrl
+          });
+          
+          // Clean up the video element on error
+          try {
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('error', handleError);
+            if (video.parentNode) {
+              video.parentNode.removeChild(video);
+            }
+          } catch (cleanupError) {
+            // Ignore cleanup errors
+          }
         }
       };
 
@@ -1266,7 +1296,36 @@ export default function CourseLearningPage() {
           {currentLesson ? (
             <>
               {/* Enhanced Video Player */}
-              {currentLesson.content_type === 'video' && currentLesson.video_url && (
+              {currentLesson.content_type === 'video' && (() => {
+                // Validate video_url before rendering
+                const videoUrl = currentLesson.video_url ? String(currentLesson.video_url).trim() : '';
+                
+                if (!videoUrl || videoUrl.length === 0) {
+                  return (
+                    <div className="bg-gray-100 rounded-lg p-8 text-center">
+                      <p className="text-gray-600">Video URL is not available for this lesson.</p>
+                    </div>
+                  );
+                }
+                
+                // Validate URL format
+                let isValidUrl = false;
+                try {
+                  new URL(videoUrl);
+                  isValidUrl = true;
+                } catch (e) {
+                  return (
+                    <div className="bg-gray-100 rounded-lg p-8 text-center">
+                      <p className="text-gray-600">Invalid video URL for this lesson.</p>
+                    </div>
+                  );
+                }
+                
+                if (!isValidUrl) {
+                  return null;
+                }
+                
+                return (
                 <div 
                   ref={videoContainerRef}
                   className={`bg-black relative group ${isTheaterMode ? 'rounded-lg overflow-hidden' : ''} ${isTheaterMode ? 'h-[70vh]' : 'h-96'} flex flex-col`}
@@ -1287,7 +1346,11 @@ export default function CourseLearningPage() {
                     <video
                       key={currentLesson.id} // Force remount when lesson changes to reload metadata
                       ref={videoRef}
-                      src={currentLesson.video_url}
+                      src={videoUrl}
+                      onError={(e) => {
+                        console.error('Video load error:', e);
+                        // Prevent error from breaking the page
+                      }}
                       className="w-full h-full max-w-full max-h-full object-contain cursor-pointer"
                       preload="metadata"
                       onTimeUpdate={handleTimeUpdate}
@@ -1607,7 +1670,8 @@ export default function CourseLearningPage() {
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
               {/* Lesson Content */}
               <div className="flex-1 p-6 overflow-y-auto">
