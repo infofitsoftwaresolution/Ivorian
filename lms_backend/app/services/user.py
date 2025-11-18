@@ -336,15 +336,13 @@ class UserService:
     
     @staticmethod
     async def delete_user(db: AsyncSession, user_id: int, current_user: User) -> bool:
-        """Delete a user (soft delete by setting is_active to False)"""
+        """Delete a user (soft delete by setting is_active to False)
+        
+        Permissions:
+        - super_admin can delete any user
+        - organization_admin can delete users in their organization
+        """
         try:
-            # Check admin permissions
-            has_permission = await RBACService.has_permission(
-                db, current_user.id, "user", "manage"
-            )
-            if not has_permission:
-                raise AuthorizationError("Insufficient permissions to delete user")
-            
             user = await UserService.get_user_by_id(db, user_id)
             if not user:
                 raise ResourceNotFoundError("User not found")
@@ -352,6 +350,24 @@ class UserService:
             # Prevent self-deletion
             if user.id == current_user.id:
                 raise ValidationError("Cannot delete your own account")
+            
+            # Check permissions
+            if current_user.role == "super_admin":
+                # Super admin can delete any user
+                pass
+            elif current_user.role == "organization_admin":
+                # Organization admin can only delete users in their organization
+                if not current_user.organization_id:
+                    raise AuthorizationError("Organization admin must belong to an organization")
+                if user.organization_id != current_user.organization_id:
+                    raise AuthorizationError("You can only delete users in your organization")
+            else:
+                # Check RBAC permissions for other roles
+                has_permission = await RBACService.has_permission(
+                    db, current_user.id, "user", "manage"
+                )
+                if not has_permission:
+                    raise AuthorizationError("Insufficient permissions to delete user")
             
             # Soft delete
             user.is_active = False
