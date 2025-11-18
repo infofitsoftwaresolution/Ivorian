@@ -5,14 +5,15 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'InfoFit Labs LMS',
+  title: 'Edumentry',
   description: 'Modern AI-Integrated Learning Management System',
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/edu_logo.svg', type: 'image/svg+xml' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
     ],
-    apple: '/edu_logo.svg',
+    apple: '/icon.svg',
+    shortcut: '/favicon.svg',
   },
 }
 
