@@ -757,7 +757,13 @@ export default function CourseLearningPage() {
             // Check if video_url is a valid non-empty string
             const videoUrl = String(lesson.video_url).trim();
             if (videoUrl && videoUrl.length > 0) {
-              // Basic URL validation
+              // Skip YouTube URLs - they can't be preloaded with HTML5 video element
+              if (isYouTubeUrl(videoUrl)) {
+                console.log(`📹 Skipping metadata preload for YouTube video in lesson ${lesson.id}`);
+                return; // Skip YouTube videos
+              }
+              
+              // Basic URL validation for non-YouTube URLs
               try {
                 new URL(videoUrl);
                 // Only add if we haven't started preloading this lesson yet
@@ -1378,7 +1384,35 @@ export default function CourseLearningPage() {
                   );
                 }
                 
-                // Validate URL format
+                // Check if it's a YouTube URL
+                if (isYouTubeUrl(videoUrl)) {
+                  const embedUrl = getYouTubeEmbedUrl(videoUrl);
+                  if (!embedUrl) {
+                    return (
+                      <div className="bg-gray-100 rounded-lg p-8 text-center">
+                        <p className="text-gray-600">Invalid YouTube URL for this lesson.</p>
+                      </div>
+                    );
+                  }
+                  
+                  // Render YouTube iframe
+                  return (
+                    <div 
+                      className={`bg-black relative ${isTheaterMode ? 'rounded-lg overflow-hidden' : ''} ${isTheaterMode ? 'h-[70vh]' : 'h-96'} flex items-center justify-center`}
+                    >
+                      <iframe
+                        src={embedUrl}
+                        className="w-full h-full"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title={currentLesson.title}
+                      />
+                    </div>
+                  );
+                }
+                
+                // Validate URL format for non-YouTube videos
                 let isValidUrl = false;
                 try {
                   new URL(videoUrl);
