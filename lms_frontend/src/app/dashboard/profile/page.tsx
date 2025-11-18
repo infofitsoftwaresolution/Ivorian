@@ -15,7 +15,8 @@ import {
   LockClosedIcon,
   CameraIcon,
   CheckCircleIcon,
-  XCircleIcon
+  XCircleIcon,
+  BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
@@ -28,6 +29,8 @@ interface ProfileData {
   phone?: string;
   bio?: string;
   avatar_url?: string;
+  organization_id?: number;
+  organization_name?: string;
 }
 
 interface PasswordChangeData {
@@ -52,7 +55,9 @@ export default function ProfilePage() {
     email: '',
     phone: '',
     bio: '',
-    avatar_url: ''
+    avatar_url: '',
+    organization_id: undefined,
+    organization_name: undefined
   });
 
   const [passwordData, setPasswordData] = useState<PasswordChangeData>({
@@ -80,13 +85,16 @@ export default function ProfilePage() {
       const response = await apiClient.getUserProfile();
       const data = response.data;
 
+      // Organization name is now included in the profile response
       setProfileData({
         first_name: data.first_name || user?.first_name || '',
         last_name: data.last_name || user?.last_name || '',
         email: data.email || user?.email || '',
         phone: data.phone || '',
         bio: data.bio || '',
-        avatar_url: data.avatar_url || ''
+        avatar_url: data.avatar_url || '',
+        organization_id: data.organization_id || user?.organization_id,
+        organization_name: data.organization_name
       });
     } catch (error: unknown) {
       console.error('Error loading profile:', error);
@@ -98,7 +106,9 @@ export default function ProfilePage() {
           email: user.email || '',
           phone: '',
           bio: '',
-          avatar_url: ''
+          avatar_url: '',
+          organization_id: user.organization_id,
+          organization_name: undefined // Will be fetched from profile API
         });
       }
       const errorMessage = error && typeof error === 'object' && 'response' in error
@@ -374,6 +384,12 @@ export default function ProfilePage() {
                 <p className="text-sm text-gray-500 capitalize mt-1">
                   {user.role?.replace('_', ' ')}
                 </p>
+                {profileData.organization_name && (
+                  <p className="text-sm text-gray-500 mt-1 flex items-center">
+                    <BuildingOfficeIcon className="h-4 w-4 mr-1" />
+                    {profileData.organization_name}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -432,6 +448,21 @@ export default function ProfilePage() {
                     />
                   </div>
                 </div>
+                {profileData.organization_name && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Organization</label>
+                    <div className="mt-1 relative">
+                      <BuildingOfficeIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={profileData.organization_name}
+                        disabled
+                        className="block w-full pl-10 border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-600 cursor-not-allowed"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">Your organization membership</p>
+                  </div>
+                )}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Bio</label>
                   <textarea

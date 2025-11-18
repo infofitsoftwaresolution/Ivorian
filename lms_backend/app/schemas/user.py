@@ -121,6 +121,7 @@ class UserProfile(BaseModel):
     is_active: bool
     is_verified: bool
     organization_id: Optional[int] = None
+    organization_name: Optional[str] = None
     roles: List[str]
     created_at: datetime
     updated_at: Optional[datetime] = None

@@ -59,8 +59,8 @@ def user_to_response(user: User) -> UserResponse:
     )
 
 # Helper function to convert User model to UserProfile
-def user_to_profile(user: User) -> UserProfile:
-    """Convert User model to UserProfile schema"""
+async def user_to_profile(user: User, db: AsyncSession) -> UserProfile:
+    """Convert User model to UserProfile schema with organization information"""
     # For now, just use the role field directly to avoid relationship issues
     roles = [user.role] if user.role else []
     
@@ -189,7 +189,7 @@ async def get_current_user_profile(
                 detail="User not found"
             )
         
-        return user_to_profile(user)
+        return await user_to_profile(user, db)
         
     except Exception as e:
         raise HTTPException(
@@ -212,7 +212,7 @@ async def update_current_user_profile(
         updated_user = await UserService.update_user(
             db, current_user.id, user_data, current_user
         )
-        return user_to_profile(updated_user)
+        return await user_to_profile(updated_user, db)
         
     except Exception as e:
         raise HTTPException(
