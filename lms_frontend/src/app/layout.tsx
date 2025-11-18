@@ -5,8 +5,16 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'InfoFit Labs LMS',
+  title: 'Edumentry',
   description: 'Modern AI-Integrated Learning Management System',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/icon.svg',
+    shortcut: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({
