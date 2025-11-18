@@ -642,10 +642,34 @@ class EnrollmentService:
             await db.commit()
             print(f"✅ Committed enrollment to database")
             
+            # Refresh enrollment and eagerly load course relationship for response serialization
+            # This prevents lazy loading issues when FastAPI serializes the response
             await db.refresh(enrollment)
             print(f"🔄 Refreshed enrollment: {enrollment.id}")
             
-            return enrollment
+            # Eagerly load the course relationship using selectinload
+            # Re-query with relationship loaded to avoid lazy loading during serialization
+            enrollment_result = await db.execute(
+                select(Enrollment)
+                .options(selectinload(Enrollment.course))
+                .where(Enrollment.id == enrollment.id)
+            )
+            enrollment_with_course = enrollment_result.scalar_one_or_none()
+            
+            if enrollment_with_course:
+                print(f"📚 Loaded enrollment with course relationship")
+                return enrollment_with_course
+            else:
+                # Fallback: manually load course if selectinload didn't work
+                print(f"⚠️ Enrollment not found after refresh, using original enrollment")
+                course_result = await db.execute(
+                    select(Course).where(Course.id == course_id)
+                )
+                course = course_result.scalar_one_or_none()
+                if course:
+                    enrollment.course = course
+                    print(f"✅ Manually attached course: {course.title}")
+                return enrollment
         except Exception as e:
             print(f"❌ Error creating enrollment: {str(e)}")
             await db.rollback()

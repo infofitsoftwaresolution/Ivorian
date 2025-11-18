@@ -422,7 +422,19 @@ async def enroll_in_course(
         print(f"📝 Calling EnrollmentService.enroll_in_course with course_id={course_id}, student_id={target_student_id}")
         enrollment = await EnrollmentService.enroll_in_course(db, course_id, target_student_id)
         print(f"✅ Enrollment created: {enrollment.id}")
-        return enrollment
+        
+        # Convert to response model to ensure proper serialization
+        from app.schemas.course import EnrollmentResponse
+        try:
+            enrollment_response = EnrollmentResponse.model_validate(enrollment)
+            print(f"✅ Enrollment response serialized successfully")
+            return enrollment_response
+        except Exception as serialization_error:
+            print(f"⚠️ Error serializing enrollment response: {str(serialization_error)}")
+            import traceback
+            traceback.print_exc()
+            # Return enrollment anyway - FastAPI will handle serialization
+            return enrollment
     except Exception as e:
         print(f"❌ Error in enroll_in_course endpoint: {str(e)}")
         import traceback
