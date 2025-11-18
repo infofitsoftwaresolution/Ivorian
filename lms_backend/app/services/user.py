@@ -58,6 +58,11 @@ class UserService:
                 hashed_password = get_password_hash(temp_password)
                 password_change_required = True
             
+            # Determine role from user_data.roles or default to "student"
+            primary_role = "student"  # Default role
+            if user_data.roles and len(user_data.roles) > 0:
+                primary_role = user_data.roles[0]  # Use first role as primary role
+            
             # Create user
             user = User(
                 first_name=user_data.first_name,
@@ -71,6 +76,7 @@ class UserService:
                 timezone=user_data.timezone or "UTC",
                 language=user_data.language or "en",
                 organization_id=user_data.organization_id,
+                role=primary_role,  # Set the role field
                 status="active" if not user_data.organization_id else "pending",
                 is_active=True,
                 is_verified=False,

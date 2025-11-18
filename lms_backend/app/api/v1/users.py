@@ -336,22 +336,87 @@ async def get_user_by_id(
             detail=f"Error retrieving user: {str(e)}"
         )
 
-@router.post("/", response_model=UserResponse, summary="Create new user (Admin only)")
+# Helper function to create user (shared by both routes)
+async def _create_user_handler(
+    user_data: UserCreate,
+    current_user: User,
+    db: AsyncSession
+) -> UserResponse:
+    """Internal handler for creating a user"""
+    # Check permissions and prepare user data
+    if current_user.role == "super_admin":
+        # Super admin can create any user - use data as is
+        pass
+    elif current_user.role == "organization_admin":
+        # Organization admin can only create users in their organization
+        if not current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Organization admin must belong to an organization"
+            )
+        # Ensure the user_data has the correct organization_id
+        if user_data.organization_id and user_data.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only create users in your organization"
+            )
+        # Set organization_id to current user's organization if not provided
+        # Create a new instance with updated organization_id
+        user_data_dict = user_data.model_dump()
+        if not user_data_dict.get('organization_id'):
+            user_data_dict['organization_id'] = current_user.organization_id
+        user_data = UserCreate(**user_data_dict)
+    else:
+        # For other roles, check RBAC permissions (if enabled)
+        # For now, allow if they have user management permissions
+        # This can be enhanced with RBAC checks later
+        pass
+    
+    user = await UserService.create_user(db, user_data, current_user)
+    return user_to_response(user)
+
+@router.post("", response_model=UserResponse, summary="Create new user (Admin only)")
 # @require_permission("user", "manage")  # Temporarily disabled
-async def create_user(
+async def create_user_no_slash(
     user_data: UserCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Create a new user.
+    Create a new user (route without trailing slash).
     
-    This endpoint is restricted to users with user management permissions.
+    Permissions:
+    - super_admin can create any user
+    - organization_admin can create users in their organization
     """
     try:
-        user = await UserService.create_user(db, user_data, current_user)
-        return user_to_response(user)
-        
+        return await _create_user_handler(user_data, current_user, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Error creating user: {str(e)}"
+        )
+
+@router.post("/", response_model=UserResponse, summary="Create new user (Admin only)")
+# @require_permission("user", "manage")  # Temporarily disabled
+async def create_user_with_slash(
+    user_data: UserCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a new user (route with trailing slash).
+    
+    Permissions:
+    - super_admin can create any user
+    - organization_admin can create users in their organization
+    """
+    try:
+        return await _create_user_handler(user_data, current_user, db)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

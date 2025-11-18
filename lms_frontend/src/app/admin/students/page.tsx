@@ -21,6 +21,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
 import { showToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface Student {
   id: number;
@@ -63,6 +64,13 @@ export default function StudentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalStudents, setTotalStudents] = useState(0);
+  
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; studentId: number | null; studentName: string }>({
+    isOpen: false,
+    studentId: null,
+    studentName: '',
+  });
 
   // Check if user is super admin or organization admin
   useEffect(() => {
@@ -219,32 +227,36 @@ export default function StudentsPage() {
     router.push(`/admin/students/${studentId}/edit`);
   };
 
-  const handleDeleteStudent = async (studentId: number) => {
+  const handleDeleteStudent = (studentId: number) => {
     const studentToDelete = students.find(s => s.id === studentId);
     const studentName = studentToDelete ? `${studentToDelete.first_name} ${studentToDelete.last_name}` : 'this student';
+    setDeleteConfirm({ isOpen: true, studentId, studentName });
+  };
+
+  const confirmDeleteStudent = async () => {
+    if (!deleteConfirm.studentId) return;
     
-    if (confirm(`Are you sure you want to delete ${studentName}? This action cannot be undone.`)) {
-      try {
-        setLoading(true);
-        await apiClient.deleteUser(String(studentId));
-        showToast(`${studentName} deleted successfully`, 'success');
-        await loadStudents();
-      } catch (error: unknown) {
-        console.error('Error deleting student:', error);
-        let errorMessage = 'Failed to delete student. Please try again.';
-        if (error && typeof error === 'object') {
-          if ('message' in error && typeof (error as any).message === 'string') {
-            errorMessage = (error as any).message;
-          } else if ('response' in error) {
-            const apiError = error as { response?: { data?: { detail?: string } } };
-            errorMessage = apiError.response?.data?.detail || errorMessage;
-          }
+    try {
+      setLoading(true);
+      setDeleteConfirm({ isOpen: false, studentId: null, studentName: '' });
+      await apiClient.deleteUser(String(deleteConfirm.studentId));
+      showToast(`${deleteConfirm.studentName} deleted successfully`, 'success');
+      await loadStudents();
+    } catch (error: unknown) {
+      console.error('Error deleting student:', error);
+      let errorMessage = 'Failed to delete student. Please try again.';
+      if (error && typeof error === 'object') {
+        if ('message' in error && typeof (error as any).message === 'string') {
+          errorMessage = (error as any).message;
+        } else if ('response' in error) {
+          const apiError = error as { response?: { data?: { detail?: string } } };
+          errorMessage = apiError.response?.data?.detail || errorMessage;
         }
-        setError(errorMessage);
-        showToast(errorMessage, 'error', 7000);
-      } finally {
-        setLoading(false);
       }
+      setError(errorMessage);
+      showToast(errorMessage, 'error', 7000);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -607,6 +619,19 @@ export default function StudentsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, studentId: null, studentName: '' })}
+        onConfirm={confirmDeleteStudent}
+        title="Delete Student"
+        message={`Are you sure you want to delete "${deleteConfirm.studentName}"? This action cannot be undone.`}
+        confirmText="Delete Student"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={loading}
+      />
     </div>
   );
 }

@@ -260,8 +260,7 @@ export default function CreateStudentPage() {
         last_name: data.last_name,
         email: data.email,
         password: data.password,
-        role: 'student',
-        is_active: true,
+        roles: ['student'], // Backend expects roles as an array
       };
 
       if (data.phone) {

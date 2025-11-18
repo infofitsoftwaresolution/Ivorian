@@ -22,6 +22,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
 import { showToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface User {
   id: number;
@@ -60,6 +61,13 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalUsers, setTotalUsers] = useState(0);
+  
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; userId: number | null; userName: string }>({
+    isOpen: false,
+    userId: null,
+    userName: '',
+  });
 
   // Check if user is super admin or organization admin
   useEffect(() => {
@@ -181,24 +189,28 @@ export default function UsersPage() {
     router.push(`/admin/users/${userId}/edit`);
   };
 
-  const handleDeleteUser = async (userId: number) => {
+  const handleDeleteUser = (userId: number) => {
     const userToDelete = users.find(u => u.id === userId);
     const userName = userToDelete ? `${userToDelete.first_name} ${userToDelete.last_name}` : 'this user';
+    setDeleteConfirm({ isOpen: true, userId, userName });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteConfirm.userId) return;
     
-    if (confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
-      try {
-        setLoading(true);
-        await apiClient.deleteUser(String(userId));
-        showToast(`${userName} deleted successfully`, 'success');
-        await loadUsers();
-      } catch (error: any) {
-        console.error('Error deleting user:', error);
-        const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete user. Please try again.';
-        setError(errorMessage);
-        showToast(errorMessage, 'error', 7000);
-      } finally {
-        setLoading(false);
-      }
+    try {
+      setLoading(true);
+      setDeleteConfirm({ isOpen: false, userId: null, userName: '' });
+      await apiClient.deleteUser(String(deleteConfirm.userId));
+      showToast(`${deleteConfirm.userName} deleted successfully`, 'success');
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete user. Please try again.';
+      setError(errorMessage);
+      showToast(errorMessage, 'error', 7000);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -564,6 +576,19 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, userId: null, userName: '' })}
+        onConfirm={confirmDeleteUser}
+        title="Delete User"
+        message={`Are you sure you want to delete "${deleteConfirm.userName}"? This action cannot be undone.`}
+        confirmText="Delete User"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={loading}
+      />
     </div>
   );
 }
