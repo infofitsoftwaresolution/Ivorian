@@ -923,8 +923,35 @@ export default function CourseLearningPage() {
       }, { once: true });
       
       // Start loading metadata immediately with error handling
+      // Wrap in try-catch and also handle promise rejections
       try {
-        video.load();
+        // Set error handler before loading to catch errors immediately
+        const loadPromise = new Promise<void>((resolve, reject) => {
+          const successHandler = () => {
+            video.removeEventListener('error', rejectHandler);
+            resolve();
+          };
+          const rejectHandler = (e: Event) => {
+            video.removeEventListener('loadedmetadata', successHandler);
+            reject(e);
+          };
+          
+          video.addEventListener('loadedmetadata', successHandler, { once: true });
+          video.addEventListener('error', rejectHandler, { once: true });
+          
+          // Start loading
+          try {
+            video.load();
+          } catch (loadError) {
+            reject(loadError);
+          }
+        });
+        
+        // Handle promise rejection silently
+        loadPromise.catch((error) => {
+          // Error already handled by handleError event listener
+          // Just prevent unhandled promise rejection
+        });
       } catch (loadError) {
         console.warn(`⚠️ Error calling video.load() for lesson ${lessonId}:`, loadError);
         handleError(new Event('error'));
