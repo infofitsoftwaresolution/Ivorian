@@ -799,10 +799,26 @@ export default function CourseLearningPage() {
         return;
       }
 
+      // Validate URL before creating video element
+      let isValidVideoUrl = false;
+      try {
+        const testUrl = new URL(videoUrl);
+        isValidVideoUrl = true;
+      } catch (e) {
+        console.warn(`⚠️ Skipping preload for lesson ${lessonId} - invalid video URL: ${videoUrl}`);
+        return; // Skip this video
+      }
+
+      if (!isValidVideoUrl) {
+        return; // Skip invalid URLs
+      }
+
       const video = document.createElement('video');
       video.preload = 'metadata';
       video.src = videoUrl;
       video.style.display = 'none';
+      video.muted = true; // Mute to allow autoplay for metadata loading
+      video.playsInline = true;
       document.body.appendChild(video);
       videoElements.push(video);
 
@@ -861,6 +877,8 @@ export default function CourseLearningPage() {
           const error = e.target as HTMLVideoElement;
           const errorCode = error.error?.code;
           const errorMessage = error.error?.message || 'Unknown error';
+          
+          // Only log warning, don't throw error
           console.warn(`⚠️ Failed to load metadata for lesson ${lessonId}:`, {
             code: errorCode,
             message: errorMessage,
@@ -871,12 +889,26 @@ export default function CourseLearningPage() {
           try {
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('error', handleError);
+            // Remove src to prevent further errors
+            video.src = '';
+            video.load();
             if (video.parentNode) {
               video.parentNode.removeChild(video);
             }
           } catch (cleanupError) {
-            // Ignore cleanup errors
+            // Ignore cleanup errors - just try to remove from DOM
+            try {
+              if (video.parentNode) {
+                video.parentNode.removeChild(video);
+              }
+            } catch (e) {
+              // Final fallback - ignore
+            }
           }
+          
+          // Mark as processed to prevent duplicate error handling
+          hasProcessed = true;
+          processedLessons.add(lessonId);
         }
       };
 
@@ -884,8 +916,19 @@ export default function CourseLearningPage() {
       video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
       video.addEventListener('error', handleError, { once: true });
       
-      // Start loading metadata immediately
-      video.load();
+      // Add additional error handlers to catch all error types
+      video.addEventListener('abort', handleError, { once: true });
+      video.addEventListener('stalled', () => {
+        console.warn(`⚠️ Video stalled for lesson ${lessonId}`);
+      }, { once: true });
+      
+      // Start loading metadata immediately with error handling
+      try {
+        video.load();
+      } catch (loadError) {
+        console.warn(`⚠️ Error calling video.load() for lesson ${lessonId}:`, loadError);
+        handleError(new Event('error'));
+      }
       
       // Backup: check if metadata is already available after a short delay
       const timeout = setTimeout(() => {
