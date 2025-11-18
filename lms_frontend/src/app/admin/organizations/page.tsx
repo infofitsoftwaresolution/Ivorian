@@ -46,10 +46,18 @@ export default function OrganizationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [filterIndustry, setFilterIndustry] = useState('all');
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; orgId: number | null; orgName: string }>({
+  const [deleteConfirm, setDeleteConfirm] = useState<{ 
+    isOpen: boolean; 
+    orgId: number | null; 
+    orgName: string;
+    userCount: number;
+    courseCount: number;
+  }>({
     isOpen: false,
     orgId: null,
     orgName: '',
+    userCount: 0,
+    courseCount: 0,
   });
 
   // Check if user is super admin
@@ -157,7 +165,15 @@ export default function OrganizationsPage() {
   const handleDeleteOrganization = (orgId: number) => {
     const org = organizations.find(o => o.id === orgId);
     const orgName = org?.name || 'this organization';
-    setDeleteConfirm({ isOpen: true, orgId, orgName });
+    const userCount = org?.user_count || 0;
+    const courseCount = org?.course_count || 0;
+    setDeleteConfirm({ 
+      isOpen: true, 
+      orgId, 
+      orgName,
+      userCount,
+      courseCount,
+    });
   };
 
   const confirmDeleteOrganization = async () => {
@@ -165,9 +181,11 @@ export default function OrganizationsPage() {
     
     try {
       setLoading(true);
-      setDeleteConfirm({ isOpen: false, orgId: null, orgName: '' });
-      await apiClient.deleteOrganization(deleteConfirm.orgId.toString());
-      showToast(`${deleteConfirm.orgName} deleted successfully`, 'success');
+      const orgId = deleteConfirm.orgId;
+      const orgName = deleteConfirm.orgName;
+      setDeleteConfirm({ isOpen: false, orgId: null, orgName: '', userCount: 0, courseCount: 0 });
+      await apiClient.deleteOrganization(orgId.toString());
+      showToast(`${orgName} deleted successfully`, 'success');
       await loadOrganizations();
     } catch (error: any) {
       console.error('Error deleting organization:', error);
@@ -419,10 +437,14 @@ export default function OrganizationsPage() {
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        onClose={() => setDeleteConfirm({ isOpen: false, orgId: null, orgName: '' })}
+        onClose={() => setDeleteConfirm({ isOpen: false, orgId: null, orgName: '', userCount: 0, courseCount: 0 })}
         onConfirm={confirmDeleteOrganization}
         title="Delete Organization"
-        message={`Are you sure you want to delete "${deleteConfirm.orgName}"? This action cannot be undone. All users and courses must be removed first.`}
+        message={
+          deleteConfirm.userCount > 0 || deleteConfirm.courseCount > 0
+            ? `Are you sure you want to delete "${deleteConfirm.orgName}"? This organization has ${deleteConfirm.userCount} user(s) and ${deleteConfirm.courseCount} course(s). As a super admin, you can force delete this organization, which will: (1) Remove organization association from ${deleteConfirm.userCount} user(s), (2) Permanently delete ${deleteConfirm.courseCount} course(s) and all associated data. This action cannot be undone.`
+            : `Are you sure you want to delete "${deleteConfirm.orgName}"? This action cannot be undone.`
+        }
         confirmText="Delete Organization"
         cancelText="Cancel"
         type="danger"

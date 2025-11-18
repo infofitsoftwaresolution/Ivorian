@@ -55,10 +55,18 @@ export default function PlatformDashboard() {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; orgId: number | null; orgName: string }>({
+  const [deleteConfirm, setDeleteConfirm] = useState<{ 
+    isOpen: boolean; 
+    orgId: number | null; 
+    orgName: string;
+    userCount: number;
+    courseCount: number;
+  }>({
     isOpen: false,
     orgId: null,
     orgName: '',
+    userCount: 0,
+    courseCount: 0,
   });
 
   // Check if user is super admin
@@ -421,7 +429,13 @@ export default function PlatformDashboard() {
                       <PencilIcon className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => setDeleteConfirm({ isOpen: true, orgId: org.id, orgName: org.name })}
+                      onClick={() => setDeleteConfirm({ 
+                        isOpen: true, 
+                        orgId: org.id, 
+                        orgName: org.name,
+                        userCount: org.user_count || 0,
+                        courseCount: org.course_count || 0,
+                      })}
                       className="text-red-600 hover:text-red-900"
                       title="Delete Organization"
                     >
@@ -438,14 +452,16 @@ export default function PlatformDashboard() {
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
-        onClose={() => setDeleteConfirm({ isOpen: false, orgId: null, orgName: '' })}
+        onClose={() => setDeleteConfirm({ isOpen: false, orgId: null, orgName: '', userCount: 0, courseCount: 0 })}
         onConfirm={async () => {
           if (!deleteConfirm.orgId) return;
           try {
             setLoading(true);
-            setDeleteConfirm({ isOpen: false, orgId: null, orgName: '' });
-            await apiClient.deleteOrganization(deleteConfirm.orgId.toString());
-            showToast(`${deleteConfirm.orgName} deleted successfully`, 'success');
+            const orgId = deleteConfirm.orgId;
+            const orgName = deleteConfirm.orgName;
+            setDeleteConfirm({ isOpen: false, orgId: null, orgName: '', userCount: 0, courseCount: 0 });
+            await apiClient.deleteOrganization(orgId.toString());
+            showToast(`${orgName} deleted successfully`, 'success');
             await loadPlatformData();
           } catch (error: any) {
             console.error('Error deleting organization:', error);
@@ -456,7 +472,11 @@ export default function PlatformDashboard() {
           }
         }}
         title="Delete Organization"
-        message={`Are you sure you want to delete "${deleteConfirm.orgName}"? This action cannot be undone. All users and courses must be removed first.`}
+        message={
+          deleteConfirm.userCount > 0 || deleteConfirm.courseCount > 0
+            ? `Are you sure you want to delete "${deleteConfirm.orgName}"? This organization has ${deleteConfirm.userCount} user(s) and ${deleteConfirm.courseCount} course(s). As a super admin, you can force delete this organization, which will: (1) Remove organization association from ${deleteConfirm.userCount} user(s), (2) Permanently delete ${deleteConfirm.courseCount} course(s) and all associated data. This action cannot be undone.`
+            : `Are you sure you want to delete "${deleteConfirm.orgName}"? This action cannot be undone.`
+        }
         confirmText="Delete Organization"
         cancelText="Cancel"
         type="danger"

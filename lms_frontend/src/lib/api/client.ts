@@ -224,6 +224,14 @@ class ApiClient {
         }
       }
 
+      // Handle 204 No Content responses (no body to parse)
+      if (response.status === 204) {
+        return {
+          data: null as any,
+          status: response.status,
+        };
+      }
+
       // Handle other errors
       if (!response.ok) {
         let errorData: any = {};
@@ -268,11 +276,22 @@ class ApiClient {
         });
       }
 
-      const data = await response.json();
-      return {
-        data,
-        status: response.status,
-      };
+      // Parse JSON response (only if there's content)
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : null;
+        return {
+          data,
+          status: response.status,
+        };
+      } else {
+        // Non-JSON response
+        return {
+          data: null as any,
+          status: response.status,
+        };
+      }
     } catch (error) {
       // Handle network errors and retries
       if (error instanceof ApiError) {

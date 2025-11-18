@@ -328,13 +328,42 @@ async def delete_organization(
         )
         course_count = course_count_result.scalar() or 0
         
-        if user_count > 0 or course_count > 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot delete organization with {user_count} users and {course_count} courses. Please remove all users and courses first."
-            )
+        # Super admin can force delete organizations even if they have users/courses
+        # Organization admin cannot delete if there are users/courses
+        if current_user.role != "super_admin":
+            if user_count > 0 or course_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot delete organization with {user_count} users and {course_count} courses. Please remove all users and courses first."
+                )
+        else:
+            # Super admin can force delete - handle users and courses before deletion
+            if user_count > 0 or course_count > 0:
+                app_logger.warning(
+                    f"Super admin {current_user.email} is force deleting organization {organization.name} "
+                    f"(ID: {organization_id}) with {user_count} users and {course_count} courses. "
+                    "Setting organization_id to NULL for all associated users and courses."
+                )
+                
+                # Set organization_id to NULL for all users in this organization
+                if user_count > 0:
+                    from sqlalchemy import update as sql_update
+                    update_stmt = sql_update(User).where(User.organization_id == organization_id).values(organization_id=None)
+                    await db.execute(update_stmt)
+                    await db.flush()  # Flush to ensure the update is executed before delete
+                    app_logger.info(f"Set organization_id to NULL for {user_count} users")
+                
+                # Delete all courses in this organization (since organization_id is NOT NULL in Course model)
+                # This will cascade delete topics, lessons, enrollments, etc. due to cascade relationships
+                if course_count > 0:
+                    delete_courses_stmt = delete(Course).where(Course.organization_id == organization_id)
+                    await db.execute(delete_courses_stmt)
+                    await db.flush()  # Flush to ensure the delete is executed before organization delete
+                    app_logger.info(f"Deleted {course_count} courses associated with organization")
         
-        await db.execute(delete(Organization).where(Organization.id == organization_id))
+        # Delete the organization
+        delete_org_stmt = delete(Organization).where(Organization.id == organization_id)
+        await db.execute(delete_org_stmt)
         await db.commit()
         
         return None
