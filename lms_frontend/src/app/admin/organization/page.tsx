@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { 
@@ -25,30 +25,174 @@ import { apiClient } from '@/lib/api/client';
 import { showToast } from '@/components/ui/Toast';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
-// Mock data for organization dashboard
-const mockStats = {
-  totalTutors: 12,
-  totalStudents: 156,
-  totalCourses: 24,
-  activeEnrollments: 89,
-  revenueThisMonth: 12500,
-  completionRate: 78
-};
-
-const mockRecentActivity = [
-  { id: 1, type: 'tutor_created', message: 'New tutor John Doe joined', time: '2 hours ago' },
-  { id: 2, type: 'course_created', message: 'Course "Advanced JavaScript" was created', time: '1 day ago' },
-  { id: 3, type: 'enrollment', message: '15 new student enrollments', time: '2 days ago' },
-  { id: 4, type: 'completion', message: 'Course "Python Basics" completed by 8 students', time: '3 days ago' }
-];
+interface OrganizationStats {
+  totalTutors: number;
+  totalStudents: number;
+  totalCourses: number;
+  activeEnrollments: number;
+  revenueThisMonth: number;
+  completionRate: number;
+}
 
 export default function OrganizationDashboard() {
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [organizationName, setOrganizationName] = useState<string>('Your Organization');
+  const [stats, setStats] = useState<OrganizationStats>({
+    totalTutors: 0,
+    totalStudents: 0,
+    totalCourses: 0,
+    activeEnrollments: 0,
+    revenueThisMonth: 0,
+    completionRate: 0
+  });
+  const [error, setError] = useState('');
 
+  // Fetch organization dashboard data
+  const fetchDashboardData = useCallback(async () => {
+    if (!user || user.role !== 'organization_admin' || !user.organization_id) return;
+    
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Fetch organization name
+      try {
+        const orgResponse = await apiClient.getMyOrganization();
+        if (orgResponse.data?.name) {
+          setOrganizationName(orgResponse.data.name);
+        }
+      } catch (orgError) {
+        console.warn('Could not fetch organization name:', orgError);
+      }
+      
+      // Fetch all data in parallel
+      const [tutorsResponse, studentsResponse, coursesResponse] = await Promise.all([
+        apiClient.getUsers({ role: 'tutor', organization_id: user.organization_id, size: 1000 }),
+        apiClient.getUsers({ role: 'student', organization_id: user.organization_id, size: 1000 }),
+        apiClient.getCourses({ organization_id: user.organization_id, size: 1000 })
+      ]);
+      
+      // Extract data from responses
+      const tutorsData = Array.isArray(tutorsResponse.data) 
+        ? tutorsResponse.data 
+        : tutorsResponse.data?.users || [];
+      const studentsData = Array.isArray(studentsResponse.data) 
+        ? studentsResponse.data 
+        : studentsResponse.data?.users || [];
+      const coursesData = Array.isArray(coursesResponse.data) 
+        ? coursesResponse.data 
+        : coursesResponse.data?.courses || [];
+      
+      // Filter for correct roles (handle both roles array and role field)
+      const tutors = tutorsData.filter((tutor: any) => {
+        const userRoles = tutor.roles || (tutor.role ? [tutor.role] : []);
+        return userRoles.includes('tutor') || userRoles.includes('instructor');
+      });
+      
+      const students = studentsData.filter((student: any) => {
+        const userRoles = student.roles || (student.role ? [student.role] : []);
+        return userRoles.includes('student');
+      });
+      
+      // Calculate stats
+      const totalTutors = tutors.length;
+      const totalStudents = students.length;
+      const totalCourses = coursesData.length;
+      
+      // Calculate active enrollments (enrollments in last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      let activeEnrollments = 0;
+      let totalEnrollments = 0;
+      let completedEnrollments = 0;
+      let totalRevenue = 0;
+      
+      // Fetch enrollments for all courses
+      for (const course of coursesData) {
+        try {
+          const enrollmentsResponse = await apiClient.getCourseEnrollments(course.id);
+          const enrollments = Array.isArray(enrollmentsResponse.data) 
+            ? enrollmentsResponse.data 
+            : [];
+          
+          totalEnrollments += enrollments.length;
+          
+          enrollments.forEach((enrollment: any) => {
+            // Check if enrollment is active (within last 30 days)
+            const enrollmentDate = new Date(enrollment.enrollment_date || enrollment.created_at);
+            if (enrollmentDate >= thirtyDaysAgo) {
+              activeEnrollments++;
+            }
+            
+            // Check if completed
+            if (enrollment.status === 'completed' || enrollment.progress_percentage === 100) {
+              completedEnrollments++;
+            }
+            
+            // Calculate revenue
+            if (enrollment.payment_amount && enrollment.payment_status === 'paid') {
+              totalRevenue += parseFloat(enrollment.payment_amount) || 0;
+            }
+          });
+        } catch (enrollmentError) {
+          console.warn(`Could not fetch enrollments for course ${course.id}:`, enrollmentError);
+        }
+      }
+      
+      // Calculate completion rate
+      const completionRate = totalEnrollments > 0 
+        ? Math.round((completedEnrollments / totalEnrollments) * 100) 
+        : 0;
+      
+      // Calculate revenue this month
+      const thisMonthStart = new Date();
+      thisMonthStart.setDate(1);
+      thisMonthStart.setHours(0, 0, 0, 0);
+      
+      let revenueThisMonth = 0;
+      for (const course of coursesData) {
+        try {
+          const enrollmentsResponse = await apiClient.getCourseEnrollments(course.id);
+          const enrollments = Array.isArray(enrollmentsResponse.data) 
+            ? enrollmentsResponse.data 
+            : [];
+          
+          enrollments.forEach((enrollment: any) => {
+            const enrollmentDate = new Date(enrollment.enrollment_date || enrollment.created_at);
+            if (enrollmentDate >= thisMonthStart && 
+                enrollment.payment_amount && 
+                enrollment.payment_status === 'paid') {
+              revenueThisMonth += parseFloat(enrollment.payment_amount) || 0;
+            }
+          });
+        } catch (enrollmentError) {
+          // Skip courses with enrollment fetch errors
+        }
+      }
+      
+      setStats({
+        totalTutors,
+        totalStudents,
+        totalCourses,
+        activeEnrollments,
+        revenueThisMonth: Math.round(revenueThisMonth),
+        completionRate
+      });
+    } catch (error: unknown) {
+      console.error('Error fetching dashboard data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard data';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+  
   // Check if user is organization admin and redirect if not
   useEffect(() => {
     console.log('OrganizationDashboard: Auth check - isLoading:', isLoading, 'user:', user, 'isRedirecting:', isRedirecting);
@@ -58,14 +202,32 @@ export default function OrganizationDashboard() {
       router.push('/dashboard');
     }
   }, [user, router, isRedirecting, isLoading]);
+  
+  // Fetch dashboard data when user is available
+  useEffect(() => {
+    if (!isLoading && user && user.role === 'organization_admin' && user.organization_id) {
+      fetchDashboardData();
+    }
+  }, [user, isLoading, fetchDashboardData]);
+  
+  // Refresh data when page regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user && user.role === 'organization_admin' && !loading) {
+        fetchDashboardData();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user, loading, fetchDashboardData]);
 
-  // Show loading while checking authentication
-  if (isLoading) {
+  // Show loading while checking authentication or fetching data
+  if (isLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -127,9 +289,16 @@ export default function OrganizationDashboard() {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-500">Organization Admin</p>
-          <p className="text-sm font-medium text-gray-900">Your Organization</p>
+          <p className="text-sm font-medium text-gray-900">{organizationName}</p>
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -140,7 +309,7 @@ export default function OrganizationDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Tutors</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.totalTutors}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalTutors}</p>
             </div>
           </div>
         </div>
@@ -152,7 +321,7 @@ export default function OrganizationDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.totalStudents}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalStudents}</p>
             </div>
           </div>
         </div>
@@ -164,7 +333,7 @@ export default function OrganizationDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Courses</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.totalCourses}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalCourses}</p>
             </div>
           </div>
         </div>
@@ -176,7 +345,7 @@ export default function OrganizationDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Completion Rate</p>
-              <p className="text-2xl font-bold text-gray-900">{mockStats.completionRate}%</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.completionRate}%</p>
             </div>
           </div>
         </div>
@@ -210,24 +379,14 @@ export default function OrganizationDashboard() {
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Activity - Placeholder for future implementation */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">Recent Activity</h2>
         </div>
         <div className="p-6">
-          <div className="space-y-4">
-            {mockRecentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900">{activity.message}</p>
-                  <p className="text-xs text-gray-500">{activity.time}</p>
-                </div>
-              </div>
-            ))}
+          <div className="text-center py-8">
+            <p className="text-sm text-gray-500">Activity feed coming soon</p>
           </div>
         </div>
       </div>
@@ -241,15 +400,15 @@ export default function OrganizationDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
               <p className="text-sm font-medium text-gray-500">This Month</p>
-              <p className="text-2xl font-bold text-green-600">${mockStats.revenueThisMonth.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-green-600">${stats.revenueThisMonth.toLocaleString()}</p>
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-gray-500">Active Enrollments</p>
-              <p className="text-2xl font-bold text-blue-600">{mockStats.activeEnrollments}</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.activeEnrollments}</p>
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-500">Growth</p>
-              <p className="text-2xl font-bold text-green-600">+12%</p>
+              <p className="text-sm font-medium text-gray-500">Total Courses</p>
+              <p className="text-2xl font-bold text-purple-600">{stats.totalCourses}</p>
             </div>
           </div>
         </div>
