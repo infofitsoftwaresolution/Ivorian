@@ -98,42 +98,8 @@ export default function CourseDetailView() {
         if (error?.response?.status === 403 || error?.message?.includes('permission')) {
           setError('You do not have permission to view this course.');
         } else {
-        // Mock course for development
-        setCourse({
-          id: courseId,
-          title: 'Complete Web Development Bootcamp',
-          description: 'Learn HTML, CSS, JavaScript, React, Node.js and more',
-          category: 'Technology',
-          difficulty_level: 'beginner',
-          price: 299,
-          currency: 'USD',
-          status: 'published',
-          thumbnail_url: '',
-          intro_video_url: '',
-          topics: [
-            {
-              id: 1,
-              title: 'Introduction to Web Development',
-              description: 'Get started with web development basics',
-              order: 1,
-              lessons: [
-                { id: 1, title: 'What is Web Development?', content_type: 'video', estimated_duration: 15, is_free_preview: true },
-                { id: 2, title: 'Setting up Development Environment', content_type: 'video', estimated_duration: 20, is_free_preview: false }
-              ]
-            },
-            {
-              id: 2,
-              title: 'HTML Fundamentals',
-              description: 'Learn HTML structure and semantics',
-              order: 2,
-              lessons: [
-                { id: 3, title: 'HTML Structure', content_type: 'video', estimated_duration: 25, is_free_preview: false },
-                { id: 4, title: 'HTML Elements', content_type: 'text', estimated_duration: 30, is_free_preview: false }
-              ]
-            }
-          ],
-          enrollments: []
-        });
+          setError('Failed to load course. Please try again.');
+        }
       } finally {
         setLoading(false);
       }
