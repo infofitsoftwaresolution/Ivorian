@@ -4,8 +4,23 @@
  */
 
 // Environment-based configuration
+// Auto-detect HTTPS and convert HTTP backend URLs to HTTPS for security
+function getBaseURL(): string {
+  const envURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  
+  // If running in browser and page is HTTPS, convert HTTP backend URLs to HTTPS
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    // Convert http:// to https:// for production backend
+    if (envURL.startsWith('http://') && !envURL.includes('localhost')) {
+      return envURL.replace('http://', 'https://');
+    }
+  }
+  
+  return envURL;
+}
+
 const API_CONFIG = {
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  baseURL: getBaseURL(),
   timeout: 10000,
   retries: 3,
   retryDelay: 1000,
