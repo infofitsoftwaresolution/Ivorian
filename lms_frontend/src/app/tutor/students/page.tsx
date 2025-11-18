@@ -37,7 +37,7 @@ interface Student {
 }
 
 export default function StudentsPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   
   const [students, setStudents] = useState<Student[]>([]);
@@ -47,7 +47,24 @@ export default function StudentsPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Check authentication and redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    if (!authLoading && user && user.role !== 'tutor' && user.role !== 'instructor') {
+      router.push('/dashboard');
+      return;
+    }
+  }, [authLoading, isAuthenticated, user, router]);
+
   const fetchStudents = async () => {
+    // Don't fetch if not authenticated or still loading
+    if (!isAuthenticated || authLoading || !user) {
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -93,10 +110,11 @@ export default function StudentsPage() {
   };
 
   useEffect(() => {
-    if (user?.organization_id) {
+    // Only fetch if authenticated, not loading, and user has organization_id
+    if (!authLoading && isAuthenticated && user?.organization_id) {
       fetchStudents();
     }
-  }, [user?.organization_id]);
+  }, [authLoading, isAuthenticated, user?.organization_id]);
 
   // Refresh students when returning from create page
   useEffect(() => {
@@ -159,10 +177,24 @@ export default function StudentsPage() {
     });
   };
 
-  if (loading) {
+  // Show loading while checking authentication or loading data
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner size="lg" />
+        <p className="mt-4 text-gray-600">
+          {authLoading ? 'Loading authentication...' : 'Loading students...'}
+        </p>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner size="lg" />
+        <p className="mt-4 text-gray-600">Redirecting...</p>
       </div>
     );
   }
