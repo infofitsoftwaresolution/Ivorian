@@ -69,7 +69,18 @@ export default function CourseDetailView() {
       try {
         setLoading(true);
         const response = await apiClient.getCourse(courseId);
-        setCourse(response.data);
+        // Ensure topics and lessons arrays exist, even if API returns null/undefined
+        const courseData = {
+          ...response.data,
+          topics: response.data.topics || [],
+          enrollments: response.data.enrollments || []
+        };
+        // Ensure each topic has a lessons array
+        courseData.topics = courseData.topics.map((topic: any) => ({
+          ...topic,
+          lessons: topic.lessons || []
+        }));
+        setCourse(courseData);
       } catch (error) {
         console.error('Error fetching course:', error);
         // Mock course for development
@@ -164,9 +175,14 @@ export default function CourseDetailView() {
     );
   }
 
-  const totalLessons = course.topics.reduce((sum, topic) => sum + topic.lessons.length, 0);
-  const totalDuration = course.topics.reduce((sum, topic) => 
-    sum + topic.lessons.reduce((lessonSum, lesson) => lessonSum + lesson.estimated_duration, 0), 0
+  // Safely calculate totals with null/undefined checks
+  const totalLessons = (course.topics || []).reduce((sum, topic) => 
+    sum + ((topic.lessons || []).length), 0
+  );
+  const totalDuration = (course.topics || []).reduce((sum, topic) => 
+    sum + ((topic.lessons || []).reduce((lessonSum, lesson) => 
+      lessonSum + (lesson.estimated_duration || 0), 0
+    )), 0
   );
 
   return (
@@ -231,7 +247,7 @@ export default function CourseDetailView() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Topics</p>
-              <p className="text-2xl font-bold text-gray-900">{course.topics.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{course.topics?.length || 0}</p>
             </div>
           </div>
         </div>
@@ -288,7 +304,7 @@ export default function CourseDetailView() {
         </div>
         
         <div className="p-6">
-          {course.topics.length === 0 ? (
+          {!course.topics || course.topics.length === 0 ? (
             <div className="text-center py-8">
               <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No content yet</h3>
@@ -304,7 +320,7 @@ export default function CourseDetailView() {
             </div>
           ) : (
             <div className="space-y-4">
-              {course.topics.map((topic, topicIndex) => (
+              {(course.topics || []).map((topic, topicIndex) => (
                 <div key={topic.id} className="border border-gray-200 rounded-lg">
                   <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                     <h3 className="text-lg font-medium text-gray-900">
@@ -316,11 +332,11 @@ export default function CourseDetailView() {
                   </div>
                   
                   <div className="p-4">
-                    {topic.lessons.length === 0 ? (
+                    {!topic.lessons || topic.lessons.length === 0 ? (
                       <p className="text-sm text-gray-500 italic">No lessons in this topic yet.</p>
                     ) : (
                       <div className="space-y-2">
-                        {topic.lessons.map((lesson, lessonIndex) => (
+                        {(topic.lessons || []).map((lesson, lessonIndex) => (
                           <div key={lesson.id} className="flex items-center p-3 bg-gray-50 rounded-md">
                             <div className="flex items-center flex-1">
                               {lesson.content_type === 'video' ? (
@@ -333,7 +349,7 @@ export default function CourseDetailView() {
                                   {lessonIndex + 1}. {lesson.title}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  {lesson.estimated_duration} min
+                                  {lesson.estimated_duration || 0} min
                                   {lesson.is_free_preview && (
                                     <span className="ml-2 text-green-600 font-medium">Free Preview</span>
                                   )}
