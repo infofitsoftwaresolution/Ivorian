@@ -84,12 +84,6 @@ export default function Sidebar({ user, isOpen, isCollapsed = false, onClose, on
       return [
         ...baseItems,
         {
-          name: 'Platform Overview',
-          href: '/admin/platform',
-          icon: ChartBarIcon,
-          current: pathname.startsWith('/admin/platform')
-        },
-        {
           name: 'Organizations',
           href: '/admin/organizations',
           icon: BuildingOfficeIcon,
