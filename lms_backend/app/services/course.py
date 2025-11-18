@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import and_, or_, func, desc, select, cast, String
 from fastapi import HTTPException, status
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.models.course import Course, Topic, Lesson, Enrollment, LessonProgress, CourseInstructor, CourseReview, LessonAttachment, CourseStatus
 from app.models.user import User
@@ -239,7 +239,7 @@ class CourseService:
                 raise AuthorizationError("You don't have permission to publish this course")
         
         course.status = "published"
-        course.published_at = datetime.utcnow()
+        course.published_at = datetime.now(timezone.utc)
         
         await db.commit()
         await db.refresh(course)
@@ -683,10 +683,10 @@ class EnrollmentService:
                     enrollment.certificate_issued = False
                 # Ensure enrollment_date is set
                 if enrollment.enrollment_date is None:
-                    enrollment.enrollment_date = datetime.utcnow()
+                    enrollment.enrollment_date = datetime.now(timezone.utc)
                 # Ensure created_at is set
                 if enrollment.created_at is None:
-                    enrollment.created_at = datetime.utcnow()
+                    enrollment.created_at = datetime.now(timezone.utc)
             
             return enrollments, total
         except Exception as e:
@@ -702,24 +702,130 @@ class EnrollmentService:
         enrollment_data: EnrollmentUpdate
     ) -> Enrollment:
         """Update an enrollment"""
-        result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))
-        enrollment = result.scalar_one_or_none()
-        if not enrollment:
-            raise ResourceNotFoundError("Enrollment not found")
-        
-        # Update enrollment fields
-        update_data = enrollment_data.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(enrollment, field, value)
-        
-        # If status is completed, set completed_at
-        if enrollment_data.status == "completed" and not enrollment.completed_at:
-            enrollment.completed_at = datetime.utcnow()
-        
-        await db.commit()
-        await db.refresh(enrollment)
-        
-        return enrollment
+        try:
+            result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))
+            enrollment = result.scalar_one_or_none()
+            if not enrollment:
+                raise ResourceNotFoundError("Enrollment not found")
+            
+            # Update enrollment fields
+            update_data = enrollment_data.model_dump(exclude_unset=True)
+            print(f"[EnrollmentService] Updating enrollment {enrollment_id} with data: {update_data}")
+            
+            for field, value in update_data.items():
+                # Only update fields that exist on the model
+                if hasattr(enrollment, field):
+                    try:
+                        setattr(enrollment, field, value)
+                        print(f"[EnrollmentService] Set {field} = {value}")
+                    except Exception as field_error:
+                        print(f"[EnrollmentService] Error setting {field}: {str(field_error)}")
+                        raise
+            
+            # Update last_accessed_at when progress is updated
+            if 'progress_percentage' in update_data or 'completed_lessons' in update_data:
+                try:
+                    enrollment.last_accessed_at = datetime.now(timezone.utc)
+                    print(f"[EnrollmentService] Updated last_accessed_at")
+                except Exception as date_error:
+                    print(f"[EnrollmentService] Error setting last_accessed_at: {str(date_error)}")
+            
+            # If status is completed, set completion_date
+            if enrollment_data.status == "completed" and not enrollment.completion_date:
+                try:
+                    enrollment.completion_date = datetime.now(timezone.utc)
+                    print(f"[EnrollmentService] Set completion_date")
+                except Exception as date_error:
+                    print(f"[EnrollmentService] Error setting completion_date: {str(date_error)}")
+            
+            print(f"[EnrollmentService] Committing enrollment update...")
+            await db.commit()
+            
+            # Re-fetch the enrollment using explicit column selection to avoid relationship loading issues
+            # This is safer than refresh() which might try to load relationships
+            try:
+                result = await db.execute(
+                    select(
+                        Enrollment.id,
+                        Enrollment.course_id,
+                        Enrollment.student_id,
+                        Enrollment.status,
+                        Enrollment.progress_percentage,
+                        Enrollment.completed_lessons,
+                        Enrollment.total_lessons,
+                        Enrollment.enrollment_date,
+                        Enrollment.completion_date,
+                        Enrollment.last_accessed_at,
+                        Enrollment.payment_status,
+                        Enrollment.payment_amount,
+                        Enrollment.payment_currency,
+                        Enrollment.payment_method,
+                        Enrollment.payment_transaction_id,
+                        Enrollment.certificate_issued,
+                        Enrollment.certificate_url,
+                        Enrollment.certificate_issued_at,
+                        Enrollment.created_at,
+                        Enrollment.updated_at
+                    ).where(Enrollment.id == enrollment_id)
+                )
+                enrollment_row = result.first()
+                if enrollment_row:
+                    # Create a simple object with the fetched data
+                    class EnrollmentData:
+                        def __init__(self, row):
+                            self.id = row.id
+                            self.course_id = row.course_id
+                            self.student_id = row.student_id
+                            self.status = row.status
+                            self.progress_percentage = row.progress_percentage
+                            self.completed_lessons = row.completed_lessons
+                            self.total_lessons = row.total_lessons
+                            self.enrollment_date = row.enrollment_date
+                            self.completion_date = row.completion_date
+                            self.last_accessed_at = row.last_accessed_at
+                            self.payment_status = row.payment_status
+                            self.payment_amount = row.payment_amount
+                            self.payment_currency = row.payment_currency
+                            self.payment_method = row.payment_method
+                            self.payment_transaction_id = row.payment_transaction_id
+                            self.certificate_issued = row.certificate_issued
+                            self.certificate_url = row.certificate_url
+                            self.certificate_issued_at = row.certificate_issued_at
+                            self.created_at = row.created_at
+                            self.updated_at = row.updated_at
+                    
+                    enrollment = EnrollmentData(enrollment_row)
+                    print(f"[EnrollmentService] Enrollment re-fetched successfully")
+                else:
+                    print(f"[EnrollmentService] Warning: Could not re-fetch enrollment after update")
+            except Exception as refetch_error:
+                print(f"[EnrollmentService] Error re-fetching enrollment: {str(refetch_error)}")
+                import traceback
+                traceback.print_exc()
+                # Continue with the enrollment object we have - it should have the updated values
+            
+            print(f"[EnrollmentService] Enrollment updated successfully")
+            
+            return enrollment
+        except ResourceNotFoundError:
+            await db.rollback()
+            raise
+        except Exception as e:
+            await db.rollback()
+            # Log the actual error for debugging
+            import logging
+            import traceback
+            logger = logging.getLogger(__name__)
+            error_trace = traceback.format_exc()
+            logger.error(f"Error updating enrollment {enrollment_id}: {str(e)}\n{error_trace}")
+            print(f"[EnrollmentService] ERROR updating enrollment {enrollment_id}: {str(e)}")
+            print(f"[EnrollmentService] Traceback: {error_trace}")
+            # Re-raise as HTTPException with more details
+            from fastapi import HTTPException, status
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to update enrollment: {str(e)}"
+            )
     
     @staticmethod
     async def cancel_enrollment(db: AsyncSession, enrollment_id: int) -> bool:
@@ -733,6 +839,180 @@ class EnrollmentService:
         await db.commit()
         
         return True
+    
+    @staticmethod
+    async def get_enrollment_lesson_progress(
+        db: AsyncSession,
+        enrollment_id: int
+    ) -> List[Dict[str, Any]]:
+        """Get all lesson progress records for an enrollment"""
+        # Use explicit column selection to avoid accessing non-existent columns like 'time_spent'
+        # Select only the columns that are guaranteed to exist in the database
+        result = await db.execute(
+            select(
+                LessonProgress.id,
+                LessonProgress.enrollment_id,
+                LessonProgress.lesson_id,
+                LessonProgress.status,
+                LessonProgress.completion_percentage,
+                LessonProgress.video_watched_duration,
+                LessonProgress.video_completed,
+                LessonProgress.quiz_completed,
+                LessonProgress.assignment_completed,
+                LessonProgress.started_at,
+                LessonProgress.completed_at,
+                LessonProgress.last_accessed_at
+            ).where(LessonProgress.enrollment_id == enrollment_id)
+        )
+        # Get rows and convert to dictionaries
+        rows = result.all()
+        
+        # Convert to list of dictionaries
+        progress_list = []
+        for row in rows:
+            progress_list.append({
+                "id": row.id,
+                "enrollment_id": row.enrollment_id,
+                "lesson_id": row.lesson_id,
+                "status": row.status,
+                "completion_percentage": row.completion_percentage,
+                "video_watched_duration": row.video_watched_duration,
+                "video_completed": row.video_completed,
+                "quiz_completed": row.quiz_completed,
+                "assignment_completed": row.assignment_completed,
+                "started_at": row.started_at,
+                "completed_at": row.completed_at,
+                "last_accessed_at": row.last_accessed_at,
+            })
+        
+        return progress_list
+    
+    @staticmethod
+    async def update_lesson_progress(
+        db: AsyncSession,
+        enrollment_id: int,
+        lesson_id: int,
+        video_completed: bool = False,
+        status: str = "completed"
+    ) -> Dict[str, Any]:
+        """Create or update lesson progress for an enrollment"""
+        # Check if progress record already exists using explicit column selection
+        # to avoid loading non-existent columns like 'time_spent'
+        from sqlalchemy import update as sql_update
+        
+        check_result = await db.execute(
+            select(LessonProgress.id).where(
+                and_(
+                    LessonProgress.enrollment_id == enrollment_id,
+                    LessonProgress.lesson_id == lesson_id
+                )
+            )
+        )
+        existing_id = check_result.scalar_one_or_none()
+        
+        now = datetime.now(timezone.utc)
+        completion_pct = 100.0 if status == "completed" else 0.0
+        
+        if existing_id:
+            # First fetch current values to preserve started_at if it exists
+            fetch_current = await db.execute(
+                select(
+                    LessonProgress.started_at,
+                    LessonProgress.completed_at
+                ).where(LessonProgress.id == existing_id)
+            )
+            current_row = fetch_current.first()
+            current_started_at = current_row.started_at if current_row else None
+            current_completed_at = current_row.completed_at if current_row else None
+            
+            # Update existing progress using UPDATE statement to avoid loading full model
+            update_values = {
+                "status": status,
+                "video_completed": video_completed,
+                "completion_percentage": completion_pct,
+                "last_accessed_at": now
+            }
+            
+            # Only set started_at if it doesn't exist
+            if not current_started_at:
+                update_values["started_at"] = now
+            
+            # Only set completed_at if status is completed and it doesn't exist
+            if status == "completed" and not current_completed_at:
+                update_values["completed_at"] = now
+            
+            update_stmt = (
+                sql_update(LessonProgress)
+                .where(LessonProgress.id == existing_id)
+                .values(**update_values)
+            )
+            await db.execute(update_stmt)
+            await db.commit()
+            
+            # Fetch updated record using explicit columns only
+            fetch_result = await db.execute(
+                select(
+                    LessonProgress.id,
+                    LessonProgress.enrollment_id,
+                    LessonProgress.lesson_id,
+                    LessonProgress.status,
+                    LessonProgress.completion_percentage,
+                    LessonProgress.video_completed,
+                    LessonProgress.completed_at
+                ).where(LessonProgress.id == existing_id)
+            )
+            row = fetch_result.first()
+            
+            return {
+                "id": row.id,
+                "enrollment_id": row.enrollment_id,
+                "lesson_id": row.lesson_id,
+                "status": row.status,
+                "video_completed": row.video_completed,
+                "completion_percentage": row.completion_percentage,
+                "completed_at": row.completed_at,
+            }
+        else:
+            # Create new progress record - only set columns that exist
+            # Use raw INSERT to avoid model column issues
+            from sqlalchemy import text
+            
+            insert_stmt = text("""
+                INSERT INTO lesson_progress 
+                (enrollment_id, lesson_id, status, video_completed, completion_percentage, 
+                 started_at, completed_at, last_accessed_at)
+                VALUES 
+                (:enrollment_id, :lesson_id, :status, :video_completed, :completion_percentage,
+                 :started_at, :completed_at, :last_accessed_at)
+                RETURNING id, enrollment_id, lesson_id, status, video_completed, 
+                          completion_percentage, completed_at
+            """)
+            
+            result = await db.execute(
+                insert_stmt,
+                {
+                    "enrollment_id": enrollment_id,
+                    "lesson_id": lesson_id,
+                    "status": status,
+                    "video_completed": video_completed,
+                    "completion_percentage": completion_pct,
+                    "started_at": now,
+                    "completed_at": now if status == "completed" else None,
+                    "last_accessed_at": now
+                }
+            )
+            await db.commit()
+            row = result.first()
+            
+            return {
+                "id": row.id,
+                "enrollment_id": row.enrollment_id,
+                "lesson_id": row.lesson_id,
+                "status": row.status,
+                "video_completed": row.video_completed,
+                "completion_percentage": row.completion_percentage,
+                "completed_at": row.completed_at,
+            }
     
     @staticmethod
     async def bulk_enroll_students(

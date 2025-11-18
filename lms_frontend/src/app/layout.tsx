@@ -7,6 +7,13 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'InfoFit Labs LMS',
   description: 'Modern AI-Integrated Learning Management System',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/edu_logo.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/edu_logo.svg',
+  },
 }
 
 export default function RootLayout({

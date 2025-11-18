@@ -34,7 +34,7 @@ interface Course {
   id: number;
   title: string;
   description: string;
-  instructor: string;
+  instructor: string | { id: number; name: string; email: string } | null;
   thumbnail_url?: string;
   total_duration: number;
   total_lessons: number;
@@ -57,6 +57,7 @@ interface Lesson {
   content_type: 'video' | 'text' | 'interactive';
   duration?: number;
   estimated_duration?: number;
+  video_duration?: number; // in seconds
   order: number;
   is_completed: boolean;
   video_url?: string;
@@ -82,6 +83,7 @@ export default function CourseLearningPage() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [progress, setProgress] = useState<CourseProgress | null>(null);
+  const [enrollmentId, setEnrollmentId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -158,14 +160,99 @@ export default function CourseLearningPage() {
         const totalLessons = topicsData.reduce((acc: number, topic: any) => acc + (topic.lessons?.length || 0), 0);
         console.log('[CourseLearning] Total lessons:', totalLessons);
 
-        // Fetch course progress
-        // TODO: Implement progress tracking API
-        setProgress({
-          course_id: parseInt(courseId),
-          total_lessons: totalLessons,
-          completed_lessons: 0,
-          progress_percentage: 0
-        });
+        // Fetch enrollment to get enrollment ID and progress
+        try {
+          const enrollmentsResponse = await apiClient.getMyEnrollments();
+          const enrollments = enrollmentsResponse.data || [];
+          const enrollment = enrollments.find((e: any) => e.course_id === parseInt(courseId));
+          
+          if (enrollment) {
+            setEnrollmentId(enrollment.id);
+            const completedLessons = enrollment.completed_lessons || 0;
+            const progressPercentage = enrollment.progress_percentage || 0;
+            
+            setProgress({
+              course_id: parseInt(courseId),
+              total_lessons: totalLessons,
+              completed_lessons: completedLessons,
+              progress_percentage: progressPercentage
+            });
+
+            // Fetch lesson progress to mark completed lessons
+            try {
+              console.log('[CourseLearning] Fetching lesson progress for enrollment:', enrollment.id);
+              const progressResponse = await apiClient.getEnrollmentLessonProgress(enrollment.id);
+              const lessonProgress = progressResponse.data?.progress || [];
+              console.log('[CourseLearning] Lesson progress data:', lessonProgress);
+
+              // Mark lessons as completed based on progress records
+              if (lessonProgress.length > 0) {
+                const completedLessonIds = new Set(
+                  lessonProgress
+                    .filter((p: any) => p.status === 'completed' || p.video_completed)
+                    .map((p: any) => p.lesson_id)
+                );
+                console.log('[CourseLearning] Completed lesson IDs:', Array.from(completedLessonIds));
+
+                // Update topics with completed lessons
+                setTopics(prevTopics => {
+                  const updatedTopics = prevTopics.map(topic => ({
+                    ...topic,
+                    lessons: topic.lessons.map(lesson => ({
+                      ...lesson,
+                      is_completed: completedLessonIds.has(lesson.id)
+                    }))
+                  }));
+
+                  // Recalculate progress based on actual completed lessons
+                  const actualCompletedLessons = updatedTopics.reduce((acc, topic) =>
+                    acc + (topic.lessons?.filter(lesson => lesson.is_completed).length || 0), 0
+                  );
+                  const actualProgressPercentage = totalLessons > 0
+                    ? Math.round((actualCompletedLessons / totalLessons) * 100)
+                    : 0;
+
+                  setProgress(prev => ({
+                    course_id: parseInt(courseId),
+                    total_lessons: totalLessons,
+                    completed_lessons: actualCompletedLessons,
+                    progress_percentage: actualProgressPercentage
+                  }));
+
+                  return updatedTopics;
+                });
+
+                // Update current lesson if it's completed
+                setCurrentLesson(prev => {
+                  if (prev && completedLessonIds.has(prev.id)) {
+                    return { ...prev, is_completed: true };
+                  }
+                  return prev;
+                });
+              }
+            } catch (progressError) {
+              console.error('[CourseLearning] Error fetching lesson progress:', progressError);
+              // Don't fail the whole page load if progress fetch fails
+            }
+          } else {
+            // No enrollment found, set default progress
+            setProgress({
+              course_id: parseInt(courseId),
+              total_lessons: totalLessons,
+              completed_lessons: 0,
+              progress_percentage: 0
+            });
+          }
+        } catch (enrollmentError) {
+          console.error('[CourseLearning] Error fetching enrollment:', enrollmentError);
+          // Set default progress if enrollment fetch fails
+          setProgress({
+            course_id: parseInt(courseId),
+            total_lessons: totalLessons,
+            completed_lessons: 0,
+            progress_percentage: 0
+          });
+        }
 
       } catch (error) {
         console.error('[CourseLearning] Error fetching course data:', error);
@@ -229,42 +316,69 @@ export default function CourseLearningPage() {
   const goToNextLesson = () => {
     if (!currentLesson) return;
     
-    // Flatten all lessons from all topics
-    const allLessons = topics.flatMap(topic => topic.lessons || []);
+    // Flatten all lessons from all topics, sorted by topic order and lesson order
+    const allLessons = topics
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .flatMap(topic => 
+        (topic.lessons || [])
+          .sort((a, b) => (a.order || 0) - (b.order || 0))
+          .map(lesson => ({ ...lesson, topicId: topic.id }))
+      );
+    
     const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
     
     if (currentIndex < allLessons.length - 1) {
       const nextLesson = allLessons[currentIndex + 1];
-      setCurrentLesson(nextLesson);
-      setIsPlaying(false);
-      // Reset video player
-      if (videoRef.current) {
-        videoRef.current.currentTime = 0;
-      }
+      selectLesson(nextLesson);
     }
   };
 
   const goToPreviousLesson = () => {
     if (!currentLesson) return;
     
-    // Flatten all lessons from all topics
-    const allLessons = topics.flatMap(topic => topic.lessons || []);
+    // Flatten all lessons from all topics, sorted by topic order and lesson order
+    const allLessons = topics
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .flatMap(topic => 
+        (topic.lessons || [])
+          .sort((a, b) => (a.order || 0) - (b.order || 0))
+          .map(lesson => ({ ...lesson, topicId: topic.id }))
+      );
+    
     const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
     
     if (currentIndex > 0) {
       const prevLesson = allLessons[currentIndex - 1];
-      setCurrentLesson(prevLesson);
-      setIsPlaying(false);
-      // Reset video player
-      if (videoRef.current) {
-        videoRef.current.currentTime = 0;
-      }
+      selectLesson(prevLesson);
     }
+  };
+
+  // Helper to check if there's a next/previous lesson
+  const getLessonNavigation = () => {
+    if (!currentLesson) return { hasNext: false, hasPrevious: false };
+    
+    const allLessons = topics
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .flatMap(topic => 
+        (topic.lessons || [])
+          .sort((a, b) => (a.order || 0) - (b.order || 0))
+      );
+    
+    const currentIndex = allLessons.findIndex(lesson => lesson.id === currentLesson.id);
+    
+    return {
+      hasNext: currentIndex < allLessons.length - 1,
+      hasPrevious: currentIndex > 0
+    };
   };
 
   const selectLesson = async (lesson: Lesson) => {
     try {
       setLoadingLesson(true);
+      // Close sidebar on mobile when lesson is selected
+      if (window.innerWidth < 1024) {
+        setSidebarOpen(false);
+      }
       console.log('[CourseLearning] Selecting lesson:', lesson);
       
       // Fetch full lesson details to ensure we have all data (video_url, content, etc.)
@@ -343,10 +457,179 @@ export default function CourseLearningPage() {
     );
   };
 
-  const markLessonComplete = () => {
-    if (currentLesson) {
-      // TODO: Implement lesson completion API
-      console.log('Mark lesson complete:', currentLesson.id);
+  const markLessonComplete = async () => {
+    if (!currentLesson || !courseId) {
+      console.warn('[CourseLearning] Cannot mark lesson complete: missing lesson or course ID');
+      setError('Cannot mark lesson complete: missing information');
+      return;
+    }
+
+    // If no enrollment ID, try to fetch it first
+    let activeEnrollmentId: number | null = enrollmentId;
+    if (!activeEnrollmentId) {
+      try {
+        console.log('[CourseLearning] Enrollment ID not found, fetching enrollments...');
+        const enrollmentsResponse = await apiClient.getMyEnrollments();
+        const enrollments = enrollmentsResponse.data || [];
+        const enrollment = enrollments.find((e: any) => e.course_id === parseInt(courseId));
+        
+        if (enrollment) {
+          activeEnrollmentId = enrollment.id;
+          setEnrollmentId(enrollment.id);
+          console.log('[CourseLearning] Found enrollment ID:', activeEnrollmentId);
+        } else {
+          console.error('[CourseLearning] No enrollment found for course:', courseId);
+          setError('You are not enrolled in this course. Please enroll first.');
+          return;
+        }
+      } catch (fetchError) {
+        console.error('[CourseLearning] Error fetching enrollment:', fetchError);
+        setError('Failed to verify enrollment. Please try again.');
+        return;
+      }
+    }
+    
+    // Ensure we have a valid enrollment ID before proceeding
+    if (!activeEnrollmentId) {
+      console.error('[CourseLearning] No enrollment ID available');
+      setError('Cannot update progress: enrollment not found');
+      return;
+    }
+    
+    try {
+      console.log('[CourseLearning] Marking lesson as complete:', currentLesson.id);
+      console.log('[CourseLearning] Using enrollment ID:', activeEnrollmentId);
+      
+      // Calculate updated progress - check if lesson is already completed
+      const totalLessons = topics.reduce((acc, topic) => acc + (topic.lessons?.length || 0), 0);
+      const currentCompleted = topics.reduce((acc, topic) => 
+        acc + (topic.lessons?.filter(lesson => lesson.is_completed && lesson.id !== currentLesson.id).length || 0), 0
+      );
+      // Add 1 for the current lesson being completed
+      const newCompletedLessons = currentCompleted + 1;
+      const progressPercentage = totalLessons > 0 ? Math.round((newCompletedLessons / totalLessons) * 100) : 0;
+
+      // Update local state first (optimistic update)
+      // This ensures UI updates immediately regardless of API call result
+      setTopics(prevTopics => {
+        const updatedTopics = prevTopics.map(topic => ({
+          ...topic,
+          lessons: topic.lessons.map(lesson => 
+            lesson.id === currentLesson.id 
+              ? { ...lesson, is_completed: true }
+              : lesson
+          )
+        }));
+
+        // Recalculate progress
+        const totalLessons = updatedTopics.reduce((acc, topic) => acc + (topic.lessons?.length || 0), 0);
+        const completedLessons = updatedTopics.reduce((acc, topic) => 
+          acc + (topic.lessons?.filter(lesson => lesson.is_completed).length || 0), 0
+        );
+        const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+        setProgress(prev => ({
+          course_id: parseInt(courseId),
+          total_lessons: totalLessons,
+          completed_lessons: completedLessons,
+          progress_percentage: progressPercentage
+        }));
+
+        return updatedTopics;
+      });
+
+      // Update current lesson
+      setCurrentLesson(prev => prev ? { ...prev, is_completed: true } : null);
+
+      // Update lesson progress and enrollment progress via API (non-blocking - don't await, just fire and forget)
+      // TypeScript: activeEnrollmentId is guaranteed to be a number at this point due to the check above
+      const enrollmentIdToUpdate = activeEnrollmentId as number;
+      console.log('[CourseLearning] Updating enrollment and lesson progress:', enrollmentIdToUpdate, {
+        lesson_id: currentLesson.id,
+        progress_percentage: progressPercentage,
+        completed_lessons: newCompletedLessons
+      });
+      
+      // Mark lesson as complete (creates/updates LessonProgress record)
+      apiClient.markLessonComplete(enrollmentIdToUpdate, currentLesson.id)
+        .then((lessonProgressResponse) => {
+          console.log('[CourseLearning] Lesson progress update response:', lessonProgressResponse);
+          
+          // Then update enrollment progress
+          return apiClient.updateLessonProgress(enrollmentIdToUpdate, {
+            progress_percentage: progressPercentage,
+            completed_lessons: newCompletedLessons
+          });
+        })
+        .then((updateResponse) => {
+          console.log('[CourseLearning] Enrollment update response:', updateResponse);
+        })
+        .catch((error) => {
+          console.error('[CourseLearning] Error updating progress (non-blocking):', error);
+          // Show a subtle notification but don't block the UI
+          setError('Progress saved locally. Server sync may have failed.');
+          setTimeout(() => setError(''), 3000);
+        });
+    } catch (error: any) {
+      console.error('[CourseLearning] Error marking lesson as complete:', error);
+      console.error('[CourseLearning] Error details:', {
+        message: error?.message,
+        status: error?.status,
+        code: error?.code,
+        details: error?.details
+      });
+      
+      // Even if API call fails, update the UI to show progress
+      // This provides better UX - user sees their progress even if backend has issues
+      setTopics(prevTopics => {
+        const updatedTopics = prevTopics.map(topic => ({
+          ...topic,
+          lessons: topic.lessons.map(lesson => 
+            lesson.id === currentLesson.id 
+              ? { ...lesson, is_completed: true }
+              : lesson
+          )
+        }));
+
+        // Recalculate progress
+        const totalLessons = updatedTopics.reduce((acc, topic) => acc + (topic.lessons?.length || 0), 0);
+        const completedLessons = updatedTopics.reduce((acc, topic) => 
+          acc + (topic.lessons?.filter(lesson => lesson.is_completed).length || 0), 0
+        );
+        const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+        setProgress(prev => ({
+          course_id: parseInt(courseId),
+          total_lessons: totalLessons,
+          completed_lessons: completedLessons,
+          progress_percentage: progressPercentage
+        }));
+
+        return updatedTopics;
+      });
+
+      // Update current lesson
+      setCurrentLesson(prev => prev ? { ...prev, is_completed: true } : null);
+      
+      // Show error message but don't block the UI update
+      let errorMessage = 'Progress updated locally, but failed to save to server. Please refresh the page.';
+      if (error?.status === 404) {
+        errorMessage = 'Enrollment not found. Progress updated locally only.';
+      } else if (error?.status === 403) {
+        errorMessage = 'Permission denied. Progress updated locally only.';
+      } else if (error?.status === 500) {
+        errorMessage = 'Server error. Progress updated locally. Please refresh to sync.';
+      } else if (error?.message) {
+        errorMessage = `Progress updated locally. Error: ${error.message}`;
+      }
+      
+      // Show error but don't block the UI - progress is still updated locally
+      setError(errorMessage);
+      
+      // Clear error after 5 seconds
+      setTimeout(() => {
+        setError('');
+      }, 5000);
     }
   };
 
@@ -460,7 +743,11 @@ export default function CourseLearningPage() {
           </button>
           <div>
             <h1 className="text-lg font-semibold text-gray-900">{course.title}</h1>
-            <p className="text-sm text-gray-500">by {course.instructor}</p>
+            <p className="text-sm text-gray-500">
+              by {typeof course.instructor === 'string' 
+                ? course.instructor 
+                : course.instructor?.name || 'Unknown Instructor'}
+            </p>
           </div>
         </div>
         
@@ -516,7 +803,13 @@ export default function CourseLearningPage() {
                             <div>
                               <p className="text-sm font-medium text-gray-900">{lesson.title}</p>
                               <p className="text-xs text-gray-500">
-                                {formatTime((lesson.duration || lesson.estimated_duration || 0) * 60)}
+                                {lesson.video_duration 
+                                  ? formatTime(lesson.video_duration)
+                                  : lesson.estimated_duration 
+                                    ? `${lesson.estimated_duration} min`
+                                    : lesson.duration
+                                      ? formatTime(lesson.duration * 60)
+                                      : '—'}
                               </p>
                             </div>
                           </div>
@@ -692,6 +985,10 @@ export default function CourseLearningPage() {
                       onLoadedData={() => {
                         console.log('[CourseLearning] Video data loaded');
                       }}
+                      onEnded={() => {
+                        console.log('[CourseLearning] Video ended - marking as complete');
+                        markLessonComplete();
+                      }}
                       onWaiting={() => {
                         console.log('[CourseLearning] Video waiting for data');
                       }}
@@ -801,7 +1098,12 @@ export default function CourseLearningPage() {
                   <div className="flex items-center justify-between">
                     <button
                       onClick={goToPreviousLesson}
-                      className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-900"
+                      disabled={!getLessonNavigation().hasPrevious}
+                      className={`flex items-center px-4 py-2 rounded-md transition-colors ${
+                        getLessonNavigation().hasPrevious
+                          ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          : 'text-gray-400 cursor-not-allowed'
+                      }`}
                     >
                       <ChevronLeftIcon className="h-5 w-5 mr-2" />
                       Previous Lesson
@@ -809,15 +1111,25 @@ export default function CourseLearningPage() {
 
                     <button
                       onClick={markLessonComplete}
-                      className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 flex items-center"
+                      disabled={currentLesson.is_completed}
+                      className={`px-6 py-2 rounded-md flex items-center transition-colors ${
+                        currentLesson.is_completed
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
                     >
                       <CheckCircleIcon className="h-5 w-5 mr-2" />
-                      Mark Complete
+                      {currentLesson.is_completed ? 'Completed' : 'Mark Complete'}
                     </button>
 
                     <button
                       onClick={goToNextLesson}
-                      className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-900"
+                      disabled={!getLessonNavigation().hasNext}
+                      className={`flex items-center px-4 py-2 rounded-md transition-colors ${
+                        getLessonNavigation().hasNext
+                          ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          : 'text-gray-400 cursor-not-allowed'
+                      }`}
                     >
                       Next Lesson
                       <ChevronRightIcon className="h-5 w-5 ml-2" />

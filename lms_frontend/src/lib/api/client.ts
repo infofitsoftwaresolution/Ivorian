@@ -204,7 +204,17 @@ class ApiClient {
         
         // Extract detailed error message
         let errorMessage = `HTTP ${response.status}`;
-        if (errorData.detail) {
+        
+        // Handle backend error format: { error: { message, code, status_code } }
+        if (errorData.error) {
+          if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else if (errorData.error.message) {
+            errorMessage = errorData.error.message;
+          } else {
+            errorMessage = JSON.stringify(errorData.error);
+          }
+        } else if (errorData.detail) {
           // Handle both string and array detail formats
           if (Array.isArray(errorData.detail)) {
             errorMessage = errorData.detail.map((err: any) => {
@@ -220,24 +230,22 @@ class ApiClient {
           }
         } else if (errorData.message) {
           errorMessage = errorData.message;
-        } else if (errorData.error) {
-          if (typeof errorData.error === 'string') {
-            errorMessage = errorData.error;
-          } else if (errorData.error.message) {
-            errorMessage = errorData.error.message;
-          } else {
-            errorMessage = JSON.stringify(errorData.error);
-          }
         } else if (responseText) {
           // If we couldn't parse JSON but have text, use it
           errorMessage = responseText.substring(0, 200); // Limit length
         }
         
+        // Extract error code from nested error object if present
+        const errorCode = errorData.error?.code || errorData.code || `HTTP_${response.status}`;
+        
         console.error(`[API Client] Throwing ApiError: ${errorMessage}`);
+        console.error(`[API Client] Error code: ${errorCode}, Status: ${response.status}`);
+        console.error(`[API Client] Full error data:`, JSON.stringify(errorData, null, 2));
+        
         throw new ApiError({
           message: errorMessage,
           status: response.status,
-          code: errorData.code || `HTTP_${response.status}`,
+          code: errorCode,
           details: errorData,
         });
       }
@@ -271,15 +279,33 @@ class ApiClient {
         throw error;
       }
 
+      // Check if it's a network/fetch error
+      const isNetworkError = 
+        error instanceof TypeError && 
+        (error.message.includes('Failed to fetch') || 
+         error.message.includes('NetworkError') ||
+         error.message.includes('Network request failed'));
+
       if (retryCount < this.retries && this.shouldRetry(error)) {
         await this.delay(this.retryDelay * Math.pow(2, retryCount));
         return this.request<T>(endpoint, options, retryCount + 1);
       }
 
+      // Provide more helpful error message for network errors
+      let errorMessage = error instanceof Error ? error.message : 'Network error';
+      if (isNetworkError) {
+        errorMessage = `Cannot connect to backend API at ${this.baseURL}. Please ensure the backend server is running on port 8000.`;
+      }
+
       throw new ApiError({
-        message: error instanceof Error ? error.message : 'Network error',
+        message: errorMessage,
         status: 0,
         code: 'NETWORK_ERROR',
+        details: {
+          baseURL: this.baseURL,
+          endpoint,
+          originalError: error instanceof Error ? error.message : String(error)
+        }
       });
     }
   }
@@ -669,6 +695,30 @@ class ApiClient {
   async cancelEnrollment(enrollmentId: number): Promise<ApiResponse> {
     return this.request(`/api/v1/courses/enrollments/${enrollmentId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // Lesson Progress Methods - Update via enrollment
+  async updateLessonProgress(
+    enrollmentId: number,
+    progressData: {
+      progress_percentage?: number;
+      completed_lessons?: number;
+    }
+  ): Promise<ApiResponse> {
+    return this.request(`/api/v1/courses/enrollments/${enrollmentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(progressData),
+    });
+  }
+
+  async getEnrollmentLessonProgress(enrollmentId: number): Promise<ApiResponse> {
+    return this.request(`/api/v1/courses/enrollments/${enrollmentId}/lesson-progress`);
+  }
+
+  async markLessonComplete(enrollmentId: number, lessonId: number): Promise<ApiResponse> {
+    return this.request(`/api/v1/courses/enrollments/${enrollmentId}/lessons/${lessonId}/complete`, {
+      method: 'POST',
     });
   }
 

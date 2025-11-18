@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 # from app.core.rbac import require_permission, require_role  # Temporarily disabled
 from app.models.user import User
+from app.models.course import Enrollment
 from app.schemas.course import (
     CourseCreate, CourseUpdate, CourseResponse, CourseListResponse, CourseFilter,
     TopicCreate, TopicUpdate, TopicResponse, TopicWithLessons,
@@ -495,8 +496,143 @@ async def update_enrollment(
     current_user: User = Depends(get_current_user)
 ):
     """Update an enrollment"""
-    enrollment = await EnrollmentService.update_enrollment(db, enrollment_id, enrollment_data)
-    return enrollment
+    try:
+        enrollment = await EnrollmentService.update_enrollment(db, enrollment_id, enrollment_data)
+        
+        # Convert enrollment to dict to avoid serialization issues
+        # Handle both model instance and simple object
+        enrollment_dict = {
+            "id": enrollment.id,
+            "course_id": enrollment.course_id,
+            "student_id": enrollment.student_id,
+            "enrollment_date": getattr(enrollment, 'enrollment_date', None),
+            "completion_date": getattr(enrollment, 'completion_date', None),
+            "status": getattr(enrollment, 'status', 'active'),
+            "progress_percentage": getattr(enrollment, 'progress_percentage', 0.0),
+            "completed_lessons": getattr(enrollment, 'completed_lessons', 0),
+            "total_lessons": getattr(enrollment, 'total_lessons', 0),
+            "last_accessed_at": getattr(enrollment, 'last_accessed_at', None),
+            "payment_status": getattr(enrollment, 'payment_status', 'pending'),
+            "payment_amount": getattr(enrollment, 'payment_amount', None),
+            "payment_currency": getattr(enrollment, 'payment_currency', 'USD'),
+            "payment_method": getattr(enrollment, 'payment_method', None),
+            "payment_transaction_id": getattr(enrollment, 'payment_transaction_id', None),
+            "certificate_issued": getattr(enrollment, 'certificate_issued', False),
+            "certificate_url": getattr(enrollment, 'certificate_url', None),
+            "certificate_issued_at": getattr(enrollment, 'certificate_issued_at', None),
+            "created_at": getattr(enrollment, 'created_at', None),
+            "updated_at": getattr(enrollment, 'updated_at', None),
+        }
+        
+        return EnrollmentResponse(**enrollment_dict)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API] ERROR updating enrollment {enrollment_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating enrollment: {str(e)}"
+        )
+
+
+@router.get("/enrollments/{enrollment_id}/lesson-progress")
+async def get_enrollment_lesson_progress(
+    enrollment_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get lesson progress for an enrollment"""
+    try:
+        # Verify enrollment exists and belongs to current user
+        result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))
+        enrollment = result.scalar_one_or_none()
+        if not enrollment:
+            raise HTTPException(status_code=404, detail="Enrollment not found")
+        
+        # Check if user has access to this enrollment
+        if enrollment.student_id != current_user.id and current_user.role not in ["instructor", "tutor", "organization_admin", "super_admin"]:
+            raise HTTPException(status_code=403, detail="You don't have permission to view this enrollment's progress")
+        
+        # Get lesson progress records (already in dict format)
+        progress_records = await EnrollmentService.get_enrollment_lesson_progress(db, enrollment_id)
+        
+        # Convert datetime objects to ISO format strings for JSON response
+        progress_data = []
+        for progress in progress_records:
+            progress_data.append({
+                "id": progress["id"],
+                "enrollment_id": progress["enrollment_id"],
+                "lesson_id": progress["lesson_id"],
+                "status": progress.get("status", "not_started"),
+                "completion_percentage": progress.get("completion_percentage", 0.0),
+                "time_spent": 0,  # Column doesn't exist in DB, default to 0
+                "video_watched_duration": progress.get("video_watched_duration", 0),
+                "video_completed": progress.get("video_completed", False),
+                "quiz_completed": progress.get("quiz_completed", False),
+                "assignment_completed": progress.get("assignment_completed", False),
+                "started_at": progress["started_at"].isoformat() if progress.get("started_at") else None,
+                "completed_at": progress["completed_at"].isoformat() if progress.get("completed_at") else None,
+                "last_accessed_at": progress["last_accessed_at"].isoformat() if progress.get("last_accessed_at") else None,
+            })
+        
+        return {"progress": progress_data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API] ERROR getting lesson progress for enrollment {enrollment_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving lesson progress: {str(e)}"
+        )
+
+
+@router.post("/enrollments/{enrollment_id}/lessons/{lesson_id}/complete")
+async def mark_lesson_complete(
+    enrollment_id: int,
+    lesson_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark a lesson as complete for an enrollment"""
+    try:
+        # Verify enrollment exists and belongs to current user
+        result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))
+        enrollment = result.scalar_one_or_none()
+        if not enrollment:
+            raise HTTPException(status_code=404, detail="Enrollment not found")
+        
+        # Check if user has access to this enrollment
+        if enrollment.student_id != current_user.id and current_user.role not in ["instructor", "tutor", "organization_admin", "super_admin"]:
+            raise HTTPException(status_code=403, detail="You don't have permission to update this enrollment's progress")
+        
+        # Update lesson progress (returns dict)
+        progress = await EnrollmentService.update_lesson_progress(
+            db=db,
+            enrollment_id=enrollment_id,
+            lesson_id=lesson_id,
+            video_completed=True,
+            status="completed"
+        )
+        
+        # Convert datetime to ISO format if present
+        if progress.get("completed_at") and hasattr(progress["completed_at"], "isoformat"):
+            progress["completed_at"] = progress["completed_at"].isoformat()
+        
+        return progress
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[API] ERROR marking lesson {lesson_id} complete for enrollment {enrollment_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error marking lesson as complete: {str(e)}"
+        )
 
 
 @router.delete("/enrollments/{enrollment_id}", status_code=status.HTTP_204_NO_CONTENT)
