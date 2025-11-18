@@ -338,5 +338,29 @@ echo "🏥 Running health check..."
 sleep 5
 curl -f http://localhost:8000/health || echo "⚠️  Health check failed"
 
+# SSL/HTTPS Check
+echo ""
+echo "🔒 Checking SSL/HTTPS configuration..."
+if [ -f "/etc/letsencrypt/live/edumentry.com/fullchain.pem" ]; then
+    echo "✅ SSL certificate found - HTTPS is configured"
+    # Check if certificate is valid and not expired soon
+    CERT_EXPIRY=$(sudo openssl x509 -in /etc/letsencrypt/live/edumentry.com/cert.pem -noout -enddate 2>/dev/null | cut -d= -f2)
+    if [ ! -z "$CERT_EXPIRY" ]; then
+        EXPIRY_EPOCH=$(date -d "$CERT_EXPIRY" +%s 2>/dev/null || echo "0")
+        CURRENT_EPOCH=$(date +%s)
+        DAYS_UNTIL_EXPIRY=$(( ($EXPIRY_EPOCH - $CURRENT_EPOCH) / 86400 ))
+        if [ $DAYS_UNTIL_EXPIRY -lt 30 ]; then
+            echo "⚠️  SSL certificate expires in $DAYS_UNTIL_EXPIRY days - renewal recommended"
+        else
+            echo "✅ SSL certificate valid for $DAYS_UNTIL_EXPIRY more days"
+        fi
+    fi
+else
+    echo "⚠️  SSL certificate not found - HTTPS is not configured"
+    echo "📋 To set up HTTPS, run:"
+    echo "   cd $DEPLOY_PATH && sudo ./deploy/setup-ssl.sh"
+    echo "   Or see: deploy/SSL_SETUP_GUIDE.md"
+fi
+
 echo "✅ Deployment completed successfully!"
 
