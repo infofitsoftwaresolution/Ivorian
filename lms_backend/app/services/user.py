@@ -179,9 +179,19 @@ class UserService:
             count_query = select(func.count(User.id))
             
             # Apply filters
+            conditions = []
+            
+            # Auto-filter by organization for tutors/instructors
+            if current_user:
+                if current_user.role == "tutor" or current_user.role == "instructor":
+                    # Tutors/instructors can only see users from their organization
+                    conditions.append(User.organization_id == current_user.organization_id)
+                elif current_user.role == "organization_admin":
+                    # Organization admins can see all users from their organization
+                    if not filters or not filters.organization_id:
+                        conditions.append(User.organization_id == current_user.organization_id)
+            
             if filters:
-                conditions = []
-                
                 if filters.search:
                     search_term = f"%{filters.search}%"
                     conditions.append(
@@ -212,10 +222,10 @@ class UserService:
                 
                 if filters.role:
                     conditions.append(User.role == filters.role)
-                
-                if conditions:
-                    query = query.where(and_(*conditions))
-                    count_query = count_query.where(and_(*conditions))
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+                count_query = count_query.where(and_(*conditions))
             
             # Get total count
             total_result = await db.execute(count_query)

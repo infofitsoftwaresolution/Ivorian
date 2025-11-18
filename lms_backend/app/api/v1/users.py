@@ -264,6 +264,19 @@ async def list_users(
     Supports filtering by various criteria.
     """
     try:
+        # Auto-filter by organization for tutors
+        # Tutors can only see students from their organization
+        actual_organization_id = organization_id
+        
+        if current_user:
+            if current_user.role == "tutor" or current_user.role == "instructor":
+                # Tutors/instructors can only see students from their organization
+                actual_organization_id = current_user.organization_id
+            elif current_user.role == "organization_admin":
+                # Organization admins can see all users from their organization
+                if not actual_organization_id:
+                    actual_organization_id = current_user.organization_id
+        
         # FastAPI automatically parses boolean query params from strings
         # "true" -> True, "false" -> False, anything else -> None
         # Build filters
@@ -271,7 +284,7 @@ async def list_users(
             search=search,
             status=status,
             role=role,
-            organization_id=organization_id,
+            organization_id=actual_organization_id,
             is_active=is_active,  # FastAPI handles string-to-bool conversion
             is_verified=is_verified  # FastAPI handles string-to-bool conversion
         )
