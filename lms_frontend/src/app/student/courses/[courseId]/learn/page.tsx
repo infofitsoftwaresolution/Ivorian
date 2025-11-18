@@ -80,6 +80,49 @@ interface CourseProgress {
   progress_percentage: number;
 }
 
+// Utility function to detect and convert YouTube URLs
+const isYouTubeUrl = (url: string): boolean => {
+  if (!url) return false;
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname === 'www.youtube.com' || 
+           urlObj.hostname === 'youtube.com' || 
+           urlObj.hostname === 'youtu.be' ||
+           urlObj.hostname === 'm.youtube.com';
+  } catch {
+    return false;
+  }
+};
+
+// Extract YouTube video ID from various URL formats
+const getYouTubeVideoId = (url: string): string | null => {
+  if (!url) return null;
+  try {
+    const urlObj = new URL(url);
+    
+    // Handle youtu.be format
+    if (urlObj.hostname === 'youtu.be') {
+      return urlObj.pathname.slice(1);
+    }
+    
+    // Handle youtube.com/watch?v= format
+    if (urlObj.hostname.includes('youtube.com')) {
+      return urlObj.searchParams.get('v');
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+// Convert YouTube URL to embeddable format
+const getYouTubeEmbedUrl = (url: string): string | null => {
+  const videoId = getYouTubeVideoId(url);
+  if (!videoId) return null;
+  return `https://www.youtube.com/embed/${videoId}`;
+};
+
 export default function CourseLearningPage() {
   const params = useParams();
   const router = useRouter();
