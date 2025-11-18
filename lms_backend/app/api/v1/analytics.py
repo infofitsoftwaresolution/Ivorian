@@ -126,18 +126,34 @@ async def get_tutor_analytics(
         total_courses = len(courses)
         
         # Get enrollments for tutor's courses
-        enrollments_query = select(Enrollment).where(Enrollment.course_id.in_(course_ids))
-        if start_date:
-            enrollments_query = enrollments_query.where(Enrollment.enrollment_date >= start_date)
-        
-        enrollments_result = await db.execute(enrollments_query)
-        enrollments = enrollments_result.scalars().all()
+        # Handle case when there are no courses (empty course_ids list)
+        if course_ids:
+            enrollments_query = select(Enrollment).where(Enrollment.course_id.in_(course_ids))
+            if start_date:
+                enrollments_query = enrollments_query.where(Enrollment.enrollment_date >= start_date)
+            
+            enrollments_result = await db.execute(enrollments_query)
+            enrollments = enrollments_result.scalars().all()
+        else:
+            # No courses, so no enrollments
+            enrollments = []
         
         total_enrollments = len(enrollments)
         
-        # Get unique students
+        # Get ALL students in the tutor's organization (not just those with enrollments)
+        # This ensures we count all students, even if they haven't enrolled in courses yet
+        students_query = select(User).where(
+            and_(
+                User.organization_id == current_user.organization_id,
+                User.role == "student"
+            )
+        )
+        students_result = await db.execute(students_query)
+        all_students = students_result.scalars().all()
+        total_students = len(all_students)
+        
+        # Get unique students from enrollments (for enrollment-based metrics)
         unique_student_ids = set([e.student_id for e in enrollments])
-        total_students = len(unique_student_ids)
         
         # Get active students (enrolled in last 30 days)
         active_date = now - timedelta(days=30)
