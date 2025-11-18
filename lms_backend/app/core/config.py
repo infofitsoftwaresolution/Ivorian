@@ -58,7 +58,9 @@ class Settings(BaseSettings):
             return default_origins
         
         if isinstance(v, list):
-            return v
+            # Merge with defaults to ensure production domains are always included
+            merged = list(set(default_origins + v))
+            return merged
         
         if isinstance(v, str):
             # Remove surrounding quotes if present
@@ -69,13 +71,19 @@ class Settings(BaseSettings):
                 try:
                     parsed = json.loads(v)
                     if isinstance(parsed, list):
-                        return parsed
+                        # Merge with defaults
+                        merged = list(set(default_origins + parsed))
+                        return merged
                 except:
                     # If JSON parsing fails, try comma-separated
                     v = v.strip("[]")
             # Handle comma-separated string
             origins = [i.strip().strip('"').strip("'") for i in v.split(",") if i.strip()]
-            return origins if origins else default_origins
+            if origins:
+                # Merge with defaults
+                merged = list(set(default_origins + origins))
+                return merged
+            return default_origins
         
         return default_origins
     
