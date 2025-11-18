@@ -127,10 +127,53 @@ export default function TutorAnalyticsPage() {
       setLoading(true);
       setError('');
 
-      // TODO: Replace with actual API call when endpoint is available
-      // const response = await apiClient.getTutorAnalytics({ period: timePeriod, instructor_id: user?.id });
+      // Fetch real analytics data from API
+      const response = await apiClient.getTutorAnalytics({ period: timePeriod });
       
-      // Empty data structure - analytics endpoint not yet implemented
+      if (response.data) {
+        setAnalyticsData(response.data as TutorAnalyticsData);
+      } else {
+        // Fallback to empty data if response is empty
+        const emptyData: TutorAnalyticsData = {
+          overview: {
+            total_courses: 0,
+            total_students: 0,
+            total_enrollments: 0,
+            total_revenue: 0,
+            average_completion_rate: 0,
+            active_students: 0,
+            course_growth: 0,
+            enrollment_growth: 0
+          },
+          enrollment_trend: {
+            labels: [],
+            data: []
+          },
+          course_performance: {
+            labels: [],
+            data: []
+          },
+          revenue_trend: {
+            labels: [],
+            data: []
+          },
+          student_distribution: {
+            labels: [],
+            data: []
+          },
+          top_courses: [],
+          top_students: []
+        };
+        setAnalyticsData(emptyData);
+      }
+    } catch (error: unknown) {
+      console.error('Error loading analytics:', error);
+      const errorMessage = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      setError(errorMessage || 'Failed to load analytics. Please try again.');
+      
+      // Set empty data on error
       const emptyData: TutorAnalyticsData = {
         overview: {
           total_courses: 0,
@@ -161,15 +204,7 @@ export default function TutorAnalyticsPage() {
         top_courses: [],
         top_students: []
       };
-
       setAnalyticsData(emptyData);
-      setError('Analytics data is not available yet. This feature will be available soon.');
-    } catch (error: unknown) {
-      console.error('Error loading analytics:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error
-        ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-        : undefined;
-      setError(errorMessage || 'Failed to load analytics. Please try again.');
     } finally {
       setLoading(false);
     }
