@@ -222,8 +222,9 @@ class AuthService:
         await self.db.commit()
         await self.db.refresh(organization)
         
-        # Generate temporary password
-        temp_password = self._generate_temp_password()
+        # Use the password provided by the user, or generate a temporary one if not provided
+        # Note: The schema requires admin_password, so it should always be provided
+        temp_password = org_data.admin_password
         hashed_password = get_password_hash(temp_password)
         
         # Create admin user for the organization
