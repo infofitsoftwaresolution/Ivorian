@@ -5,6 +5,7 @@ FastAPI routes for user-related operations
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import math
 
 from app.core.database import get_db
@@ -17,6 +18,7 @@ from app.schemas.user import (
 from app.services.user import UserService
 from app.services.course import EnrollmentService
 from app.models.user import User
+from app.models.organization import Organization
 from app.schemas.tutor import TutorCreate, TutorResponse
 from app.schemas.course import EnrollmentResponse
 from app.core.errors import ValidationError, AuthorizationError, ResourceNotFoundError
@@ -69,6 +71,20 @@ async def user_to_profile(user: User, db: AsyncSession) -> UserProfile:
     is_verified = user.is_verified if user.is_verified is not None else False
     is_active = user.is_active if user.is_active is not None else True
     
+    # Fetch organization name if organization_id exists
+    organization_name = None
+    if user.organization_id:
+        try:
+            org_result = await db.execute(
+                select(Organization).where(Organization.id == user.organization_id)
+            )
+            organization = org_result.scalar_one_or_none()
+            if organization:
+                organization_name = organization.name
+        except Exception as e:
+            # If organization fetch fails, just continue without organization name
+            logger.error(f"Error fetching organization for user {user.id}: {str(e)}")
+    
     return UserProfile(
         id=user.id,
         first_name=user.first_name or "",
@@ -84,6 +100,7 @@ async def user_to_profile(user: User, db: AsyncSession) -> UserProfile:
         is_active=is_active,
         is_verified=is_verified,
         organization_id=user.organization_id,
+        organization_name=organization_name,
         roles=roles,
         created_at=user.created_at,
         updated_at=user.updated_at,
