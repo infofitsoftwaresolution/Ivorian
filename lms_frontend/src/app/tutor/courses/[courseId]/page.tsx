@@ -69,20 +69,35 @@ export default function CourseDetailView() {
       try {
         setLoading(true);
         const response = await apiClient.getCourse(courseId);
+        const courseData = response.data;
+        
+        // Check permissions: tutors can only view their own courses
+        if (user && (user.role === 'tutor' || user.role === 'instructor')) {
+          if (courseData.created_by !== user.id || courseData.organization_id !== user.organization_id) {
+            setError('You do not have permission to view this course.');
+            setLoading(false);
+            return;
+          }
+        }
+        
         // Ensure topics and lessons arrays exist, even if API returns null/undefined
-        const courseData = {
-          ...response.data,
-          topics: response.data.topics || [],
-          enrollments: response.data.enrollments || []
+        const normalizedCourseData = {
+          ...courseData,
+          topics: courseData.topics || [],
+          enrollments: courseData.enrollments || []
         };
         // Ensure each topic has a lessons array
-        courseData.topics = courseData.topics.map((topic: any) => ({
+        normalizedCourseData.topics = normalizedCourseData.topics.map((topic: any) => ({
           ...topic,
           lessons: topic.lessons || []
         }));
-        setCourse(courseData);
-      } catch (error) {
+        setCourse(normalizedCourseData);
+      } catch (error: any) {
         console.error('Error fetching course:', error);
+        // Check if it's a permission error
+        if (error?.response?.status === 403 || error?.message?.includes('permission')) {
+          setError('You do not have permission to view this course.');
+        } else {
         // Mock course for development
         setCourse({
           id: courseId,

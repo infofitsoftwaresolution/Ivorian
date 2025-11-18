@@ -109,7 +109,7 @@ async def get_current_admin(
 
 
 async def get_optional_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
     db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
     """
@@ -133,5 +133,5 @@ async def get_optional_current_user(
         
         user = await User.get_by_id(db, user_id_int)
         return user if user and user.is_active else None
-    except HTTPException:
+    except (HTTPException, Exception):
         return None 

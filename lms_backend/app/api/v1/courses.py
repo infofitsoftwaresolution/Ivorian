@@ -8,7 +8,7 @@ from sqlalchemy import select
 import math
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_optional_current_user
 # from app.core.rbac import require_permission, require_role  # Temporarily disabled
 from app.models.user import User
 from app.schemas.course import (
@@ -54,6 +54,7 @@ async def get_courses(
     organization_id: Optional[int] = Query(None, description="Filter by organization"),
     category: Optional[str] = Query(None, description="Filter by category"),
     is_featured: Optional[bool] = Query(None, description="Filter by featured status"),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Get courses with filtering and pagination"""
@@ -87,15 +88,31 @@ async def get_courses(
                 logger.warning(f"Invalid status value '{status}', ignoring filter: {str(e)}")
                 pass
         
+        # Auto-filter by organization and created_by for tutors
+        # Tutors can only see courses from their organization that they created
+        actual_organization_id = organization_id
+        created_by = None
+        
+        if current_user:
+            if current_user.role == "tutor" or current_user.role == "instructor":
+                # Tutors/instructors can only see their own courses from their organization
+                actual_organization_id = current_user.organization_id
+                created_by = current_user.id
+            elif current_user.role == "organization_admin":
+                # Organization admins can see all courses from their organization
+                if not actual_organization_id:
+                    actual_organization_id = current_user.organization_id
+        
         filters = CourseFilter(
             search=search,
             difficulty_level=difficulty_level,
             min_price=min_price,
             max_price=max_price,
             status=status_enum,
-            organization_id=organization_id,
+            organization_id=actual_organization_id,
             category=category,
-            is_featured=is_featured
+            is_featured=is_featured,
+            created_by=created_by
         )
         
         courses, total = await CourseService.get_courses(db, actual_skip, actual_limit, filters)
@@ -125,12 +142,28 @@ async def get_courses(
 @router.get("/{course_id}", response_model=CourseDetail)
 async def get_course(
     course_id: int,
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Get a course by ID with all details"""
     course = await CourseService.get_course_with_details(db, course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Check permissions: tutors can only view their own courses from their organization
+    if current_user:
+        if current_user.role == "tutor" or current_user.role == "instructor":
+            if course.created_by != current_user.id or course.organization_id != current_user.organization_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You don't have permission to view this course"
+                )
+        elif current_user.role == "organization_admin":
+            if course.organization_id != current_user.organization_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You don't have permission to view this course"
+                )
     
     # Calculate additional stats
     total_lessons = sum(len(topic.lessons) for topic in course.topics)

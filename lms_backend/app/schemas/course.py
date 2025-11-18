@@ -383,6 +383,7 @@ class CourseFilter(BaseModel):
     category: Optional[str] = None
     organization_id: Optional[int] = None
     instructor_id: Optional[int] = None
+    created_by: Optional[int] = None
     min_price: Optional[float] = Field(None, ge=0)
     max_price: Optional[float] = Field(None, ge=0)
     is_featured: Optional[bool] = None

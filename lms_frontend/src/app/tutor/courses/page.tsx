@@ -72,11 +72,26 @@ export default function TutorCourses() {
       try {
         setLoading(true);
         
-        // Use API client to call backend
+        // For tutors, backend automatically filters by organization_id and created_by
+        // No need to pass additional filters - backend handles it based on authenticated user
         const response = await apiClient.getCourses();
         
         // Transform backend data to match our frontend format
-        const transformedCourses = response.data.courses?.map((course: any) => ({
+        // Additional frontend filtering for safety (defense in depth)
+        const allCourses = response.data.courses || response.data.data || response.data || [];
+        const transformedCourses = allCourses
+          .filter((course: any) => {
+            // Additional safety check: only show courses created by current user
+            if (user?.role === 'tutor' || user?.role === 'instructor') {
+              return course.created_by === user.id && course.organization_id === user.organization_id;
+            }
+            // Organization admins can see all courses from their organization
+            if (user?.role === 'organization_admin') {
+              return course.organization_id === user.organization_id;
+            }
+            return true;
+          })
+          .map((course: any) => ({
           id: course.id,
           title: course.title,
           description: course.description,

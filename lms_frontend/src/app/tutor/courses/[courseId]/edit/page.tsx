@@ -142,9 +142,19 @@ export default function CourseBuilder() {
         
         const response = await apiClient.getCourse(courseId);
         console.log('Course data received:', response.data);
+        const courseData = response.data;
+        
+        // Check permissions: tutors can only edit their own courses
+        if (user && (user.role === 'tutor' || user.role === 'instructor')) {
+          if (courseData.created_by !== user.id || courseData.organization_id !== user.organization_id) {
+            alert('You do not have permission to edit this course.');
+            router.push('/tutor/courses');
+            return;
+          }
+        }
         
         // If topics are not included in the main response, fetch them separately
-        let topics = response.data.topics || [];
+        let topics = courseData.topics || [];
         if (!topics || topics.length === 0) {
           console.log('No topics in course response, fetching topics separately...');
           try {

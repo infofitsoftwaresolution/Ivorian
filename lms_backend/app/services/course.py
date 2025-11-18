@@ -141,6 +141,9 @@ class CourseService:
             if filters.organization_id:
                 query = query.where(Course.organization_id == filters.organization_id)
             
+            if filters.created_by:
+                query = query.where(Course.created_by == filters.created_by)
+            
             if filters.category:
                 query = query.where(Course.category == filters.category)
             
@@ -172,11 +175,22 @@ class CourseService:
             raise ResourceNotFoundError("Course not found")
         
         # Check if user has permission to update this course
-        if course.created_by != user_id:
-            # Check if user is organization admin
-            result = await db.execute(select(User).where(User.id == user_id))
-            user = result.scalar_one_or_none()
-            if not user or user.role != "organization_admin":
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            raise AuthorizationError("User not found")
+        
+        # Tutors/instructors can only update their own courses from their organization
+        if user.role == "tutor" or user.role == "instructor":
+            if course.created_by != user_id or course.organization_id != user.organization_id:
+                raise AuthorizationError("You don't have permission to update this course")
+        # Organization admins can update any course from their organization
+        elif user.role == "organization_admin":
+            if course.organization_id != user.organization_id:
+                raise AuthorizationError("You don't have permission to update this course")
+        # Super admins can update any course
+        elif user.role != "super_admin":
+            if course.created_by != user_id:
                 raise AuthorizationError("You don't have permission to update this course")
         
         # Update course fields
