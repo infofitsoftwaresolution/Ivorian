@@ -132,6 +132,154 @@ async def get_organizations(
         )
 
 
+@router.get("/me", response_model=OrganizationResponse, summary="Get current user's organization")
+async def get_my_organization(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get the current user's organization.
+    Accessible by organization_admin to get their own organization.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="You are not associated with any organization."
+        )
+    
+    try:
+        result = await db.execute(
+            select(Organization).where(Organization.id == current_user.organization_id)
+        )
+        organization = result.scalar_one_or_none()
+        
+        if not organization:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Organization not found."
+            )
+        
+        # Get user and course counts
+        user_count_result = await db.execute(
+            select(func.count(User.id)).where(User.organization_id == organization.id)
+        )
+        user_count = user_count_result.scalar() or 0
+        
+        course_count_result = await db.execute(
+            select(func.count(Course.id)).where(Course.organization_id == organization.id)
+        )
+        course_count = course_count_result.scalar() or 0
+        
+        org_dict = {
+            "id": organization.id,
+            "name": organization.name,
+            "description": organization.description,
+            "website": organization.website,
+            "contact_email": organization.contact_email,
+            "contact_phone": organization.contact_phone,
+            "address": organization.address,
+            "industry": organization.industry,
+            "size": organization.size,
+            "domain": organization.domain,
+            "logo_url": organization.logo_url,
+            "is_active": organization.is_active,
+            "created_at": organization.created_at,
+            "updated_at": organization.updated_at,
+            "user_count": user_count,
+            "course_count": course_count
+        }
+        
+        return OrganizationResponse(**org_dict)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        app_logger.error(f"Error fetching organization: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve organization: {str(e)}"
+        )
+
+
+@router.put("/me", response_model=OrganizationResponse, summary="Update current user's organization")
+async def update_my_organization(
+    organization_data: OrganizationUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update the current user's organization.
+    Accessible by organization_admin to update their own organization.
+    """
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="You are not associated with any organization."
+        )
+    
+    try:
+        result = await db.execute(
+            select(Organization).where(Organization.id == current_user.organization_id)
+        )
+        organization = result.scalar_one_or_none()
+        
+        if not organization:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Organization not found."
+            )
+        
+        # Update fields
+        update_data = organization_data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(organization, field, value)
+        
+        await db.commit()
+        await db.refresh(organization)
+        
+        # Get user and course counts
+        user_count_result = await db.execute(
+            select(func.count(User.id)).where(User.organization_id == organization.id)
+        )
+        user_count = user_count_result.scalar() or 0
+        
+        course_count_result = await db.execute(
+            select(func.count(Course.id)).where(Course.organization_id == organization.id)
+        )
+        course_count = course_count_result.scalar() or 0
+        
+        org_dict = {
+            "id": organization.id,
+            "name": organization.name,
+            "description": organization.description,
+            "website": organization.website,
+            "contact_email": organization.contact_email,
+            "contact_phone": organization.contact_phone,
+            "address": organization.address,
+            "industry": organization.industry,
+            "size": organization.size,
+            "domain": organization.domain,
+            "logo_url": organization.logo_url,
+            "is_active": organization.is_active,
+            "created_at": organization.created_at,
+            "updated_at": organization.updated_at,
+            "user_count": user_count,
+            "course_count": course_count
+        }
+        
+        return OrganizationResponse(**org_dict)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        app_logger.error(f"Error updating organization: {str(e)}")
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update organization: {str(e)}"
+        )
+
+
 @router.get("/{organization_id}", response_model=OrganizationResponse, summary="Get organization by ID")
 async def get_organization(
     organization_id: int,
@@ -140,12 +288,19 @@ async def get_organization(
 ):
     """
     Get a specific organization by ID.
-    Only accessible by super_admin.
+    Accessible by super_admin for any organization, or organization_admin for their own organization.
     """
-    if current_user.role != "super_admin":
+    # Check permissions
+    if current_user.role == "super_admin":
+        # Super admin can access any organization
+        pass
+    elif current_user.role == "organization_admin" and current_user.organization_id == organization_id:
+        # Organization admin can access their own organization
+        pass
+    else:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only super administrators can access organizations."
+            detail="You don't have permission to access this organization."
         )
     
     try:
@@ -211,12 +366,19 @@ async def update_organization(
 ):
     """
     Update an organization.
-    Only accessible by super_admin.
+    Accessible by super_admin for any organization, or organization_admin for their own organization.
     """
-    if current_user.role != "super_admin":
+    # Check permissions
+    if current_user.role == "super_admin":
+        # Super admin can update any organization
+        pass
+    elif current_user.role == "organization_admin" and current_user.organization_id == organization_id:
+        # Organization admin can update their own organization
+        pass
+    else:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only super administrators can update organizations."
+            detail="You don't have permission to update this organization."
         )
     
     try:

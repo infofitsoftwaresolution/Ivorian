@@ -528,6 +528,17 @@ class ApiClient {
     return this.request(`/api/v1/organizations/${queryString}`);
   }
 
+  async getMyOrganization(): Promise<ApiResponse> {
+    return this.request(`/api/v1/organizations/me`);
+  }
+
+  async updateMyOrganization(data: any): Promise<ApiResponse> {
+    return this.request(`/api/v1/organizations/me`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getOrganization(id: string): Promise<ApiResponse> {
     return this.request(`/api/v1/organizations/${id}`);
   }

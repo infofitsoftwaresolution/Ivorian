@@ -21,7 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
-// import { apiClient } from '@/lib/api/client'; // TODO: Uncomment when API is ready
+import { apiClient } from '@/lib/api/client';
 
 interface PlatformSettings {
   app_name: string;
@@ -71,11 +71,11 @@ export default function SettingsPage() {
 
   // Settings state
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>({
-    app_name: 'InfoFit Labs LMS',
+    app_name: '',
     app_version: '1.0.0',
-    support_email: 'support@infofitlabs.com',
-    support_phone: '+1-555-0123',
-    website_url: 'https://infofitlabs.com',
+    support_email: '',
+    support_phone: '',
+    website_url: '',
     maintenance_mode: false,
     registration_enabled: true,
     email_verification_required: true
@@ -123,19 +123,35 @@ export default function SettingsPage() {
   }, [user, authLoading]);
 
   const loadSettings = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
       setError('');
 
-      // TODO: Replace with actual API call
-      // const response = await apiClient.getPlatformSettings();
-      // setPlatformSettings(response.data.platform);
-      // setEmailSettings(response.data.email);
-      // setPaymentSettings(response.data.payment);
-      // setSecuritySettings(response.data.security);
-
-      // Mock data for now
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // For organization admins, fetch their organization data
+      if (user.role === 'organization_admin' && user.organization_id) {
+        const orgResponse = await apiClient.getMyOrganization();
+        const orgData = orgResponse.data;
+        
+        if (orgData) {
+          // Map organization data to platform settings
+          setPlatformSettings({
+            app_name: orgData.name || '',
+            app_version: '1.0.0',
+            support_email: orgData.contact_email || '',
+            support_phone: orgData.contact_phone || '',
+            website_url: orgData.website || '',
+            maintenance_mode: false, // Organization-level setting
+            registration_enabled: true, // Organization-level setting
+            email_verification_required: true // Organization-level setting
+          });
+        }
+      } else if (user.role === 'super_admin') {
+        // For super admin, load platform-wide settings
+        // TODO: Implement platform settings API when available
+        // For now, keep default values
+      }
     } catch (error: unknown) {
       console.error('Error loading settings:', error);
       const errorMessage = error && typeof error === 'object' && 'response' in error
@@ -148,24 +164,33 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
+    if (!user) return;
+    
     try {
       setSaving(true);
       setError('');
       setSuccessMessage('');
 
-      // TODO: Replace with actual API call
-      // await apiClient.updatePlatformSettings({
-      //   platform: platformSettings,
-      //   email: emailSettings,
-      //   payment: paymentSettings,
-      //   security: securitySettings
-      // });
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // For organization admins, update their organization
+      if (user.role === 'organization_admin' && user.organization_id) {
+        await apiClient.updateMyOrganization({
+          name: platformSettings.app_name,
+          contact_email: platformSettings.support_email,
+          contact_phone: platformSettings.support_phone,
+          website: platformSettings.website_url
+        });
+      } else if (user.role === 'super_admin') {
+        // For super admin, update platform-wide settings
+        // TODO: Implement platform settings API when available
+        // For now, just show success message
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
 
       setSuccessMessage('Settings saved successfully!');
       setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Reload settings to show updated data
+      await loadSettings();
     } catch (error: unknown) {
       console.error('Error saving settings:', error);
       const errorMessage = error && typeof error === 'object' && 'response' in error
@@ -299,15 +324,20 @@ export default function SettingsPage() {
           {activeTab === 'general' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Platform Information</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  {user?.role === 'organization_admin' ? 'Organization Information' : 'Platform Information'}
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">App Name</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {user?.role === 'organization_admin' ? 'Organization Name' : 'App Name'}
+                    </label>
                     <input
                       type="text"
                       value={platformSettings.app_name}
                       onChange={(e) => setPlatformSettings({ ...platformSettings, app_name: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder={user?.role === 'organization_admin' ? 'Enter organization name' : 'Enter app name'}
                     />
                   </div>
                   <div>
