@@ -70,10 +70,12 @@ export default function OrganizationDashboard() {
       }
       
       // Fetch all data in parallel
+      // Note: Backend limits size to 100 for users, but we can use total from response for accurate counts
+      // For courses, we can use limit (up to 1000) instead of size
       const [tutorsResponse, studentsResponse, coursesResponse] = await Promise.all([
-        apiClient.getUsers({ role: 'tutor', organization_id: user.organization_id, size: 1000 }),
-        apiClient.getUsers({ role: 'student', organization_id: user.organization_id, size: 1000 }),
-        apiClient.getCourses({ organization_id: user.organization_id, size: 1000 })
+        apiClient.getUsers({ role: 'tutor', organization_id: Number(user.organization_id), size: 100, page: 1 }),
+        apiClient.getUsers({ role: 'student', organization_id: Number(user.organization_id), size: 100, page: 1 }),
+        apiClient.getCourses({ organization_id: Number(user.organization_id), limit: 1000, skip: 0 })
       ]);
       
       // Extract data from responses
@@ -87,7 +89,12 @@ export default function OrganizationDashboard() {
         ? coursesResponse.data 
         : coursesResponse.data?.courses || [];
       
-      // Filter for correct roles (handle both roles array and role field)
+      // Get total counts from API responses (more accurate than counting returned items)
+      const totalTutors = tutorsResponse.data?.total ?? tutorsData.length;
+      const totalStudents = studentsResponse.data?.total ?? studentsData.length;
+      const totalCourses = coursesResponse.data?.total ?? coursesData.length;
+      
+      // Filter for correct roles (handle both roles array and role field) for display purposes
       const tutors = tutorsData.filter((tutor: any) => {
         const userRoles = tutor.roles || (tutor.role ? [tutor.role] : []);
         return userRoles.includes('tutor') || userRoles.includes('instructor');
@@ -97,11 +104,6 @@ export default function OrganizationDashboard() {
         const userRoles = student.roles || (student.role ? [student.role] : []);
         return userRoles.includes('student');
       });
-      
-      // Calculate stats
-      const totalTutors = tutors.length;
-      const totalStudents = students.length;
-      const totalCourses = coursesData.length;
       
       // Calculate active enrollments (enrollments in last 30 days)
       const thirtyDaysAgo = new Date();
