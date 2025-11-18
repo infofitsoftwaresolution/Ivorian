@@ -10,9 +10,12 @@ function getBaseURL(): string {
   
   // If running in browser and page is HTTPS, convert HTTP backend URLs to HTTPS
   if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    // Convert http:// to https:// for production backend
-    if (envURL.startsWith('http://') && !envURL.includes('localhost')) {
-      return envURL.replace('http://', 'https://');
+    // Convert http:// to https:// for production backend (but not localhost)
+    if (envURL.startsWith('http://') && !envURL.includes('localhost') && !envURL.includes('127.0.0.1')) {
+      const httpsURL = envURL.replace('http://', 'https://');
+      console.warn(`[API Client] Converting HTTP to HTTPS: ${envURL} -> ${httpsURL}`);
+      console.warn(`[API Client] Note: Backend must support HTTPS for this to work. If backend doesn't support HTTPS, configure a reverse proxy or update NEXT_PUBLIC_API_URL.`);
+      return httpsURL;
     }
   }
   
@@ -148,6 +151,15 @@ class ApiClient {
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     const accessToken = TokenManager.getAccessToken();
+    
+    // Log request details in development or when there are errors
+    if (process.env.NODE_ENV === 'development' || retryCount === 0) {
+      console.log(`[API Client] ${options.method || 'GET'} ${url}`);
+      console.log(`[API Client] Base URL: ${this.baseURL}`);
+      if (typeof window !== 'undefined') {
+        console.log(`[API Client] Frontend Protocol: ${window.location.protocol}`);
+      }
+    }
 
     const defaultHeaders: HeadersInit = {
       'Content-Type': 'application/json',
@@ -241,10 +253,34 @@ class ApiClient {
         return this.request<T>(endpoint, options, retryCount + 1);
       }
 
+      // Provide more detailed error messages for network errors
+      let errorMessage = 'Network error';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        // Check for specific error types
+        if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+          // This usually means CORS, mixed content, or backend not reachable
+          const isHTTPS = typeof window !== 'undefined' && window.location.protocol === 'https:';
+          const backendURL = this.baseURL;
+          if (isHTTPS && backendURL.startsWith('http://')) {
+            errorMessage = `Mixed Content Error: Frontend is HTTPS but backend is HTTP. Please configure HTTPS for backend at ${backendURL} or update NEXT_PUBLIC_API_URL to use HTTPS.`;
+          } else if (backendURL.includes('localhost')) {
+            errorMessage = `Cannot connect to backend at ${backendURL}. Please ensure the backend server is running.`;
+          } else {
+            errorMessage = `Cannot connect to backend at ${backendURL}. Please check: 1) Backend server is running, 2) CORS is configured, 3) Network connectivity.`;
+          }
+        }
+      }
+      
       throw new ApiError({
-        message: error instanceof Error ? error.message : 'Network error',
+        message: errorMessage,
         status: 0,
         code: 'NETWORK_ERROR',
+        details: {
+          baseURL: this.baseURL,
+          endpoint,
+          protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown',
+        },
       });
     }
   }
