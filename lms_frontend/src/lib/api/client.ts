@@ -250,7 +250,16 @@ class ApiClient {
         
         // Extract detailed error message
         let errorMessage = `HTTP ${response.status}`;
-        if (errorData.detail) {
+        
+        // Special handling for 502 Bad Gateway
+        if (response.status === 502) {
+          errorMessage = 'Backend server is not responding. Please check if the backend service is running.';
+          console.error('[API Client] 502 Bad Gateway - Backend server is not accessible');
+          console.error('[API Client] This usually means:');
+          console.error('[API Client] 1. Backend server is not running on port 8000');
+          console.error('[API Client] 2. Nginx cannot reach the backend server');
+          console.error('[API Client] 3. Backend server is overloaded or crashed');
+        } else if (errorData.detail) {
           // Handle both string and array detail formats
           if (Array.isArray(errorData.detail)) {
             errorMessage = errorData.detail.map((err: any) => {
