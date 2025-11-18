@@ -12,6 +12,14 @@ function getBaseURL(): string {
   if (typeof window !== 'undefined') {
     const isHTTPS = window.location.protocol === 'https:';
     const currentHost = window.location.host;
+    const isEdumentryDomain = currentHost.includes('edumentry.com');
+    
+    // If frontend is on edumentry.com domain, always use relative URL
+    // This assumes Nginx is routing /api to the backend
+    if (isEdumentryDomain) {
+      console.log(`[API Client] Frontend on ${currentHost} - using relative URL /api`);
+      return ''; // Empty string means relative URL - requests will go to /api/v1/...
+    }
     
     // If frontend is HTTPS and backend URL is HTTP
     if (isHTTPS && envURL.startsWith('http://') && !envURL.includes('localhost') && !envURL.includes('127.0.0.1')) {
@@ -27,7 +35,7 @@ function getBaseURL(): string {
       const httpsURL = envURL.replace('http://', 'https://');
       console.warn(`[API Client] Converting HTTP to HTTPS: ${envURL} -> ${httpsURL}`);
       console.warn(`[API Client] ⚠️  If you get ERR_SSL_PROTOCOL_ERROR, the backend doesn't support HTTPS.`);
-      console.warn(`[API Client] 💡 Solution: Set up Nginx reverse proxy with SSL, or use same-domain routing.`);
+      console.warn(`[API Client] 💡 Solution: Set NEXT_PUBLIC_API_URL=/api or set up Nginx reverse proxy with SSL.`);
       return httpsURL;
     }
   }
