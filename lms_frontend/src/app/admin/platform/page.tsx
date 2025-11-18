@@ -23,6 +23,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
 import { showToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface Organization {
   id: number;
@@ -54,6 +55,11 @@ export default function PlatformDashboard() {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; orgId: number | null; orgName: string }>({
+    isOpen: false,
+    orgId: null,
+    orgName: '',
+  });
 
   // Check if user is super admin
   useEffect(() => {
@@ -443,6 +449,34 @@ export default function PlatformDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, orgId: null, orgName: '' })}
+        onConfirm={async () => {
+          if (!deleteConfirm.orgId) return;
+          try {
+            setLoading(true);
+            setDeleteConfirm({ isOpen: false, orgId: null, orgName: '' });
+            await apiClient.deleteOrganization(deleteConfirm.orgId.toString());
+            showToast(`${deleteConfirm.orgName} deleted successfully`, 'success');
+            await loadPlatformData();
+          } catch (error: any) {
+            console.error('Error deleting organization:', error);
+            const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete organization. Please try again.';
+            showToast(errorMessage, 'error', 7000);
+          } finally {
+            setLoading(false);
+          }
+        }}
+        title="Delete Organization"
+        message={`Are you sure you want to delete "${deleteConfirm.orgName}"? This action cannot be undone. All users and courses must be removed first.`}
+        confirmText="Delete Organization"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={loading}
+      />
     </div>
   );
 }

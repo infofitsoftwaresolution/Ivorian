@@ -23,6 +23,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
 import { showToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 // Mock data for organization dashboard
 const mockStats = {
@@ -46,6 +47,7 @@ export default function OrganizationDashboard() {
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Check if user is organization admin and redirect if not
   useEffect(() => {
@@ -269,45 +271,48 @@ export default function OrganizationDashboard() {
                 </p>
               </div>
               <button
-                onClick={async () => {
-                  if (confirm('Are you sure you want to delete this organization? This action cannot be undone. All users and courses must be removed first.')) {
-                    try {
-                      setLoading(true);
-                      await apiClient.deleteOrganization(user.organization_id!.toString());
-                      showToast('Organization deleted successfully', 'success');
-                      // Logout and redirect to home after a short delay
-                      setTimeout(() => {
-                        logout();
-                        router.push('/');
-                      }, 2000);
-                    } catch (error: any) {
-                      console.error('Error deleting organization:', error);
-                      const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete organization. Please try again.';
-                      showToast(errorMessage, 'error', 7000);
-                    } finally {
-                      setLoading(false);
-                    }
-                  }
-                }}
+                onClick={() => setShowDeleteConfirm(true)}
                 disabled={loading}
                 className="ml-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    <span className="ml-2">Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <TrashIcon className="h-4 w-4 mr-2" />
-                    Delete Organization
-                  </>
-                )}
+                <TrashIcon className="h-4 w-4 mr-2" />
+                Delete Organization
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={async () => {
+          try {
+            setLoading(true);
+            setShowDeleteConfirm(false);
+            await apiClient.deleteOrganization(user!.organization_id!.toString());
+            showToast('Organization deleted successfully', 'success');
+            // Logout and redirect to home after a short delay
+            setTimeout(() => {
+              logout();
+              router.push('/');
+            }, 2000);
+          } catch (error: any) {
+            console.error('Error deleting organization:', error);
+            const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete organization. Please try again.';
+            showToast(errorMessage, 'error', 7000);
+          } finally {
+            setLoading(false);
+          }
+        }}
+        title="Delete Organization"
+        message="Are you sure you want to delete this organization? This action cannot be undone. All users and courses must be removed first."
+        confirmText="Delete Organization"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={loading}
+      />
     </div>
   );
 }

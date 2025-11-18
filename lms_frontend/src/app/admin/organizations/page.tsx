@@ -21,6 +21,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
 import { showToast } from '@/components/ui/Toast';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface Organization {
   id: number;
@@ -45,6 +46,11 @@ export default function OrganizationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [filterIndustry, setFilterIndustry] = useState('all');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; orgId: number | null; orgName: string }>({
+    isOpen: false,
+    orgId: null,
+    orgName: '',
+  });
 
   // Check if user is super admin
   useEffect(() => {
@@ -148,23 +154,27 @@ export default function OrganizationsPage() {
     router.push(`/admin/organizations/${orgId}/edit`);
   };
 
-  const handleDeleteOrganization = async (orgId: number) => {
+  const handleDeleteOrganization = (orgId: number) => {
     const org = organizations.find(o => o.id === orgId);
     const orgName = org?.name || 'this organization';
+    setDeleteConfirm({ isOpen: true, orgId, orgName });
+  };
+
+  const confirmDeleteOrganization = async () => {
+    if (!deleteConfirm.orgId) return;
     
-    if (confirm(`Are you sure you want to delete ${orgName}? This action cannot be undone. All users and courses must be removed first.`)) {
-      try {
-        setLoading(true);
-        await apiClient.deleteOrganization(orgId.toString());
-        showToast(`${orgName} deleted successfully`, 'success');
-        await loadOrganizations();
-      } catch (error: any) {
-        console.error('Error deleting organization:', error);
-        const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete organization. Please try again.';
-        showToast(errorMessage, 'error', 7000);
-      } finally {
-        setLoading(false);
-      }
+    try {
+      setLoading(true);
+      setDeleteConfirm({ isOpen: false, orgId: null, orgName: '' });
+      await apiClient.deleteOrganization(deleteConfirm.orgId.toString());
+      showToast(`${deleteConfirm.orgName} deleted successfully`, 'success');
+      await loadOrganizations();
+    } catch (error: any) {
+      console.error('Error deleting organization:', error);
+      const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete organization. Please try again.';
+      showToast(errorMessage, 'error', 7000);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -405,6 +415,19 @@ export default function OrganizationsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, orgId: null, orgName: '' })}
+        onConfirm={confirmDeleteOrganization}
+        title="Delete Organization"
+        message={`Are you sure you want to delete "${deleteConfirm.orgName}"? This action cannot be undone. All users and courses must be removed first.`}
+        confirmText="Delete Organization"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={loading}
+      />
     </div>
   );
 }
