@@ -15,6 +15,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
+import { showToast } from '@/components/ui/Toast';
 
 // Form validation schema
 const organizationSchema = z.object({
