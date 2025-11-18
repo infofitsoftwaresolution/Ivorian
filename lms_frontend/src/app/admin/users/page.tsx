@@ -21,6 +21,7 @@ import {
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
+import { showToast } from '@/components/ui/Toast';
 
 interface User {
   id: number;
@@ -181,15 +182,20 @@ export default function UsersPage() {
   };
 
   const handleDeleteUser = async (userId: number) => {
-    if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    const userToDelete = users.find(u => u.id === userId);
+    const userName = userToDelete ? `${userToDelete.first_name} ${userToDelete.last_name}` : 'this user';
+    
+    if (confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
       try {
         setLoading(true);
         await apiClient.deleteUser(String(userId));
+        showToast(`${userName} deleted successfully`, 'success');
         await loadUsers();
       } catch (error: any) {
         console.error('Error deleting user:', error);
-        setError(error?.response?.data?.detail || 'Failed to delete user. Please try again.');
-        alert(error?.response?.data?.detail || 'Failed to delete user. Please try again.');
+        const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete user. Please try again.';
+        setError(errorMessage);
+        showToast(errorMessage, 'error', 7000);
       } finally {
         setLoading(false);
       }

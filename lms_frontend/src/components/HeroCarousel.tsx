@@ -54,7 +54,7 @@ const heroSlides = [
     id: 6,
     title: "Watch video lessons from expert instructors",
     subtitle: "High-quality video content with lifetime access. Learn at your own pace with step-by-step guidance.",
-    image: "https://images.unnsplash.com/photo-1503676260728-1c00da094a0b?w=1920&h=600&fit=crop&auto=format&q=80",
+    image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1920&h=600&fit=crop&auto=format&q=80",
     cta: "Start Learning",
     ctaLink: "/register"
   },

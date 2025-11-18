@@ -21,6 +21,7 @@ import {
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
+import { showToast } from '@/components/ui/Toast';
 
 interface Course {
   id: number;
@@ -205,18 +206,28 @@ export default function CoursesPage() {
   };
 
   const handleDeleteCourse = async (courseId: number) => {
-    if (confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
+    const courseToDelete = courses.find(c => c.id === courseId);
+    const courseName = courseToDelete?.title || 'this course';
+    
+    if (confirm(`Are you sure you want to delete "${courseName}"? This action cannot be undone.`)) {
       try {
         setLoading(true);
         await apiClient.deleteCourse(courseId);
+        showToast(`"${courseName}" deleted successfully`, 'success');
         await loadCourses();
       } catch (error: unknown) {
         console.error('Error deleting course:', error);
-        const errorMessage = error && typeof error === 'object' && 'response' in error
-          ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-          : undefined;
-        setError(errorMessage || 'Failed to delete course. Please try again.');
-        alert(errorMessage || 'Failed to delete course. Please try again.');
+        let errorMessage = 'Failed to delete course. Please try again.';
+        if (error && typeof error === 'object') {
+          if ('message' in error && typeof (error as any).message === 'string') {
+            errorMessage = (error as any).message;
+          } else if ('response' in error) {
+            const apiError = error as { response?: { data?: { detail?: string } } };
+            errorMessage = apiError.response?.data?.detail || errorMessage;
+          }
+        }
+        setError(errorMessage);
+        showToast(errorMessage, 'error', 7000);
       } finally {
         setLoading(false);
       }

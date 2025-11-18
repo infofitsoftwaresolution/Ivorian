@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import ToastContainer from '@/components/ui/Toast'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -29,6 +30,7 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         {children}
+        <ToastContainer />
       </body>
     </html>
   )

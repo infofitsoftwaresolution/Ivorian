@@ -290,14 +290,8 @@ async def delete_organization(
 ):
     """
     Delete an organization.
-    Only accessible by super_admin.
+    Accessible by super_admin or organization_admin (only their own organization).
     """
-    if current_user.role != "super_admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only super administrators can delete organizations."
-        )
-    
     try:
         result = await db.execute(
             select(Organization).where(Organization.id == organization_id)
@@ -308,6 +302,19 @@ async def delete_organization(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Organization with ID {organization_id} not found."
+            )
+        
+        # Check permissions: super_admin can delete any, organization_admin can only delete their own
+        if current_user.role == "super_admin":
+            # Super admin can delete any organization
+            pass
+        elif current_user.role == "organization_admin" and current_user.organization_id == organization_id:
+            # Organization admin can delete their own organization
+            pass
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to delete this organization. Only super administrators can delete any organization, or organization administrators can delete their own organization."
             )
         
         # Check if organization has users or courses

@@ -16,10 +16,13 @@ import {
   PlusIcon,
   UserGroupIcon,
   DocumentTextIcon,
-  CogIcon
+  CogIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
+import { apiClient } from '@/lib/api/client';
+import { showToast } from '@/components/ui/Toast';
 
 // Mock data for organization dashboard
 const mockStats = {
@@ -39,9 +42,10 @@ const mockRecentActivity = [
 ];
 
 export default function OrganizationDashboard() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Check if user is organization admin and redirect if not
   useEffect(() => {
@@ -248,6 +252,62 @@ export default function OrganizationDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Danger Zone - Delete Organization */}
+      {user?.organization_id && (
+        <div className="bg-white rounded-lg shadow border border-red-200">
+          <div className="px-6 py-4 border-b border-red-200 bg-red-50">
+            <h2 className="text-lg font-medium text-red-900">Danger Zone</h2>
+          </div>
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-900">Delete Organization</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Permanently delete your organization and all associated data. This action cannot be undone.
+                  You must remove all users and courses before deleting the organization.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  if (confirm('Are you sure you want to delete this organization? This action cannot be undone. All users and courses must be removed first.')) {
+                    try {
+                      setLoading(true);
+                      await apiClient.deleteOrganization(user.organization_id!.toString());
+                      showToast('Organization deleted successfully', 'success');
+                      // Logout and redirect to home after a short delay
+                      setTimeout(() => {
+                        logout();
+                        router.push('/');
+                      }, 2000);
+                    } catch (error: any) {
+                      console.error('Error deleting organization:', error);
+                      const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete organization. Please try again.';
+                      showToast(errorMessage, 'error', 7000);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }
+                }}
+                disabled={loading}
+                className="ml-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    <span className="ml-2">Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon className="h-4 w-4 mr-2" />
+                    Delete Organization
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

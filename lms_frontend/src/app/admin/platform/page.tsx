@@ -22,6 +22,7 @@ import {
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
+import { showToast } from '@/components/ui/Toast';
 
 interface Organization {
   id: number;
@@ -415,13 +416,16 @@ export default function PlatformDashboard() {
                     </button>
                     <button
                       onClick={async () => {
-                        if (confirm(`Are you sure you want to delete ${org.name}? This action cannot be undone.`)) {
+                        if (confirm(`Are you sure you want to delete ${org.name}? This action cannot be undone. All users and courses must be removed first.`)) {
                           try {
                             setLoading(true);
                             await apiClient.deleteOrganization(org.id.toString());
+                            showToast(`${org.name} deleted successfully`, 'success');
                             await loadPlatformData();
                           } catch (error: any) {
-                            alert(error?.response?.data?.detail || 'Failed to delete organization. Please try again.');
+                            console.error('Error deleting organization:', error);
+                            const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete organization. Please try again.';
+                            showToast(errorMessage, 'error', 7000);
                           } finally {
                             setLoading(false);
                           }

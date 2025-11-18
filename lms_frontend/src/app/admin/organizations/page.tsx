@@ -20,6 +20,7 @@ import {
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
+import { showToast } from '@/components/ui/Toast';
 
 interface Organization {
   id: number;
@@ -148,14 +149,19 @@ export default function OrganizationsPage() {
   };
 
   const handleDeleteOrganization = async (orgId: number) => {
-    if (confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
+    const org = organizations.find(o => o.id === orgId);
+    const orgName = org?.name || 'this organization';
+    
+    if (confirm(`Are you sure you want to delete ${orgName}? This action cannot be undone. All users and courses must be removed first.`)) {
       try {
         setLoading(true);
         await apiClient.deleteOrganization(orgId.toString());
+        showToast(`${orgName} deleted successfully`, 'success');
         await loadOrganizations();
       } catch (error: any) {
         console.error('Error deleting organization:', error);
-        alert(error?.response?.data?.detail || 'Failed to delete organization. Please try again.');
+        const errorMessage = error?.message || error?.response?.data?.detail || 'Failed to delete organization. Please try again.';
+        showToast(errorMessage, 'error', 7000);
       } finally {
         setLoading(false);
       }

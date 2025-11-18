@@ -20,6 +20,7 @@ import {
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
+import { showToast } from '@/components/ui/Toast';
 
 interface Student {
   id: number;
@@ -219,18 +220,28 @@ export default function StudentsPage() {
   };
 
   const handleDeleteStudent = async (studentId: number) => {
-    if (confirm('Are you sure you want to delete this student? This action cannot be undone.')) {
+    const studentToDelete = students.find(s => s.id === studentId);
+    const studentName = studentToDelete ? `${studentToDelete.first_name} ${studentToDelete.last_name}` : 'this student';
+    
+    if (confirm(`Are you sure you want to delete ${studentName}? This action cannot be undone.`)) {
       try {
         setLoading(true);
         await apiClient.deleteUser(String(studentId));
+        showToast(`${studentName} deleted successfully`, 'success');
         await loadStudents();
       } catch (error: unknown) {
         console.error('Error deleting student:', error);
-        const errorMessage = error && typeof error === 'object' && 'response' in error
-          ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-          : undefined;
-        setError(errorMessage || 'Failed to delete student. Please try again.');
-        alert(errorMessage || 'Failed to delete student. Please try again.');
+        let errorMessage = 'Failed to delete student. Please try again.';
+        if (error && typeof error === 'object') {
+          if ('message' in error && typeof (error as any).message === 'string') {
+            errorMessage = (error as any).message;
+          } else if ('response' in error) {
+            const apiError = error as { response?: { data?: { detail?: string } } };
+            errorMessage = apiError.response?.data?.detail || errorMessage;
+          }
+        }
+        setError(errorMessage);
+        showToast(errorMessage, 'error', 7000);
       } finally {
         setLoading(false);
       }
