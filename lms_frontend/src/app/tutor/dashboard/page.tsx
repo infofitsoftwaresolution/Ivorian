@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api/client';
@@ -53,7 +53,8 @@ interface Student {
   first_name: string;
   last_name: string;
   email: string;
-  last_login: string;
+  last_login?: string;
+  created_at?: string;
   enrolled_courses: number;
 }
 
@@ -63,6 +64,7 @@ export default function TutorDashboard() {
   
   // State management
   const [loading, setLoading] = useState(true);
+  const [organizationName, setOrganizationName] = useState<string>('Your Organization');
   const [stats, setStats] = useState<DashboardStats>({
     totalCourses: 0,
     totalStudents: 0,
@@ -76,55 +78,103 @@ export default function TutorDashboard() {
   const [error, setError] = useState('');
 
   // Fetch dashboard data
-  useEffect(() => {
-    const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Fetch organization name from user profile
       try {
-        setLoading(true);
-        
-        // Fetch courses
-        const coursesResponse = await apiClient.getCourses();
-        const coursesData = Array.isArray(coursesResponse.data) 
-          ? coursesResponse.data 
-          : coursesResponse.data?.courses || [];
-        setCourses(coursesData.slice(0, 5)); // Show only recent 5 courses
-        
-        // Fetch students
-        // Backend automatically filters by organization_id for tutors
-        const studentsResponse = await apiClient.getUsers({ role: 'student' });
-        const studentsData = Array.isArray(studentsResponse.data) 
-          ? studentsResponse.data 
-          : studentsResponse.data?.users || [];
-        // Backend already filters by organization and role, so we just need to transform
-        const studentUsers = studentsData.filter((user: any) => user.role === 'student');
-        setStudents(studentUsers.slice(0, 5)); // Show only recent 5 students
-        
-        // Calculate stats
-        const totalCourses = coursesData.length;
-        const totalStudents = studentUsers.length;
-        const totalLessons = coursesData.reduce((acc: number, course: any) => acc + (course.total_lessons || 0), 0);
-        const completionRate = totalCourses > 0 ? Math.round((totalCourses / totalCourses) * 100) : 0; // Placeholder calculation
-        
-        setStats({
-          totalCourses,
-          totalStudents,
-          totalLessons,
-          completionRate,
-          totalEarnings: 0, // TODO: Implement earnings calculation
-          thisMonthEarnings: 0 // TODO: Implement monthly earnings
-        });
-        
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setError('Failed to load dashboard data');
-      } finally {
-        setLoading(false);
+        const profileResponse = await apiClient.getUserProfile();
+        if (profileResponse.data?.organization_name) {
+          setOrganizationName(profileResponse.data.organization_name);
+        }
+      } catch (profileError) {
+        console.warn('Could not fetch organization name:', profileError);
+        // Keep default "Your Organization" if fetch fails
       }
-    };
+      
+      // Fetch courses
+      const coursesResponse = await apiClient.getCourses();
+      const coursesData = Array.isArray(coursesResponse.data) 
+        ? coursesResponse.data 
+        : coursesResponse.data?.courses || [];
+      setCourses(coursesData.slice(0, 5)); // Show only recent 5 courses
+      
+      // Fetch students
+      // Backend automatically filters by organization_id for tutors
+      const studentsResponse = await apiClient.getUsers({ role: 'student' });
+      const studentsData = Array.isArray(studentsResponse.data) 
+        ? studentsResponse.data 
+        : studentsResponse.data?.users || [];
+      
+      // Filter for students - handle both roles array and role field
+      const studentUsers = studentsData.filter((userItem: any) => {
+        const userRoles = userItem.roles || (userItem.role ? [userItem.role] : []);
+        return userRoles.includes('student');
+      });
+      
+      // Sort by created_at (most recent first) and take top 5
+      const sortedStudents = studentUsers
+        .sort((a: any, b: any) => {
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          return dateB - dateA;
+        })
+        .slice(0, 5);
+      
+      setStudents(sortedStudents);
+      
+      // Calculate stats from real data
+      const totalCourses = coursesData.length;
+      const totalStudents = studentUsers.length;
+      const totalLessons = coursesData.reduce((acc: number, course: any) => acc + (course.total_lessons || 0), 0);
+      
+      // Calculate completion rate from enrollments if available
+      let completionRate = 0;
+      if (totalCourses > 0 && studentUsers.length > 0) {
+        // This is a placeholder - actual completion rate should come from analytics
+        // For now, calculate based on courses with enrollments
+        const coursesWithEnrollments = coursesData.filter((c: any) => (c.enrollment_count || 0) > 0).length;
+        completionRate = Math.round((coursesWithEnrollments / totalCourses) * 100);
+      }
+      
+      setStats({
+        totalCourses,
+        totalStudents,
+        totalLessons,
+        completionRate,
+        totalEarnings: 0, // TODO: Implement earnings calculation
+        thisMonthEarnings: 0 // TODO: Implement monthly earnings
+      });
+      
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
+  useEffect(() => {
     if (user) {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user, fetchDashboardData]);
+
+  // Refresh data when page comes into focus (e.g., returning from other pages)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (user && !loading) {
+        fetchDashboardData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user, loading, fetchDashboardData]);
 
   const quickActions = [
     {
@@ -213,7 +263,7 @@ export default function TutorDashboard() {
             </button>
             <div className="text-right">
               <p className="text-indigo-200 text-sm">Tutor</p>
-              <p className="text-white font-medium">Your Organization</p>
+              <p className="text-white font-medium">{organizationName}</p>
             </div>
           </div>
         </div>
@@ -444,7 +494,7 @@ export default function TutorDashboard() {
                           {student.enrolled_courses || 0} courses
                         </span>
                         <span className="text-xs text-gray-400">
-                          Joined {new Date(student.last_login).toLocaleDateString()}
+                          Joined {student.created_at ? new Date(student.created_at).toLocaleDateString() : 'Recently'}
                         </span>
                       </div>
                     </div>

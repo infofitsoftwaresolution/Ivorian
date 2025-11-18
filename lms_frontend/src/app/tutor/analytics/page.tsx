@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api/client';
@@ -116,13 +116,7 @@ export default function TutorAnalyticsPage() {
     }
   }, [user, router, authLoading]);
 
-  useEffect(() => {
-    if (!authLoading && user?.role === 'tutor') {
-      loadAnalytics();
-    }
-  }, [user, authLoading, timePeriod]);
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -208,7 +202,25 @@ export default function TutorAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timePeriod]);
+
+  useEffect(() => {
+    if (!authLoading && user?.role === 'tutor') {
+      loadAnalytics();
+    }
+  }, [user, authLoading, loadAnalytics]);
+
+  // Refresh data when page comes into focus (e.g., returning from other pages)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (!authLoading && user?.role === 'tutor' && !loading) {
+        loadAnalytics();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user, authLoading, loading, loadAnalytics]);
 
   // Chart configurations
   const enrollmentTrendChartData = {
