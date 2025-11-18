@@ -81,23 +81,32 @@ export default function StudentsPage() {
       
       // Filter for students only and transform API data
       // Backend already filters by organization_id for tutors, so we just filter by role
+      // API returns roles as an array, so check if 'student' is in the roles array
       const studentUsers = users.filter((user: any) => {
-        return user.role === 'student';
+        // Check both roles array and role field for compatibility
+        const userRoles = user.roles || (user.role ? [user.role] : []);
+        return userRoles.includes('student');
       });
       console.log('Filtered students:', studentUsers);
       
-      const transformedStudents: Student[] = studentUsers.map((student: any) => ({
-        id: student.id,
-        first_name: student.first_name || 'Unknown',
-        last_name: student.last_name || 'User',
-        email: student.email || 'No email',
-        phone: student.phone || null,
-        role: student.role || 'student',
-        created_at: student.created_at || new Date().toISOString(),
-        last_login: student.last_login || null,
-        enrolled_courses: student.enrolled_courses || 0,
-        completion_rate: student.completion_rate || 0
-      }));
+      const transformedStudents: Student[] = studentUsers.map((student: any) => {
+        // Get role from roles array or fallback to role field
+        const userRoles = student.roles || (student.role ? [student.role] : []);
+        const role = userRoles.includes('student') ? 'student' : (userRoles[0] || 'student');
+        
+        return {
+          id: student.id,
+          first_name: student.first_name || 'Unknown',
+          last_name: student.last_name || 'User',
+          email: student.email || 'No email',
+          phone: student.phone || null,
+          role: role,
+          created_at: student.created_at || new Date().toISOString(),
+          last_login: student.last_login || null,
+          enrolled_courses: student.enrolled_courses || 0,
+          completion_rate: student.completion_rate || 0
+        };
+      });
       
       setStudents(transformedStudents);
     } catch (error) {
