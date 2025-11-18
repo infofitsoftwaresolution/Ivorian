@@ -340,15 +340,17 @@ export default function SettingsPage() {
                       placeholder={user?.role === 'organization_admin' ? 'Enter organization name' : 'Enter app name'}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">App Version</label>
-                    <input
-                      type="text"
-                      value={platformSettings.app_version}
-                      onChange={(e) => setPlatformSettings({ ...platformSettings, app_version: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
+                  {user?.role === 'super_admin' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">App Version</label>
+                      <input
+                        type="text"
+                        value={platformSettings.app_version}
+                        onChange={(e) => setPlatformSettings({ ...platformSettings, app_version: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Support Email</label>
                     <input
@@ -379,8 +381,9 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Platform Features</h3>
+              {user?.role === 'super_admin' && (
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Platform Features</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
