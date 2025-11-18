@@ -30,7 +30,7 @@ const heroSlides = [
     id: 3,
     title: "Join live tutorial sessions",
     subtitle: "Connect with instructors in real-time. Ask questions, get feedback, and learn interactively.",
-    image: "/hero/slide3.png",
+    image: "/hero/slide2.png",
     cta: "View Sessions",
     ctaLink: "/sessions"
   },
@@ -38,7 +38,7 @@ const heroSlides = [
     id: 4,
     title: "Earn certificates and advance your career",
     subtitle: "Complete courses and earn certificates that are recognized by top companies worldwide.",
-    image: "/hero/slide4.png",
+    image: "/hero/slide1.png",
     cta: "Get Started",
     ctaLink: "/register"
   },
@@ -54,7 +54,7 @@ const heroSlides = [
     id: 6,
     title: "Watch video lessons from expert instructors",
     subtitle: "High-quality video content with lifetime access. Learn at your own pace with step-by-step guidance.",
-    image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1920&h=600&fit=crop&auto=format&q=80",
+    image: "https://images.unnsplash.com/photo-1503676260728-1c00da094a0b?w=1920&h=600&fit=crop&auto=format&q=80",
     cta: "Start Learning",
     ctaLink: "/register"
   },
