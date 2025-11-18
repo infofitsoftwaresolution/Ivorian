@@ -66,6 +66,7 @@ export default function CreateOrganization() {
   const [error, setError] = useState('');
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [successData, setSuccessData] = useState<{email: string; password: string} | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const {
     register,
@@ -136,12 +137,19 @@ export default function CreateOrganization() {
       // Call backend API
       const response = await apiClient.registerOrganization(organizationData);
       
+      // Show success toast message
+      showToast('Organization created successfully!', 'success', 5000);
+      setSuccessMessage('Organization created successfully!');
+      
       // Store success data to show credentials
       if (response.data?.admin_user && response.data?.temp_password) {
         setSuccessData({
           email: response.data.admin_user.email,
           password: response.data.temp_password
         });
+      } else if (response.data) {
+        // Even if credentials aren't returned, show success
+        setSuccessMessage('Organization created successfully!');
       }
       
       // Refresh user authentication state
@@ -177,40 +185,59 @@ export default function CreateOrganization() {
         </div>
       </div>
 
-      {/* Success Message with Credentials */}
-      {successData && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-6">
-          <h3 className="text-lg font-semibold text-green-800 mb-4">✅ Organization Created Successfully!</h3>
-          <p className="text-green-700 mb-4">The organization admin user has been created. Please save these credentials:</p>
-          <div className="bg-white rounded-md p-4 mb-4 space-y-2">
-            <div>
-              <span className="font-medium text-gray-700">Email: </span>
-              <span className="text-gray-900 font-mono">{successData.email}</span>
+      {/* Success Message */}
+      {(successMessage || successData) && (
+        <div className="bg-green-50 border-2 border-green-400 rounded-lg p-6 shadow-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
-            <div>
-              <span className="font-medium text-gray-700">Password: </span>
-              <span className="text-gray-900 font-mono">{successData.password}</span>
+            <div className="ml-3 flex-1">
+              <h3 className="text-lg font-bold text-green-800 mb-2">✅ Organization Created Successfully!</h3>
+              <p className="text-green-700 mb-4">
+                {successData 
+                  ? 'The organization and admin user have been created. Please save these credentials:'
+                  : 'The organization has been created successfully!'}
+              </p>
+              
+              {successData && (
+                <div className="bg-white rounded-md p-4 mb-4 space-y-2 border border-green-200">
+                  <div>
+                    <span className="font-medium text-gray-700">Email: </span>
+                    <span className="text-gray-900 font-mono">{successData.email}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Password: </span>
+                    <span className="text-gray-900 font-mono">{successData.password}</span>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => {
+                    setSuccessData(null);
+                    setSuccessMessage('');
+                    router.push('/admin/organizations?created=true');
+                  }}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium"
+                >
+                  Go to Organizations List
+                </button>
+                <button
+                  onClick={() => {
+                    setSuccessData(null);
+                    setSuccessMessage('');
+                    reset();
+                  }}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium"
+                >
+                  Create Another Organization
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="flex space-x-4">
-            <button
-              onClick={() => {
-                setSuccessData(null);
-                router.push('/admin/organizations?created=true');
-              }}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-            >
-              Go to Organizations List
-            </button>
-            <button
-              onClick={() => {
-                setSuccessData(null);
-                reset();
-              }}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-            >
-              Create Another Organization
-            </button>
           </div>
         </div>
       )}
@@ -223,7 +250,7 @@ export default function CreateOrganization() {
       )}
 
       {/* Form - Hide if success */}
-      {!successData && (
+      {!successMessage && !successData && (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         {/* Organization Details */}
         <div className="bg-white shadow rounded-lg p-6">
