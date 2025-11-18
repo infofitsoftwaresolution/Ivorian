@@ -86,7 +86,7 @@ export default function AboutPage() {
       <section className="py-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-            About InfoFit Labs
+            About Edumentry
           </h1>
           <p className="text-xl md:text-2xl max-w-3xl mx-auto opacity-90">
             Empowering learners worldwide with AI-integrated education and expert-led courses
@@ -103,7 +103,7 @@ export default function AboutPage() {
                 Our Mission
               </h2>
               <p className="text-lg text-gray-600 mb-4 leading-relaxed">
-                At InfoFit Labs, we believe that education should be accessible, engaging, and transformative. 
+                At Edumentry, we believe that education should be accessible, engaging, and transformative. 
                 Our mission is to democratize high-quality education by combining cutting-edge AI technology 
                 with expert instruction to create personalized learning experiences for everyone.
               </p>
@@ -219,7 +219,7 @@ export default function AboutPage() {
           
           <div className="space-y-6 text-lg text-gray-600 leading-relaxed">
             <p>
-              InfoFit Labs was founded in 2023 with a simple yet powerful vision: to make world-class 
+              Edumentry was founded in 2023 with a simple yet powerful vision: to make world-class 
               education accessible to everyone, everywhere. Our founders, experienced educators and 
               technologists, recognized that traditional learning platforms were falling short in 
               providing personalized, engaging, and effective learning experiences.
@@ -231,7 +231,7 @@ export default function AboutPage() {
               adapts to each student&apos;s unique needs and learning style.
             </p>
             <p>
-              Today, InfoFit Labs serves tens of thousands of learners across the globe, offering 
+              Today, Edumentry serves tens of thousands of learners across the globe, offering 
               courses in programming, data science, design, marketing, and more. Our community of 
               expert instructors brings real-world experience and industry insights to every course, 
               ensuring that students gain practical, applicable skills.
@@ -252,7 +252,7 @@ export default function AboutPage() {
             Ready to Start Your Learning Journey?
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Join thousands of learners who are transforming their careers with InfoFit Labs
+            Join thousands of learners who are transforming their careers with Edumentry
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 

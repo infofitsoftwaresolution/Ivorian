@@ -103,7 +103,7 @@ export default function LoginPage() {
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                 <GraduationCap className="w-7 h-7 text-white" />
               </div>
-              <h2 className="text-2xl font-bold">InfoFit LMS</h2>
+              <h2 className="text-2xl font-bold">Edumentry</h2>
             </div>
             <h1 className="text-5xl font-bold mb-6 leading-tight">
               Welcome Back to Your Learning Journey
@@ -149,7 +149,7 @@ export default function LoginPage() {
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                 <GraduationCap className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">InfoFit LMS</span>
+              <span className="text-xl font-bold text-gray-900">Edumentry</span>
             </div>
           </div>
 

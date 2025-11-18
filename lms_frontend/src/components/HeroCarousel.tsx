@@ -41,6 +41,70 @@ const heroSlides = [
     image: "/hero/slide4.png",
     cta: "Get Started",
     ctaLink: "/register"
+  },
+  {
+    id: 5,
+    title: "Learn from anywhere, anytime",
+    subtitle: "Access thousands of courses on your schedule. Study on your laptop, tablet, or phone - learning fits your life.",
+    image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1920&h=600&fit=crop&auto=format&q=80",
+    cta: "Browse Courses",
+    ctaLink: "/courses"
+  },
+  {
+    id: 6,
+    title: "Watch video lessons from expert instructors",
+    subtitle: "High-quality video content with lifetime access. Learn at your own pace with step-by-step guidance.",
+    image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1920&h=600&fit=crop&auto=format&q=80",
+    cta: "Start Learning",
+    ctaLink: "/register"
+  },
+  {
+    id: 7,
+    title: "Join millions of students worldwide",
+    subtitle: "Be part of a global learning community. Connect with fellow students and share your learning journey.",
+    image: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1920&h=600&fit=crop&auto=format&q=80",
+    cta: "Join Now",
+    ctaLink: "/register"
+  },
+  {
+    id: 8,
+    title: "Build skills with hands-on projects",
+    subtitle: "Practice what you learn with real-world projects. Build a portfolio that showcases your expertise.",
+    image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&h=600&fit=crop&auto=format&q=80",
+    cta: "Explore Courses",
+    ctaLink: "/courses"
+  },
+  {
+    id: 9,
+    title: "Get certified and advance your career",
+    subtitle: "Earn certificates of completion for every course. Add them to your resume and LinkedIn profile.",
+    image: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1920&h=600&fit=crop&auto=format&q=80",
+    cta: "View Certificates",
+    ctaLink: "/certificates"
+  },
+  {
+    id: 10,
+    title: "Learn from industry professionals",
+    subtitle: "Our instructors are real-world experts with years of experience. Get insights you can't find in textbooks.",
+    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1920&h=600&fit=crop&auto=format&q=80",
+    cta: "Meet Instructors",
+    ctaLink: "/instructors"
+  },
+  {
+    id: 11,
+    title: "Affordable courses for everyone",
+    subtitle: "Quality education shouldn't break the bank. Get access to premium courses at prices that work for you.",
+    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=1920&h=600&fit=crop&auto=format&q=80",
+    cta: "View Pricing",
+    ctaLink: "/pricing"
+  },
+  {
+    id: 12,
+    title: "Start your learning journey today",
+    subtitle: "Choose from thousands of courses in programming, design, business, marketing, and more. Your future starts here.",
+    image: "https://images.unsplash.com/photo-1516321497487-e288fb19713f?w=1920&h=600&fit=crop&auto=format&q=80",
+    cta: "Get Started",
+    ctaLink: "/register"
   }
 ];
 

@@ -67,7 +67,7 @@ export default function Navbar({ user, onMenuClick, sidebarCollapsed = false, on
             
             <div className="ml-4 lg:ml-0">
               <h1 className="text-xl font-semibold text-gray-900 lg:hidden">
-                InfoFit Labs LMS
+                Edumentry
               </h1>
             </div>
           </div>

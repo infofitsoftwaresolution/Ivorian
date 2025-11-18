@@ -8,10 +8,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  Bars3Icon, 
-  XMarkIcon,
-  UserCircleIcon
+import {
+  Bars3Icon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 export default function HomeHeader() {
@@ -40,7 +39,7 @@ export default function HomeHeader() {
                 <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">IL</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">InfoFit Labs</span>
+                <span className="text-xl font-bold text-gray-900">Edumentry</span>
               </Link>
             </div>
 

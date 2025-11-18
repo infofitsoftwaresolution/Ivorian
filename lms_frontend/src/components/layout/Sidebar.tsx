@@ -274,7 +274,7 @@ export default function Sidebar({ user, isOpen, isCollapsed = false, onClose, on
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
             {!isCollapsed && (
               <h1 className="text-xl font-semibold text-gray-900">
-                InfoFit Labs LMS
+                Edumentry
               </h1>
             )}
             <div className="flex items-center space-x-2">

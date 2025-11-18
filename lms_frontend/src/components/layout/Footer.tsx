@@ -86,7 +86,7 @@ export default function Footer() {
           <div className="space-y-8">
             <div className="flex items-center">
               <AcademicCapIcon className="h-8 w-8 text-primary-400" />
-              <span className="ml-2 text-xl font-bold">InfoFit LMS</span>
+              <span className="ml-2 text-xl font-bold">Edumentry</span>
             </div>
             <p className="text-sm leading-6 text-gray-300">
               Transform your learning journey with AI-powered education. Connect with expert instructors and achieve your goals.

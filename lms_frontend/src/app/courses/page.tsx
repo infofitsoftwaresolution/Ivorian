@@ -392,7 +392,7 @@ export default function CoursesPage() {
             Ready to Start Learning?
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Join thousands of students already learning with InfoFit Labs
+            Join thousands of students already learning with Edumentry
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 

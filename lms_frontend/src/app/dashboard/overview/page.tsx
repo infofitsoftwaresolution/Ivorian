@@ -95,7 +95,7 @@ export default function DashboardOverview() {
 
       {/* Welcome Message */}
       <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Welcome to InfoFit Labs LMS</h2>
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Welcome to Edumentry</h2>
         <p className="text-gray-600 mb-4">
           You're currently logged in as a user with role: <span className="font-semibold text-gray-900">{user?.role || 'Unknown'}</span>
         </p>
