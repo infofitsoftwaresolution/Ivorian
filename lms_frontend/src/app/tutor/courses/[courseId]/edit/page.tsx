@@ -592,6 +592,8 @@ export default function CourseBuilder() {
               selectedContent={selectedContent}
               onContentUpdate={(updatedCourse) => setCourse(updatedCourse)}
               onSave={handleSave}
+              onContentSelect={handleContentSelect}
+              onRefresh={() => setRefreshKey(prev => prev + 1)}
             />
           </div>
         </div>
@@ -614,33 +616,35 @@ interface ContentEditorProps {
   selectedContent: SelectedContent;
   onContentUpdate: (course: Course) => void;
   onSave: () => void;
+  onContentSelect: (content: SelectedContent) => void;
+  onRefresh: () => void;
 }
 
-function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: ContentEditorProps) {
+function ContentEditor({ course, selectedContent, onContentUpdate, onSave, onContentSelect, onRefresh }: ContentEditorProps) {
   const renderContent = () => {
     switch (selectedContent.type) {
       case 'course-overview':
-        return <CourseOverviewEditor course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} />;
+        return <CourseOverviewEditor course={course} onUpdate={onContentUpdate} onRefresh={onRefresh} />;
       
       case 'topic':
         const topic = course.topics.find(t => t.id === selectedContent.id);
-        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onSelectLesson={(lessonId) => {
+        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={onRefresh} onSelectLesson={(lessonId) => {
           const selectedLesson = topic.lessons.find(l => l.id === lessonId);
           if (selectedLesson) {
-            setSelectedContent({ type: 'lesson', id: lessonId, parentId: topic.id });
+            onContentSelect({ type: 'lesson', id: lessonId, parentId: topic.id });
           }
-        }} onDelete={() => setSelectedContent({ type: 'course-overview' })} /> : null;
+        }} onDelete={() => onContentSelect({ type: 'course-overview' })} /> : null;
       
       case 'lesson':
         const lesson = course.topics
           .flatMap(t => t.lessons)
           .find(l => l.id === selectedContent.id);
         const lessonTopic = lesson ? course.topics.find(t => t.lessons.some(l => l.id === lesson.id)) : null;
-        return lesson ? <LessonEditor lesson={lesson} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onDelete={() => {
+        return lesson ? <LessonEditor lesson={lesson} course={course} onUpdate={onContentUpdate} onRefresh={onRefresh} onDelete={() => {
           if (lessonTopic) {
-            setSelectedContent({ type: 'topic', id: lessonTopic.id });
+            onContentSelect({ type: 'topic', id: lessonTopic.id });
           } else {
-            setSelectedContent({ type: 'course-overview' });
+            onContentSelect({ type: 'course-overview' });
           }
         }} /> : null;
       
