@@ -569,10 +569,21 @@ export default function CourseBuilder() {
                       ))}
                     </div>
                   )}
+                  
+                  {/* Add Module Button - After each module */}
+                  <div className="border-t border-gray-200 p-2">
+                    <button
+                      onClick={() => handleContentSelect({ type: 'new-topic' })}
+                      className="w-full flex items-center p-2 text-sm text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      <span className="font-medium">Add Module</span>
+                    </button>
+                  </div>
                 </div>
               ))}
               
-              {/* Add Module Button */}
+              {/* Add Module Button - At the end */}
               <button
                 onClick={() => handleContentSelect({ type: 'new-topic' })}
                 className="w-full flex items-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
