@@ -4,7 +4,7 @@ Course service for the LMS application
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import and_, or_, func, desc, select, cast, String
+from sqlalchemy import and_, or_, func, desc, select, cast, String, delete
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 
@@ -670,7 +670,7 @@ class TopicService:
     
     @staticmethod
     async def delete_topic(db: AsyncSession, topic_id: int, user_id: int) -> bool:
-        """Delete a topic"""
+        """Delete a topic and all its related data"""
         topic = await TopicService.get_topic(db, topic_id)
         if not topic:
             raise ResourceNotFoundError("Topic not found")
@@ -683,10 +683,118 @@ class TopicService:
             if not user or user.role != "organization_admin":
                 raise AuthorizationError("You don't have permission to delete this topic")
         
-        await db.delete(topic)
-        await db.commit()
-        
-        return True
+        try:
+            # Load related data to ensure cascade deletes work properly
+            from app.models.assessment import Assignment, AssignmentSubmission, Quiz, QuizSubmission, QuizQuestion, QuizAnswer
+            
+            # Get all lessons for this topic
+            lessons_result = await db.execute(
+                select(Lesson).where(Lesson.topic_id == topic_id)
+            )
+            lessons = lessons_result.scalars().all()
+            lesson_ids = [lesson.id for lesson in lessons]
+            
+            # Delete lesson progress records first (they reference lessons)
+            if lesson_ids:
+                await db.execute(
+                    delete(LessonProgress).where(LessonProgress.lesson_id.in_(lesson_ids))
+                )
+                await db.flush()
+            
+            # Delete quiz submissions and answers for lessons in this topic
+            if lesson_ids:
+                # Get all quizzes for these lessons
+                quizzes_result = await db.execute(
+                    select(Quiz).where(Quiz.lesson_id.in_(lesson_ids))
+                )
+                quizzes = quizzes_result.scalars().all()
+                quiz_ids = [quiz.id for quiz in quizzes]
+                
+                if quiz_ids:
+                    # Get all quiz questions
+                    questions_result = await db.execute(
+                        select(QuizQuestion).where(QuizQuestion.quiz_id.in_(quiz_ids))
+                    )
+                    questions = questions_result.scalars().all()
+                    question_ids = [q.id for q in questions]
+                    
+                    # Delete quiz answers
+                    if question_ids:
+                        await db.execute(
+                            delete(QuizAnswer).where(QuizAnswer.question_id.in_(question_ids))
+                        )
+                        await db.flush()
+                    
+                    # Delete quiz questions
+                    if question_ids:
+                        await db.execute(
+                            delete(QuizQuestion).where(QuizQuestion.id.in_(question_ids))
+                        )
+                        await db.flush()
+                    
+                    # Delete quiz submissions
+                    await db.execute(
+                        delete(QuizSubmission).where(QuizSubmission.quiz_id.in_(quiz_ids))
+                    )
+                    await db.flush()
+                    
+                    # Delete quizzes
+                    await db.execute(
+                        delete(Quiz).where(Quiz.id.in_(quiz_ids))
+                    )
+                    await db.flush()
+            
+            # Delete lesson attachments
+            if lesson_ids:
+                await db.execute(
+                    delete(LessonAttachment).where(LessonAttachment.lesson_id.in_(lesson_ids))
+                )
+                await db.flush()
+            
+            # Delete lessons
+            if lesson_ids:
+                await db.execute(
+                    delete(Lesson).where(Lesson.id.in_(lesson_ids))
+                )
+                await db.flush()
+            
+            # Delete assignment submissions first
+            assignments_result = await db.execute(
+                select(Assignment).where(Assignment.topic_id == topic_id)
+            )
+            assignments = assignments_result.scalars().all()
+            assignment_ids = [assignment.id for assignment in assignments]
+            
+            if assignment_ids:
+                # Delete assignment submissions
+                await db.execute(
+                    delete(AssignmentSubmission).where(AssignmentSubmission.assignment_id.in_(assignment_ids))
+                )
+                await db.flush()
+                
+                # Delete assignments
+                await db.execute(
+                    delete(Assignment).where(Assignment.id.in_(assignment_ids))
+                )
+                await db.flush()
+            
+            # Finally, delete the topic itself
+            await db.execute(
+                delete(Topic).where(Topic.id == topic_id)
+            )
+            await db.commit()
+            
+            return True
+            
+        except Exception as e:
+            await db.rollback()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error deleting topic {topic_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete topic: {str(e)}"
+            )
 
 
 class LessonService:
