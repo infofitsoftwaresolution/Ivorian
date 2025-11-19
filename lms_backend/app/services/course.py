@@ -219,12 +219,13 @@ class CourseService:
         - Reviews
         """
         try:
-            # Load course with all relationships to enable cascade deletion
+            # Load course (without assignments to avoid schema mismatch issues)
+            # We'll handle deletion of related records explicitly
             result = await db.execute(
                 select(Course)
                 .options(
                     selectinload(Course.topics).selectinload(Topic.lessons),
-                    selectinload(Course.topics).selectinload(Topic.assignments),
+                    # Removed assignments eager loading - will delete explicitly to avoid schema issues
                     selectinload(Course.enrollments),
                     selectinload(Course.instructors),
                     selectinload(Course.reviews)
@@ -273,6 +274,52 @@ class CourseService:
             topic_ids = [topic.id for topic in topics]
             
             if topic_ids:
+                # Delete assignments and their submissions first (if assignments table exists)
+                # Use raw SQL to safely check and delete without triggering ORM schema validation
+                try:
+                    from sqlalchemy import text
+                    # Check if assignments table exists and has topic_id column
+                    check_query = text("""
+                        SELECT EXISTS (
+                            SELECT 1 
+                            FROM information_schema.columns 
+                            WHERE table_name = 'assignments' 
+                            AND column_name = 'topic_id'
+                        )
+                    """)
+                    result = await db.execute(check_query)
+                    has_topic_id_column = result.scalar()
+                    
+                    if has_topic_id_column:
+                        # Get assignment IDs for these topics
+                        assignment_query = text("""
+                            SELECT id FROM assignments 
+                            WHERE topic_id = ANY(:topic_ids)
+                        """)
+                        assignment_result = await db.execute(
+                            assignment_query, 
+                            {"topic_ids": topic_ids}
+                        )
+                        assignment_ids = [row[0] for row in assignment_result.fetchall()]
+                        
+                        if assignment_ids:
+                            # Delete assignment submissions first
+                            await db.execute(
+                                text("DELETE FROM assignments_submissions WHERE assignment_id = ANY(:assignment_ids)"),
+                                {"assignment_ids": assignment_ids}
+                            )
+                            
+                            # Delete assignments
+                            await db.execute(
+                                text("DELETE FROM assignments WHERE topic_id = ANY(:topic_ids)"),
+                                {"topic_ids": topic_ids}
+                            )
+                except Exception as assignment_error:
+                    # Log but don't fail - assignments might not exist or have different schema
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Could not delete assignments (table may not exist or have different schema): {assignment_error}")
+                
                 # Get all lessons for these topics
                 lessons_result = await db.execute(
                     select(Lesson).where(Lesson.topic_id.in_(topic_ids))
@@ -290,6 +337,42 @@ class CourseService:
                     await db.execute(
                         delete(LessonProgress).where(LessonProgress.lesson_id.in_(lesson_ids))
                     )
+                    
+                    # Delete quiz submissions and related data for these lessons
+                    try:
+                        from app.models.assessment import Quiz, QuizSubmission, QuizAnswer, QuizQuestion
+                        # Get quiz IDs for these lessons
+                        quizzes_result = await db.execute(
+                            select(Quiz.id).where(Quiz.lesson_id.in_(lesson_ids))
+                        )
+                        quiz_ids = [row[0] for row in quizzes_result.fetchall()]
+                        
+                        if quiz_ids:
+                            # Delete quiz answers
+                            await db.execute(
+                                delete(QuizAnswer).where(QuizAnswer.submission_id.in_(
+                                    select(QuizSubmission.id).where(QuizSubmission.quiz_id.in_(quiz_ids))
+                                ))
+                            )
+                            
+                            # Delete quiz submissions
+                            await db.execute(
+                                delete(QuizSubmission).where(QuizSubmission.quiz_id.in_(quiz_ids))
+                            )
+                            
+                            # Delete quiz questions
+                            await db.execute(
+                                delete(QuizQuestion).where(QuizQuestion.quiz_id.in_(quiz_ids))
+                            )
+                            
+                            # Delete quizzes
+                            await db.execute(
+                                delete(Quiz).where(Quiz.lesson_id.in_(lesson_ids))
+                            )
+                    except Exception as quiz_error:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(f"Could not delete quiz data: {quiz_error}")
                     
                     # Delete lessons
                     await db.execute(
@@ -340,11 +423,18 @@ class CourseService:
             return True
         except (ResourceNotFoundError, AuthorizationError):
             # Re-raise these exceptions as-is
+            await db.rollback()
             raise
         except Exception as e:
             # Rollback on any other error
             await db.rollback()
-            raise Exception(f"Error deleting course: {str(e)}")
+            import traceback
+            import logging
+            logger = logging.getLogger(__name__)
+            error_msg = f"Error deleting course {course_id}: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            raise Exception(f"Failed to delete course: {str(e)}")
     
     @staticmethod
     async def set_course_pricing(
