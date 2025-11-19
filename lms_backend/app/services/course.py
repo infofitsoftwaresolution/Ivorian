@@ -211,15 +211,34 @@ class CourseService:
         - Tutors can delete courses they created
         - Organization admins can delete courses in their organization
         - Super admins can delete any course
+        
+        This method handles cascading deletion of all related records:
+        - Topics (and their lessons, assignments, etc.)
+        - Enrollments (and their progress, submissions, etc.)
+        - Course instructors
+        - Reviews
         """
         try:
-            course = await CourseService.get_course(db, course_id)
+            # Load course with all relationships to enable cascade deletion
+            result = await db.execute(
+                select(Course)
+                .options(
+                    selectinload(Course.topics).selectinload(Topic.lessons),
+                    selectinload(Course.topics).selectinload(Topic.assignments),
+                    selectinload(Course.enrollments),
+                    selectinload(Course.instructors),
+                    selectinload(Course.reviews)
+                )
+                .where(Course.id == course_id)
+            )
+            course = result.scalar_one_or_none()
+            
             if not course:
                 raise ResourceNotFoundError("Course not found")
             
             # Get the user making the request
-            result = await db.execute(select(User).where(User.id == user_id))
-            user = result.scalar_one_or_none()
+            user_result = await db.execute(select(User).where(User.id == user_id))
+            user = user_result.scalar_one_or_none()
             if not user:
                 raise AuthorizationError("User not found")
             
@@ -240,10 +259,82 @@ class CourseService:
                 # Other roles cannot delete courses
                 raise AuthorizationError("You don't have permission to delete this course")
             
-            # Use delete statement for proper async deletion
+            # Manually delete related records to avoid foreign key constraint violations
+            # Delete in order: lesson attachments -> lesson progress -> lessons -> topics -> 
+            # enrollment progress -> enrollments -> instructors -> reviews -> course
+            
             from sqlalchemy import delete
-            delete_stmt = delete(Course).where(Course.id == course_id)
-            await db.execute(delete_stmt)
+            
+            # Get all topics for this course to find lessons
+            topics_result = await db.execute(
+                select(Topic).where(Topic.course_id == course_id)
+            )
+            topics = topics_result.scalars().all()
+            topic_ids = [topic.id for topic in topics]
+            
+            if topic_ids:
+                # Get all lessons for these topics
+                lessons_result = await db.execute(
+                    select(Lesson).where(Lesson.topic_id.in_(topic_ids))
+                )
+                lessons = lessons_result.scalars().all()
+                lesson_ids = [lesson.id for lesson in lessons]
+                
+                if lesson_ids:
+                    # Delete lesson attachments
+                    await db.execute(
+                        delete(LessonAttachment).where(LessonAttachment.lesson_id.in_(lesson_ids))
+                    )
+                    
+                    # Delete lesson progress
+                    await db.execute(
+                        delete(LessonProgress).where(LessonProgress.lesson_id.in_(lesson_ids))
+                    )
+                    
+                    # Delete lessons
+                    await db.execute(
+                        delete(Lesson).where(Lesson.topic_id.in_(topic_ids))
+                    )
+            
+            # Delete topics
+            if topic_ids:
+                await db.execute(
+                    delete(Topic).where(Topic.course_id == course_id)
+                )
+            
+            # Get enrollment IDs for deleting related progress
+            enrollments_result = await db.execute(
+                select(Enrollment).where(Enrollment.course_id == course_id)
+            )
+            enrollments = enrollments_result.scalars().all()
+            enrollment_ids = [enrollment.id for enrollment in enrollments]
+            
+            if enrollment_ids:
+                # Delete enrollment-related progress
+                await db.execute(
+                    delete(LessonProgress).where(LessonProgress.enrollment_id.in_(enrollment_ids))
+                )
+            
+            # Delete enrollments
+            await db.execute(
+                delete(Enrollment).where(Enrollment.course_id == course_id)
+            )
+            
+            # Delete course instructors
+            await db.execute(
+                delete(CourseInstructor).where(CourseInstructor.course_id == course_id)
+            )
+            
+            # Delete reviews
+            await db.execute(
+                delete(CourseReview).where(CourseReview.course_id == course_id)
+            )
+            
+            # Finally, delete the course itself
+            await db.execute(
+                delete(Course).where(Course.id == course_id)
+            )
+            
             await db.commit()
             
             return True
