@@ -908,7 +908,7 @@ class LessonService:
     
     @staticmethod
     async def delete_lesson(db: AsyncSession, lesson_id: int, user_id: int) -> bool:
-        """Delete a lesson"""
+        """Delete a lesson and all its related data"""
         lesson = await LessonService.get_lesson(db, lesson_id)
         if not lesson:
             raise ResourceNotFoundError("Lesson not found")
@@ -922,10 +922,87 @@ class LessonService:
             if not user or user.role != "organization_admin":
                 raise AuthorizationError("You don't have permission to delete this lesson")
         
-        await db.delete(lesson)
-        await db.commit()
-        
-        return True
+        try:
+            # Delete lesson progress records first (they reference lessons)
+            await db.execute(
+                delete(LessonProgress).where(LessonProgress.lesson_id == lesson_id)
+            )
+            await db.flush()
+            
+            # Delete quiz submissions and answers for this lesson
+            try:
+                from app.models.assessment import Quiz, QuizSubmission, QuizAnswer, QuizQuestion
+                
+                # Get quiz for this lesson
+                quiz_result = await db.execute(
+                    select(Quiz).where(Quiz.lesson_id == lesson_id)
+                )
+                quiz = quiz_result.scalar_one_or_none()
+                
+                if quiz:
+                    quiz_id = quiz.id
+                    
+                    # Get all quiz questions
+                    questions_result = await db.execute(
+                        select(QuizQuestion).where(QuizQuestion.quiz_id == quiz_id)
+                    )
+                    questions = questions_result.scalars().all()
+                    question_ids = [q.id for q in questions]
+                    
+                    # Delete quiz answers
+                    if question_ids:
+                        await db.execute(
+                            delete(QuizAnswer).where(QuizAnswer.question_id.in_(question_ids))
+                        )
+                        await db.flush()
+                    
+                    # Delete quiz questions
+                    if question_ids:
+                        await db.execute(
+                            delete(QuizQuestion).where(QuizQuestion.id.in_(question_ids))
+                        )
+                        await db.flush()
+                    
+                    # Delete quiz submissions
+                    await db.execute(
+                        delete(QuizSubmission).where(QuizSubmission.quiz_id == quiz_id)
+                    )
+                    await db.flush()
+                    
+                    # Delete quiz
+                    await db.execute(
+                        delete(Quiz).where(Quiz.id == quiz_id)
+                    )
+                    await db.flush()
+            except Exception as quiz_error:
+                # Log but don't fail - quiz might not exist or have different schema
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Could not delete quiz data (may not exist or have different schema): {quiz_error}")
+            
+            # Delete lesson attachments
+            await db.execute(
+                delete(LessonAttachment).where(LessonAttachment.lesson_id == lesson_id)
+            )
+            await db.flush()
+            
+            # Finally, delete the lesson itself
+            await db.execute(
+                delete(Lesson).where(Lesson.id == lesson_id)
+            )
+            await db.commit()
+            
+            return True
+            
+        except Exception as e:
+            await db.rollback()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error deleting lesson {lesson_id}: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete lesson: {str(e)}"
+            )
 
 
 class EnrollmentService:
