@@ -105,14 +105,26 @@ export default function CourseDetailView() {
           }
         }
         
-        // Ensure topics and lessons arrays exist, sort by order, and normalize data
+        // Deduplicate topics by ID, ensure topics and lessons arrays exist, sort by order, and normalize data
+        const uniqueTopicsMap = new Map();
+        topics.forEach((topic: any) => {
+          if (!uniqueTopicsMap.has(topic.id)) {
+            uniqueTopicsMap.set(topic.id, topic);
+          }
+        });
+        const uniqueTopics = Array.from(uniqueTopicsMap.values());
+        
         const normalizedCourseData = {
           ...courseData,
-          topics: topics
+          topics: uniqueTopics
             .map((topic: any) => ({
               ...topic,
-              lessons: (topic.lessons || []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+              order: topic.order || 0, // Ensure order is always a number
+              lessons: (topic.lessons || [])
+                .filter((lesson: any) => lesson && lesson.id) // Filter out invalid lessons
+                .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
             }))
+            .filter((topic: any) => topic && topic.id) // Filter out invalid topics
             .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
           enrollments: courseData.enrollments || []
         };
@@ -373,7 +385,7 @@ export default function CourseDetailView() {
                                 <DocumentTextIcon className="h-4 w-4 mr-3 text-gray-600" />
                               )}
                               <div>
-                                <div className="font-medium text-sm">
+                                <div className="font-medium text-sm text-gray-900">
                                   {lessonIndex + 1}. {lesson.title}
                                 </div>
                                 <div className="text-xs text-gray-500">

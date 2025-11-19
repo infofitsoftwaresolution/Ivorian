@@ -180,31 +180,43 @@ export default function CourseBuilder() {
           }
         }
         
-        // Transform backend data and sort topics by order
+        // Deduplicate topics by ID, transform backend data and sort topics by order
+        const uniqueTopicsMap = new Map();
+        topics.forEach((topic: any) => {
+          if (!uniqueTopicsMap.has(topic.id)) {
+            uniqueTopicsMap.set(topic.id, topic);
+          }
+        });
+        const uniqueTopics = Array.from(uniqueTopicsMap.values());
+        
         const courseData: Course = {
           id: response.data.id,
           title: response.data.title,
           description: response.data.description || response.data.short_description,
           status: response.data.status,
-          topics: topics
+          topics: uniqueTopics
             .map((topic: any) => ({
               id: topic.id,
               title: topic.title,
               description: topic.description,
               order: topic.order || 0,
-              lessons: (topic.lessons || []).map((lesson: any) => ({
-                id: lesson.id,
-                title: lesson.title,
-                description: lesson.description,
-                content: lesson.content,
-                video_url: lesson.video_url,
-                content_type: lesson.content_type,
-                order: lesson.order || 0,
-                estimated_duration: lesson.estimated_duration,
-                is_free_preview: lesson.is_free_preview
-              })).sort((a: any, b: any) => a.order - b.order),
+              lessons: (topic.lessons || [])
+                .filter((lesson: any) => lesson && lesson.id) // Filter out invalid lessons
+                .map((lesson: any) => ({
+                  id: lesson.id,
+                  title: lesson.title,
+                  description: lesson.description,
+                  content: lesson.content,
+                  video_url: lesson.video_url,
+                  content_type: lesson.content_type,
+                  order: lesson.order || 0,
+                  estimated_duration: lesson.estimated_duration,
+                  is_free_preview: lesson.is_free_preview
+                }))
+                .sort((a: any, b: any) => a.order - b.order),
               isExpanded: true
             }))
+            .filter((topic: any) => topic && topic.id) // Filter out invalid topics
             .sort((a: any, b: any) => a.order - b.order) || []
         };
         
@@ -784,7 +796,7 @@ function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course
                     <DocumentTextIcon className="h-4 w-4 mr-3 text-gray-600" />
                   )}
                   <div>
-                    <div className="font-medium text-sm">{lesson.title || `Lesson ${index + 1}`}</div>
+                    <div className="font-medium text-sm text-gray-900">{lesson.title || `Lesson ${index + 1}`}</div>
                     <div className="text-xs text-gray-500">{lesson.estimated_duration || 0} minutes</div>
                   </div>
                 </div>
