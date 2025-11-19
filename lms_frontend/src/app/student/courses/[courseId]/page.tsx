@@ -278,7 +278,23 @@ export default function CourseDetailPage() {
               {topics.map((topic, topicIndex) => (
                 <div key={topic.id} className="border border-gray-200 rounded-lg">
                   <div className="p-4 bg-gray-50 border-b border-gray-200">
-                    <h3 className="font-medium text-gray-900">{topic.title}</h3>
+                    <h3 className="font-medium text-gray-900">
+                      {(() => {
+                        // Always use the order field from database for module number
+                        const moduleNumber = Number(topic.order) || 0;
+                        // Title is already cleaned during normalization, but double-check
+                        let displayTitle = topic.title || '';
+                        
+                        // Final cleanup - remove any remaining "Module X:" patterns (safety check)
+                        displayTitle = displayTitle.replace(/^Module\s*\d+\s*:\s*/i, '').trim();
+                        // Handle multiple nested prefixes
+                        while (displayTitle.match(/^Module\s*\d+\s*:\s*/i)) {
+                          displayTitle = displayTitle.replace(/^Module\s*\d+\s*:\s*/i, '').trim();
+                        }
+                        
+                        return `Module ${moduleNumber}: ${displayTitle || 'Untitled Module'}`;
+                      })()}
+                    </h3>
                     <p className="text-sm text-gray-600 mt-1">{topic.description}</p>
                   </div>
                   <div className="p-4">
