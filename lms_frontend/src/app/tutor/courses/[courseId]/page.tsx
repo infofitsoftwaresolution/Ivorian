@@ -63,11 +63,13 @@ export default function CourseDetailView() {
 
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCourse = async () => {
       try {
         setLoading(true);
+        setError(null);
         const response = await apiClient.getCourse(courseId);
         const courseData = response.data;
         
@@ -80,17 +82,41 @@ export default function CourseDetailView() {
           }
         }
         
-        // Ensure topics and lessons arrays exist, even if API returns null/undefined
+        // Fetch topics separately if not included in the main response
+        let topics = courseData.topics || [];
+        if (!topics || topics.length === 0) {
+          try {
+            const topicsResponse = await apiClient.getCourseTopics(courseId);
+            topics = topicsResponse.data || [];
+            
+            // Fetch lessons for each topic
+            for (let i = 0; i < topics.length; i++) {
+              try {
+                const lessonsResponse = await apiClient.getTopicLessons(topics[i].id);
+                topics[i].lessons = lessonsResponse.data || [];
+              } catch (lessonError) {
+                console.error(`Error fetching lessons for topic ${topics[i].id}:`, lessonError);
+                topics[i].lessons = [];
+              }
+            }
+          } catch (topicsError) {
+            console.error('Error fetching topics:', topicsError);
+            topics = [];
+          }
+        }
+        
+        // Ensure topics and lessons arrays exist, sort by order, and normalize data
         const normalizedCourseData = {
           ...courseData,
-          topics: courseData.topics || [],
+          topics: topics
+            .map((topic: any) => ({
+              ...topic,
+              lessons: (topic.lessons || []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+            }))
+            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
           enrollments: courseData.enrollments || []
         };
-        // Ensure each topic has a lessons array
-        normalizedCourseData.topics = normalizedCourseData.topics.map((topic: any) => ({
-          ...topic,
-          lessons: topic.lessons || []
-        }));
+        
         setCourse(normalizedCourseData);
       } catch (error: any) {
         console.error('Error fetching course:', error);
@@ -108,7 +134,7 @@ export default function CourseDetailView() {
     if (courseId) {
       fetchCourse();
     }
-  }, [courseId]);
+  }, [courseId, user]);
 
   const handleEditCourse = () => {
     router.push(`/tutor/courses/${courseId}/edit`);
@@ -130,6 +156,27 @@ export default function CourseDetailView() {
         <div className="text-center">
           <LoadingSpinner size="lg" />
           <p className="mt-4 text-gray-600">Loading course...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumb />
+        <div className="text-center py-12">
+          <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Error</h3>
+          <p className="mt-1 text-sm text-gray-500">{error}</p>
+          <div className="mt-6">
+            <button
+              onClick={() => router.push('/tutor/courses')}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            >
+              Back to Courses
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -301,11 +348,11 @@ export default function CourseDetailView() {
             </div>
           ) : (
             <div className="space-y-4">
-              {(course.topics || []).map((topic, topicIndex) => (
+              {(course.topics || []).map((topic) => (
                 <div key={topic.id} className="border border-gray-200 rounded-lg">
                   <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                     <h3 className="text-lg font-medium text-gray-900">
-                      {topicIndex + 1}. {topic.title}
+                      Module {topic.order || 0}: {topic.title}
                     </h3>
                     {topic.description && (
                       <p className="text-sm text-gray-600 mt-1">{topic.description}</p>

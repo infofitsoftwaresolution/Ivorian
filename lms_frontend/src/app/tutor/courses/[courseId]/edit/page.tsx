@@ -180,30 +180,32 @@ export default function CourseBuilder() {
           }
         }
         
-        // Transform backend data
+        // Transform backend data and sort topics by order
         const courseData: Course = {
           id: response.data.id,
           title: response.data.title,
           description: response.data.description || response.data.short_description,
           status: response.data.status,
-          topics: topics.map((topic: any) => ({
-            id: topic.id,
-            title: topic.title,
-            description: topic.description,
-            order: topic.order,
-            lessons: topic.lessons?.map((lesson: any) => ({
-              id: lesson.id,
-              title: lesson.title,
-              description: lesson.description,
-              content: lesson.content,
-              video_url: lesson.video_url,
-              content_type: lesson.content_type,
-              order: lesson.order,
-              estimated_duration: lesson.estimated_duration,
-              is_free_preview: lesson.is_free_preview
-            })) || [],
-            isExpanded: true
-          })) || []
+          topics: topics
+            .map((topic: any) => ({
+              id: topic.id,
+              title: topic.title,
+              description: topic.description,
+              order: topic.order || 0,
+              lessons: (topic.lessons || []).map((lesson: any) => ({
+                id: lesson.id,
+                title: lesson.title,
+                description: lesson.description,
+                content: lesson.content,
+                video_url: lesson.video_url,
+                content_type: lesson.content_type,
+                order: lesson.order || 0,
+                estimated_duration: lesson.estimated_duration,
+                is_free_preview: lesson.is_free_preview
+              })).sort((a: any, b: any) => a.order - b.order),
+              isExpanded: true
+            }))
+            .sort((a: any, b: any) => a.order - b.order) || []
         };
         
         console.log('Transformed course data:', courseData);
@@ -390,12 +392,12 @@ export default function CourseBuilder() {
                 className={`w-full flex items-center p-3 rounded-lg text-left transition-colors ${
                   selectedContent.type === 'course-overview'
                     ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                    : 'hover:bg-gray-50'
+                    : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
                 <BookOpenIcon className="h-5 w-5 mr-3 flex-shrink-0" />
                 <div>
-                  <div className="font-medium">Course Overview</div>
+                  <div className={`font-medium ${selectedContent.type === 'course-overview' ? 'text-indigo-700' : 'text-gray-700'}`}>Course Overview</div>
                   <div className="text-xs text-gray-500">Basic information & settings</div>
                 </div>
               </button>
@@ -403,7 +405,7 @@ export default function CourseBuilder() {
 
             {/* Topics */}
             <div className="space-y-2">
-              {course.topics.map((topic, index) => (
+              {[...course.topics].sort((a, b) => (a.order || 0) - (b.order || 0)).map((topic, index) => (
                 <div key={topic.id} className="border border-gray-200 rounded-lg">
                   {/* Topic Header */}
                   <button
@@ -420,8 +422,12 @@ export default function CourseBuilder() {
                       <ChevronRightIcon className="h-4 w-4 mr-2 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium break-words">
-                        {topic.title || `Module ${index + 1}`}
+                      <div className={`font-medium break-words ${
+                        selectedContent.type === 'topic' && selectedContent.id === topic.id
+                          ? 'text-blue-700'
+                          : 'text-gray-700'
+                      }`}>
+                        {topic.title || `Module ${topic.order || index + 1}`}
                       </div>
                       <div className="text-xs text-gray-500">
                         {topic.lessons.length} lessons
@@ -1081,10 +1087,17 @@ function LessonEditor({ lesson, course, onUpdate }: { lesson: Lesson; course: Co
 
 // New Topic Editor
 function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate: (course: Course) => void; onSave: () => void }) {
+  // Calculate the next order number based on existing topics' order values
+  const getNextOrder = () => {
+    if (course.topics.length === 0) return 1;
+    const maxOrder = Math.max(...course.topics.map(t => t.order || 0));
+    return maxOrder + 1;
+  };
+
   const [topicData, setTopicData] = useState({
     title: '',
     description: '',
-    order: course.topics.length + 1
+    order: getNextOrder()
   });
 
   const handleCreate = async () => {
