@@ -21,6 +21,7 @@ import {
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { apiClient } from '@/lib/api/client';
+import { showToast } from '@/components/ui/Toast';
 
 // Form validation schema
 const studentSchema = z.object({
@@ -284,11 +285,18 @@ export default function CreateStudentPage() {
       }
 
       // Enroll student in selected courses
+      let enrollmentsSuccess = 0;
+      let enrollmentsFailed = 0;
+      
       if (data.course_ids && data.course_ids.length > 0) {
         console.log('Enrolling student in courses:', data.course_ids);
         
         const enrollmentPromises = data.course_ids.map(courseId => 
-          apiClient.enrollStudentInCourse(studentId, courseId).catch(err => {
+          apiClient.enrollStudentInCourse(studentId, courseId).then(() => {
+            enrollmentsSuccess++;
+            return null;
+          }).catch(err => {
+            enrollmentsFailed++;
             console.error(`Failed to enroll in course ${courseId}:`, err);
             // Continue with other enrollments even if one fails
             return null;
@@ -297,6 +305,15 @@ export default function CreateStudentPage() {
 
         await Promise.all(enrollmentPromises);
         console.log('Enrollment process completed');
+      }
+      
+      // Show success messages
+      showToast('Student created successfully!', 'success', 5000);
+      if (enrollmentsSuccess > 0) {
+        showToast(`Student enrolled in ${enrollmentsSuccess} course(s)`, 'success', 5000);
+      }
+      if (enrollmentsFailed > 0) {
+        showToast(`Failed to enroll in ${enrollmentsFailed} course(s)`, 'error', 5000);
       }
       
       // Show success message
@@ -361,6 +378,7 @@ export default function CreateStudentPage() {
       }
       
       setError(errorMessage);
+      showToast(errorMessage, 'error', 7000);
     } finally {
       setLoading(false);
     }

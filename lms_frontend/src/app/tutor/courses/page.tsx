@@ -22,6 +22,7 @@ import {
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import { showToast } from '@/components/ui/Toast';
 
 // Course interface
 interface Course {
@@ -166,10 +167,11 @@ export default function TutorCourses() {
       });
       
       // Show success message
-      alert('Course deleted successfully!');
+      showToast('Course deleted successfully!', 'success', 5000);
     } catch (error) {
       console.error('Error deleting course:', error);
-      alert(`Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to delete course: ${errorMessage}`, 'error', 7000);
       
       // Reset loading state
       setDeleteModal(prev => ({ ...prev, isLoading: false }));
@@ -217,10 +219,11 @@ export default function TutorCourses() {
       });
       
       // Show success message
-      alert('Course published successfully! Students can now enroll.');
+      showToast('Course published successfully! Students can now enroll.', 'success', 5000);
     } catch (error) {
       console.error('Error publishing course:', error);
-      alert(`Failed to publish course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to publish course: ${errorMessage}`, 'error', 7000);
       
       // Reset loading state
       setPublishModal(prev => ({ ...prev, isLoading: false }));

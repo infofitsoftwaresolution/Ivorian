@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { showToast } from '@/components/ui/Toast';
 
 interface StudentFormData {
   first_name: string;
@@ -215,7 +216,12 @@ export default function AddStudent() {
       const response = await apiClient.createUser(studentData);
       console.log('Student created successfully:', response.data);
       
+      showToast('Student created successfully!', 'success', 5000);
+      
       // If courses are selected, enroll the student in those courses
+      let enrollmentsSuccess = 0;
+      let enrollmentsFailed = 0;
+      
       if (formData.course_ids.length > 0) {
         console.log('🎓 Enrolling student in courses:', formData.course_ids);
         console.log('👤 Student ID:', response.data.id);
@@ -225,12 +231,21 @@ export default function AddStudent() {
           try {
             console.log(`🔄 Enrolling student ${response.data.id} in course ${courseId}`);
             const enrollmentResponse = await apiClient.enrollStudentInCourse(response.data.id, courseId);
+            enrollmentsSuccess++;
             console.log(`✅ Successfully enrolled student in course ${courseId}:`, enrollmentResponse);
           } catch (enrollmentError) {
+            enrollmentsFailed++;
             console.error(`❌ Failed to enroll student in course ${courseId}:`, enrollmentError);
             console.error('Enrollment error details:', enrollmentError);
             // Continue with other enrollments even if one fails
           }
+        }
+        
+        if (enrollmentsSuccess > 0) {
+          showToast(`Student enrolled in ${enrollmentsSuccess} course(s)`, 'success', 5000);
+        }
+        if (enrollmentsFailed > 0) {
+          showToast(`Failed to enroll in ${enrollmentsFailed} course(s)`, 'error', 5000);
         }
       } else {
         console.log('ℹ️ No courses selected for enrollment');
@@ -244,11 +259,9 @@ export default function AddStudent() {
       
     } catch (error) {
       console.error('Error creating student:', error);
-      if (error instanceof Error) {
-        setError(`Failed to create student: ${error.message}`);
-      } else {
-        setError('Failed to create student. Please try again.');
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setError(`Failed to create student: ${errorMessage}`);
+      showToast(`Failed to create student: ${errorMessage}`, 'error', 7000);
     } finally {
       setLoading(false);
     }

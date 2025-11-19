@@ -31,6 +31,7 @@ import KnowledgeCheckBuilder from '@/components/editor/KnowledgeCheckBuilder';
 import StudentPreview from '@/components/editor/StudentPreview';
 import CoursePreview from '@/components/editor/CoursePreview';
 import AssessmentEditor from '@/components/course/AssessmentEditor';
+import { showToast } from '@/components/ui/Toast';
 
 // Interfaces
 interface Course {
@@ -147,7 +148,7 @@ export default function CourseBuilder() {
         // Check permissions: tutors can only edit their own courses
         if (user && (user.role === 'tutor' || user.role === 'instructor')) {
           if (rawCourseData.created_by !== user.id || rawCourseData.organization_id !== user.organization_id) {
-            alert('You do not have permission to edit this course.');
+            showToast('You do not have permission to edit this course.', 'error', 5000);
             router.push('/tutor/courses');
             return;
           }
@@ -253,8 +254,11 @@ export default function CourseBuilder() {
       // TODO: Save current content
       await new Promise(resolve => setTimeout(resolve, 1000));
       console.log('Content saved successfully');
+      showToast('Course changes saved successfully!', 'success', 3000);
     } catch (error) {
       console.error('Error saving content:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to save changes: ${errorMessage}`, 'error', 5000);
     } finally {
       setSaving(false);
     }
@@ -278,10 +282,11 @@ export default function CourseBuilder() {
       // Update course status in local state
       setCourse(prev => prev ? { ...prev, status: 'published' } : null);
       
-      alert('Course published successfully! Students can now enroll in this course.');
+      showToast('Course published successfully! Students can now enroll in this course.', 'success', 5000);
     } catch (error) {
       console.error('Error publishing course:', error);
-      alert(`Failed to publish course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to publish course: ${errorMessage}`, 'error', 7000);
     } finally {
       setPublishing(false);
     }
@@ -1074,7 +1079,7 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
 
   const handleCreate = async () => {
     if (!topicData.title.trim()) {
-      alert('Please enter a topic title');
+      showToast('Please enter a topic title', 'warning', 3000);
       return;
     }
 
@@ -1109,9 +1114,11 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
 
       onUpdate(updatedCourse);
       onSave();
+      showToast('Topic created successfully!', 'success', 3000);
     } catch (error) {
       console.error('Error creating topic:', error);
-      alert(`Failed to create topic: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to create topic: ${errorMessage}`, 'error', 5000);
     }
   };
 
@@ -1184,7 +1191,7 @@ function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course
 
   const handleCreate = async () => {
     if (!lessonData.title.trim()) {
-      alert('Please enter a lesson title');
+      showToast('Please enter a lesson title', 'warning', 3000);
       return;
     }
 
@@ -1229,9 +1236,11 @@ function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course
 
       onUpdate(updatedCourse);
       onSave();
+      showToast('Lesson created successfully!', 'success', 3000);
     } catch (error) {
       console.error('Error creating lesson:', error);
-      alert(`Failed to create lesson: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to create lesson: ${errorMessage}`, 'error', 5000);
     }
   };
 

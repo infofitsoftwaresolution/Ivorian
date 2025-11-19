@@ -22,6 +22,7 @@ import AdvancedAssignmentBuilder from '@/components/course/AdvancedAssignmentBui
 import RichTextEditor from '@/components/editor/RichTextEditor';
 import VideoUploader from '@/components/editor/VideoUploader';
 import { generateId } from '@/utils/idGenerator';
+import { showToast } from '@/components/ui/Toast';
 
 // Wizard steps
 const STEPS = [
@@ -162,10 +163,16 @@ export default function CourseCreateWizard() {
 
       console.log('Course created successfully:', response.data);
       
+      // Show success toast for course creation
+      showToast('Course created successfully!', 'success', 5000);
+      
       // Now create topics and lessons if they exist
       if (formData.topics && formData.topics.length > 0) {
         console.log('Creating topics and lessons for course:', courseId);
         console.log('Topics to create:', formData.topics);
+        
+        let topicsCreated = 0;
+        let lessonsCreated = 0;
         
         for (let topicIndex = 0; topicIndex < formData.topics.length; topicIndex++) {
           const topicData = formData.topics[topicIndex];
@@ -186,6 +193,7 @@ export default function CourseCreateWizard() {
               const topicResponse = await apiClient.createTopic(courseId, topicPayload);
               
               const topicId = topicResponse.data.id;
+              topicsCreated++;
               console.log('Topic created successfully:', topicResponse.data);
               
               // Create lessons for this topic
@@ -211,10 +219,12 @@ export default function CourseCreateWizard() {
                       console.log('Lesson payload:', lessonPayload);
                       
                       const lessonResponse = await apiClient.createLesson(topicId, lessonPayload);
+                      lessonsCreated++;
                       console.log('Lesson created successfully:', lessonResponse.data);
                     } catch (lessonError) {
                       console.error('Error creating lesson:', lessonError);
                       console.error('Lesson data that failed:', lessonData);
+                      showToast(`Failed to create lesson: ${lessonData.title}`, 'error', 5000);
                     }
                   }
                 }
@@ -223,35 +233,26 @@ export default function CourseCreateWizard() {
               }
             } catch (topicError) {
               console.error('Error creating topic:', topicError);
+              showToast(`Failed to create topic: ${topicData.title}`, 'error', 5000);
             }
           }
+        }
+        
+        if (topicsCreated > 0 || lessonsCreated > 0) {
+          showToast(`Created ${topicsCreated} topic(s) and ${lessonsCreated} lesson(s)`, 'success', 5000);
         }
         
         console.log('All topics and lessons created successfully');
       }
       
-      // Ask user if they want to publish the course
-      const shouldPublish = window.confirm(
-        'Course created successfully! Would you like to publish it now so students can enroll?'
-      );
-      
-      if (shouldPublish) {
-        try {
-          console.log('Publishing course:', courseId);
-          await apiClient.publishCourse(courseId);
-          console.log('Course published successfully');
-          alert('Course published successfully! Students can now enroll.');
-        } catch (publishError) {
-          console.error('Error publishing course:', publishError);
-          alert('Course created but failed to publish. You can publish it later from the course editor.');
-        }
-      }
-      
       // Redirect to course builder to continue editing
-      router.push(`/tutor/courses/${courseId}/edit`);
+      setTimeout(() => {
+        router.push(`/tutor/courses/${courseId}/edit`);
+      }, 1000);
     } catch (error) {
       console.error('Error creating course:', error);
-      alert(`Failed to create course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to create course: ${errorMessage}`, 'error', 7000);
     } finally {
       setIsSubmitting(false);
     }
