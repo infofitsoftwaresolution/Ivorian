@@ -121,6 +121,7 @@ interface SelectedContent {
   type: ContentType;
   id?: number | string;
   parentId?: number; // For lessons, this is the topic ID
+  insertAfterOrder?: number; // For new-topic, the order after which to insert
 }
 
 export default function CourseBuilder() {
@@ -573,7 +574,10 @@ export default function CourseBuilder() {
                   {/* Add Module Button - After each module */}
                   <div className="border-t border-gray-200 p-2">
                     <button
-                      onClick={() => handleContentSelect({ type: 'new-topic' })}
+                      onClick={() => {
+                        const topicOrder = topic.order || 0;
+                        handleContentSelect({ type: 'new-topic', insertAfterOrder: topicOrder });
+                      }}
                       className="w-full flex items-center p-2 text-sm text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
                     >
                       <PlusIcon className="h-4 w-4 mr-2" />
@@ -583,14 +587,18 @@ export default function CourseBuilder() {
                 </div>
               ))}
               
-              {/* Add Module Button - At the end */}
-              <button
-                onClick={() => handleContentSelect({ type: 'new-topic' })}
-                className="w-full flex items-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
-              >
-                <PlusIcon className="h-5 w-5 mr-3" />
-                <span className="font-medium">Add Module</span>
-              </button>
+              {/* Add Module Button - At the end (only show if there are no modules or as a fallback) */}
+              {course.topics.length === 0 && (
+                <button
+                  onClick={() => {
+                    handleContentSelect({ type: 'new-topic', insertAfterOrder: 0 });
+                  }}
+                  className="w-full flex items-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
+                >
+                  <PlusIcon className="h-5 w-5 mr-3" />
+                  <span className="font-medium">Add Module</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -660,7 +668,7 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave, onCon
         }} /> : null;
       
       case 'new-topic':
-        return <NewTopicEditor course={course} onUpdate={onContentUpdate} onSave={onSave} />;
+        return <NewTopicEditor course={course} onUpdate={onContentUpdate} onSave={onSave} insertAfterOrder={selectedContent.insertAfterOrder} />;
       
       case 'new-lesson':
         return <NewLessonEditor course={course} topicId={selectedContent.parentId!} onUpdate={onContentUpdate} onSave={onSave} />;
@@ -1588,9 +1596,24 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh, onDelete }: { lesso
 }
 
 // New Topic Editor
-function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate: (course: Course) => void; onSave: () => void }) {
-  // Calculate the next order number based on existing topics' order values
+function NewTopicEditor({ course, onUpdate, onSave, insertAfterOrder }: { course: Course; onUpdate: (course: Course) => void; onSave: () => void; insertAfterOrder?: number }) {
+  // Calculate the order number based on insertAfterOrder or use next available
   const getNextOrder = () => {
+    if (insertAfterOrder !== undefined) {
+      // Insert after the specified order - find the next available order
+      const sortedTopics = [...course.topics].sort((a, b) => (a.order || 0) - (b.order || 0));
+      // Find the next order that's greater than insertAfterOrder
+      const nextOrder = insertAfterOrder + 1;
+      // Check if there's already a topic with this order or higher
+      const conflictingTopics = sortedTopics.filter(t => (t.order || 0) >= nextOrder);
+      if (conflictingTopics.length > 0) {
+        // If there are conflicts, we need to shift them or use a fractional order
+        // For simplicity, use the next available integer order
+        return nextOrder;
+      }
+      return nextOrder;
+    }
+    // Default: add at the end
     if (course.topics.length === 0) return 1;
     const maxOrder = Math.max(...course.topics.map(t => t.order || 0));
     return maxOrder + 1;
@@ -1632,9 +1655,16 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
         isExpanded: true
       };
 
+      // Insert the new topic at the correct position based on order
+      const sortedTopics = [...course.topics].sort((a, b) => (a.order || 0) - (b.order || 0));
+      const insertIndex = sortedTopics.findIndex(t => (t.order || 0) > newTopic.order);
+      const updatedTopics = insertIndex === -1 
+        ? [...sortedTopics, newTopic]
+        : [...sortedTopics.slice(0, insertIndex), newTopic, ...sortedTopics.slice(insertIndex)];
+
       const updatedCourse = {
         ...course,
-        topics: [...course.topics, newTopic]
+        topics: updatedTopics
       };
 
       onUpdate(updatedCourse);
