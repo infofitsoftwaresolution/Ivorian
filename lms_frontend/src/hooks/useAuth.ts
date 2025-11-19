@@ -27,8 +27,8 @@ interface AuthState {
 
 // Hook return type
 interface UseAuthReturn extends AuthState {
-  login: (credentials: LoginRequest) => Promise<{ success: boolean; error?: string }>;
-  register: (userData: RegisterRequest) => Promise<{ success: boolean; error?: string }>;
+  login: (credentials: LoginRequest) => Promise<{ success: boolean; error?: string; passwordChangeRequired?: boolean }>;
+  register: (userData: RegisterRequest, otpCode?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   forgotPassword: (data: ForgotPasswordRequest) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (data: ResetPasswordRequest) => Promise<{ success: boolean; error?: string }>;
@@ -93,6 +93,7 @@ export function useAuth(): UseAuthReturn {
       );
 
       // Update state
+      const passwordChangeRequired = response.data.data.password_change_required || false;
       setState({
         user: response.data.data.user,
         isAuthenticated: true,
@@ -100,7 +101,10 @@ export function useAuth(): UseAuthReturn {
       });
 
       console.log('useAuth: Login successful, state updated');
-      return { success: true };
+      return { 
+        success: true,
+        passwordChangeRequired: passwordChangeRequired
+      };
     } catch (error: any) {
       console.error('useAuth: Login error:', error);
       setState(prev => ({ ...prev, isLoading: false }));
@@ -157,11 +161,11 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   // Register function
-  const register = useCallback(async (userData: RegisterRequest) => {
+  const register = useCallback(async (userData: RegisterRequest, otpCode?: string) => {
     try {
       setState(prev => ({ ...prev, isLoading: true }));
       
-      const response = await apiClient.register(userData);
+      const response = await apiClient.register(userData, otpCode);
       
       // Store tokens - register returns {message, data: {user, tokens}} structure
       TokenManager.setTokens(

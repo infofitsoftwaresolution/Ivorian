@@ -2,4 +2,4 @@
 Database models for the LMS application
 """
 
-from . import user, course, assessment, analytics, organization, rbac 
+from . import user, course, assessment, analytics, organization, rbac, otp 

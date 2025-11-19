@@ -70,6 +70,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   acceptTerms: boolean;
+  role?: 'student' | 'organization';
 }
 
 export interface AuthResponse {
@@ -402,16 +403,34 @@ class ApiClient {
     });
   }
 
-  async register(userData: RegisterRequest): Promise<ApiResponse<AuthResponse>> {
+  async sendRegistrationOTP(email: string, role: 'student' | 'organization'): Promise<ApiResponse> {
+    return this.request('/api/v1/auth/register/send-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    });
+  }
+
+  async verifyRegistrationOTP(email: string, otpCode: string): Promise<ApiResponse> {
+    return this.request('/api/v1/auth/register/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp_code: otpCode }),
+    });
+  }
+
+  async register(userData: RegisterRequest, otpCode?: string): Promise<ApiResponse<AuthResponse>> {
     // Transform camelCase to snake_case for backend compatibility
     // Only send fields that the backend expects
-    const transformedData = {
+    const transformedData: any = {
       first_name: userData.firstName,
       last_name: userData.lastName,
       email: userData.email,
       password: userData.password,
-      role: "student", // Default role for new registrations
+      role: userData.role || "student",
     };
+    
+    if (otpCode) {
+      transformedData.otp_code = otpCode;
+    }
     
     return this.request<AuthResponse>('/api/v1/auth/register', {
       method: 'POST',

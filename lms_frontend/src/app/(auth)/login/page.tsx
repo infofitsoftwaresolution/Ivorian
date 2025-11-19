@@ -9,15 +9,17 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import PasswordChangeModal from "@/components/auth/PasswordChangeModal";
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, refreshUser } = useAuth();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
   
   // Fix hydration error by ensuring component is mounted
   useEffect(() => {
@@ -52,13 +54,27 @@ export default function LoginPage() {
     console.log('Login result:', result);
 
     if (result.success) {
-      console.log('Login successful, redirecting to dashboard...');
-      setIsRedirecting(true);
-      router.push('/dashboard');
+      if (result.passwordChangeRequired) {
+        // Show password change modal instead of redirecting
+        setShowPasswordChangeModal(true);
+      } else {
+        console.log('Login successful, redirecting to dashboard...');
+        setIsRedirecting(true);
+        router.push('/dashboard');
+      }
     } else {
       console.error('Login failed:', result.error);
       setError(result.error || 'Login failed');
     }
+  };
+
+  const handlePasswordChangeSuccess = async () => {
+    setShowPasswordChangeModal(false);
+    // Refresh user data to clear password_change_required flag
+    await refreshUser();
+    // Redirect to dashboard
+    setIsRedirecting(true);
+    router.push('/dashboard');
   };
 
   // Don't render until mounted to prevent hydration errors
@@ -293,6 +309,13 @@ export default function LoginPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Password Change Modal */}
+      <PasswordChangeModal
+        isOpen={showPasswordChangeModal}
+        onClose={() => setShowPasswordChangeModal(false)}
+        onSuccess={handlePasswordChangeSuccess}
+      />
     </div>
   );
 }

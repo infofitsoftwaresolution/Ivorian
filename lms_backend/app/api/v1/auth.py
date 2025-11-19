@@ -1,9 +1,12 @@
 """
 Authentication API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import Field, EmailStr
+from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -13,6 +16,8 @@ from app.schemas.auth import (
     OrganizationRegister, OrganizationLogin
 )
 from app.services.auth import AuthService
+from app.services.otp_service import OTPService
+from app.services.email_service import email_service
 from app.models.user import User
 
 router = APIRouter()
@@ -21,14 +26,165 @@ router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"/api/v1/auth/login")
 
 
-@router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
-async def register(
-    user_data: UserRegister,
+@router.post("/test-email", response_model=dict)
+async def test_email(
+    email: EmailStr = Body(..., description="Email address to send test email to"),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Test email functionality (requires authentication)
+    """
+    # Only allow super admins to test emails
+    if current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super admins can test email functionality"
+        )
+    
+    test_subject = "Test Email - InfoFit LMS"
+    test_html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background-color: #4F46E5; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+            .content { background-color: #f9fafb; padding: 30px; border-radius: 0 0 5px 5px; }
+            .success { background-color: #D1FAE5; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #10B981; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Test Email</h1>
+            </div>
+            <div class="content">
+                <div class="success">
+                    <strong>✅ Success!</strong> If you're reading this, the email service is working correctly.
+                </div>
+                <p>This is a test email from InfoFit LMS to verify that the email service is properly configured.</p>
+                <p>Email service configuration:</p>
+                <ul>
+                    <li>Service: AWS SES</li>
+                    <li>Status: Active</li>
+                </ul>
+                <p>Best regards,<br>InfoFit LMS Team</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    test_text = "Test Email - InfoFit LMS\n\nThis is a test email to verify that the email service is working correctly.\n\nIf you're reading this, the email service is properly configured."
+    
+    email_sent = await email_service.send_email(str(email), test_subject, test_html, test_text)
+    
+    if email_sent:
+        return {
+            "message": "Test email sent successfully",
+            "data": {
+                "email": str(email),
+                "status": "sent"
+            }
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send test email. Please check email service configuration."
+        )
+
+
+@router.post("/register/send-otp", response_model=dict)
+async def send_registration_otp(
+    email: EmailStr = Body(..., description="Email address to send OTP to"),
+    role: str = Body(..., description="Registration role: 'student' or 'organization'"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Register a new user
+    Send OTP for registration
     """
+    # Validate role
+    if role not in ["student", "organization"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Role must be either 'student' or 'organization'"
+        )
+    
+    # Check if user already exists
+    existing_user = await db.execute(
+        select(User).where(User.email == str(email))
+    )
+    if existing_user.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email already exists"
+        )
+    
+    # Create and send OTP
+    otp = await OTPService.create_otp(db, str(email), purpose="registration")
+    email_sent = await OTPService.send_otp_email(str(email), otp.code, purpose="registration")
+    
+    if not email_sent:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send OTP email. Please check email service configuration."
+        )
+    
+    return {
+        "message": "OTP sent successfully to your email",
+        "data": {
+            "email": str(email),
+            "expires_in_minutes": 10
+        }
+    }
+
+
+@router.post("/register/verify-otp", response_model=dict)
+async def verify_registration_otp(
+    email: EmailStr = Body(..., description="Email address"),
+    otp_code: str = Body(..., description="OTP code"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Verify OTP for registration
+    """
+    is_valid = await OTPService.verify_otp(db, str(email), otp_code, purpose="registration")
+    
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OTP code"
+        )
+    
+    return {
+        "message": "OTP verified successfully",
+        "data": {
+            "email": str(email),
+            "verified": True
+        }
+    }
+
+
+@router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def register(
+    user_data: UserRegister = Body(...),
+    otp_code: Optional[str] = Body(None, description="OTP code for verification"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Register a new user (requires OTP verification)
+    """
+    # Verify OTP if provided
+    if otp_code:
+        is_valid = await OTPService.verify_otp(db, user_data.email, otp_code, purpose="registration")
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired OTP code. Please request a new OTP."
+            )
+    
     auth_service = AuthService(db)
     result = await auth_service.register_user(user_data)
     return {
