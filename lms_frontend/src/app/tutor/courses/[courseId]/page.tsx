@@ -105,6 +105,20 @@ export default function CourseDetailView() {
           }
         }
         
+        // Helper function to clean module title - removes all "Module X:" prefixes
+        const cleanModuleTitle = (title: string): string => {
+          if (!title) return '';
+          let cleaned = title.trim();
+          // Remove all "Module X:" patterns recursively until no more matches
+          let previousLength = 0;
+          while (cleaned.length !== previousLength) {
+            previousLength = cleaned.length;
+            // Match "Module" followed by optional space, digits, optional space, colon, optional space, and rest
+            cleaned = cleaned.replace(/^Module\s*\d+\s*:\s*/i, '').trim();
+          }
+          return cleaned;
+        };
+        
         // Deduplicate topics by ID, ensure topics and lessons arrays exist, sort by order, and normalize data
         const uniqueTopicsMap = new Map();
         topics.forEach((topic: any) => {
@@ -123,16 +137,33 @@ export default function CourseDetailView() {
           title: t.title
         })));
         
+        // Check for duplicate orders and warn
+        const orderMap = new Map();
+        uniqueTopics.forEach((topic: any) => {
+          const order = Number(topic.order) || 0;
+          if (orderMap.has(order)) {
+            console.warn(`Duplicate order ${order} found: Topic ${orderMap.get(order).id} (${orderMap.get(order).title}) and Topic ${topic.id} (${topic.title})`);
+          } else {
+            orderMap.set(order, topic);
+          }
+        });
+        
         const normalizedCourseData = {
           ...courseData,
           topics: uniqueTopics
-            .map((topic: any) => ({
-              ...topic,
-              order: Number(topic.order) || 0, // Ensure order is always a number
-              lessons: (topic.lessons || [])
-                .filter((lesson: any) => lesson && lesson.id) // Filter out invalid lessons
-                .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-            }))
+            .map((topic: any) => {
+              // Clean the title to remove any "Module X:" prefixes
+              const cleanedTitle = cleanModuleTitle(topic.title || '');
+              return {
+                ...topic,
+                title: cleanedTitle, // Store cleaned title
+                originalTitle: topic.title, // Keep original for reference
+                order: Number(topic.order) || 0, // Ensure order is always a number
+                lessons: (topic.lessons || [])
+                  .filter((lesson: any) => lesson && lesson.id) // Filter out invalid lessons
+                  .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+              };
+            })
             .filter((topic: any) => topic && topic.id) // Filter out invalid topics
             .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
           enrollments: courseData.enrollments || []
@@ -142,7 +173,8 @@ export default function CourseDetailView() {
         console.log('Topics after normalization:', normalizedCourseData.topics.map((t: any) => ({
           id: t.id,
           order: t.order,
-          title: t.title
+          originalTitle: t.originalTitle,
+          cleanedTitle: t.title
         })));
         
         setCourse(normalizedCourseData);
@@ -383,26 +415,17 @@ export default function CourseDetailView() {
                       {(() => {
                         // Always use the order field from database for module number
                         const moduleNumber = Number(topic.order) || 0;
+                        // Title is already cleaned during normalization, but double-check
                         let displayTitle = topic.title || '';
                         
-                        // Remove any "Module X:" prefix from title (handle multiple formats)
-                        // Match patterns like "Module 4:", "Module 4 :", "Module4:", etc.
-                        const titleMatch = displayTitle.match(/^Module\s*\d+\s*:\s*(.+)$/i);
-                        if (titleMatch) {
-                          displayTitle = titleMatch[1].trim();
+                        // Final cleanup - remove any remaining "Module X:" patterns (safety check)
+                        displayTitle = displayTitle.replace(/^Module\s*\d+\s*:\s*/i, '').trim();
+                        // Handle multiple nested prefixes
+                        while (displayTitle.match(/^Module\s*\d+\s*:\s*/i)) {
+                          displayTitle = displayTitle.replace(/^Module\s*\d+\s*:\s*/i, '').trim();
                         }
                         
-                        // Also handle cases where title might have "Module X: Module X:" pattern
-                        while (displayTitle.match(/^Module\s*\d+\s*:\s*(.+)$/i)) {
-                          const match = displayTitle.match(/^Module\s*\d+\s*:\s*(.+)$/i);
-                          if (match) {
-                            displayTitle = match[1].trim();
-                          } else {
-                            break;
-                          }
-                        }
-                        
-                        return `Module ${moduleNumber}: ${displayTitle}`;
+                        return `Module ${moduleNumber}: ${displayTitle || 'Untitled Module'}`;
                       })()}
                     </h3>
                     {topic.description && (

@@ -180,6 +180,19 @@ export default function CourseBuilder() {
           }
         }
         
+        // Helper function to clean module title - removes all "Module X:" prefixes
+        const cleanModuleTitle = (title: string): string => {
+          if (!title) return '';
+          let cleaned = title.trim();
+          // Remove all "Module X:" patterns recursively until no more matches
+          let previousLength = 0;
+          while (cleaned.length !== previousLength) {
+            previousLength = cleaned.length;
+            cleaned = cleaned.replace(/^Module\s*\d+\s*:\s*/i, '').trim();
+          }
+          return cleaned;
+        };
+        
         // Deduplicate topics by ID, transform backend data and sort topics by order
         const uniqueTopicsMap = new Map();
         topics.forEach((topic: any) => {
@@ -189,33 +202,48 @@ export default function CourseBuilder() {
         });
         const uniqueTopics = Array.from(uniqueTopicsMap.values());
         
+        // Check for duplicate orders and warn
+        const orderMap = new Map();
+        uniqueTopics.forEach((topic: any) => {
+          const order = Number(topic.order) || 0;
+          if (orderMap.has(order)) {
+            console.warn(`Duplicate order ${order} found: Topic ${orderMap.get(order).id} (${orderMap.get(order).title}) and Topic ${topic.id} (${topic.title})`);
+          } else {
+            orderMap.set(order, topic);
+          }
+        });
+        
         const courseData: Course = {
           id: response.data.id,
           title: response.data.title,
           description: response.data.description || response.data.short_description,
           status: response.data.status,
           topics: uniqueTopics
-            .map((topic: any) => ({
-              id: topic.id,
-              title: topic.title,
-              description: topic.description,
-              order: topic.order || 0,
-              lessons: (topic.lessons || [])
-                .filter((lesson: any) => lesson && lesson.id) // Filter out invalid lessons
-                .map((lesson: any) => ({
-                  id: lesson.id,
-                  title: lesson.title,
-                  description: lesson.description,
-                  content: lesson.content,
-                  video_url: lesson.video_url,
-                  content_type: lesson.content_type,
-                  order: lesson.order || 0,
-                  estimated_duration: lesson.estimated_duration,
-                  is_free_preview: lesson.is_free_preview
-                }))
-                .sort((a: any, b: any) => a.order - b.order),
-              isExpanded: true
-            }))
+            .map((topic: any) => {
+              // Clean the title to remove any "Module X:" prefixes
+              const cleanedTitle = cleanModuleTitle(topic.title || '');
+              return {
+                id: topic.id,
+                title: cleanedTitle, // Store cleaned title
+                description: topic.description,
+                order: Number(topic.order) || 0,
+                lessons: (topic.lessons || [])
+                  .filter((lesson: any) => lesson && lesson.id) // Filter out invalid lessons
+                  .map((lesson: any) => ({
+                    id: lesson.id,
+                    title: lesson.title,
+                    description: lesson.description,
+                    content: lesson.content,
+                    video_url: lesson.video_url,
+                    content_type: lesson.content_type,
+                    order: lesson.order || 0,
+                    estimated_duration: lesson.estimated_duration,
+                    is_free_preview: lesson.is_free_preview
+                  }))
+                  .sort((a: any, b: any) => a.order - b.order),
+                isExpanded: true
+              };
+            })
             .filter((topic: any) => topic && topic.id) // Filter out invalid topics
             .sort((a: any, b: any) => a.order - b.order) || []
         };
