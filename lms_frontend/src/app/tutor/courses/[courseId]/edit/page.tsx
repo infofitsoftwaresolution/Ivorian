@@ -878,12 +878,14 @@ function TopicEditor({ topic, course, onUpdate, onRefresh }: { topic: Topic; cou
           </label>
           <input
             type="number"
-            min="1"
             value={localTopic.order}
-            onChange={(e) => handleUpdate('order', parseInt(e.target.value) || 1)}
+            onChange={(e) => {
+              const value = e.target.value === '' ? 0 : parseInt(e.target.value);
+              handleUpdate('order', isNaN(value) ? 0 : value);
+            }}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
           />
-          <p className="text-xs text-gray-500 mt-1">The order in which this module appears in the course (1, 2, 3, etc.)</p>
+          <p className="text-xs text-gray-500 mt-1">Set the order number for this module. You can use any number to control the display order.</p>
         </div>
 
         {/* Topic Title */}

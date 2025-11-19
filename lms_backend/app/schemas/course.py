@@ -137,7 +137,7 @@ class TopicUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     content: Optional[str] = None
-    order: Optional[int] = Field(None, ge=1)
+    order: Optional[int] = None  # Allow any integer value for flexible ordering
     estimated_duration: Optional[int] = Field(None, ge=1)
     is_required: Optional[bool] = None
 
