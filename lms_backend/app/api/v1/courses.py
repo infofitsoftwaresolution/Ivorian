@@ -9,6 +9,7 @@ import math
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, get_optional_current_user
+from app.core.errors import ResourceNotFoundError, AuthorizationError
 # from app.core.rbac import require_permission, require_role  # Temporarily disabled
 from app.models.user import User
 from app.schemas.course import (
@@ -221,7 +222,19 @@ async def delete_course(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a course"""
-    await CourseService.delete_course(db, course_id, current_user.id)
+    try:
+        await CourseService.delete_course(db, course_id, current_user.id)
+    except ResourceNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except AuthorizationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete course: {str(e)}"
+        )
 
 
 @router.post("/{course_id}/pricing", response_model=CourseResponse)

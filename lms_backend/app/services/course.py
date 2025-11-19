@@ -212,37 +212,48 @@ class CourseService:
         - Organization admins can delete courses in their organization
         - Super admins can delete any course
         """
-        course = await CourseService.get_course(db, course_id)
-        if not course:
-            raise ResourceNotFoundError("Course not found")
-        
-        # Get the user making the request
-        result = await db.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-        if not user:
-            raise AuthorizationError("User not found")
-        
-        # Check if user has permission to delete this course
-        if course.created_by == user_id:
-            # Tutors can delete courses they created
-            pass
-        elif user.role == "super_admin":
-            # Super admins can delete any course
-            pass
-        elif user.role == "organization_admin":
-            # Organization admins can only delete courses in their organization
-            if not user.organization_id:
-                raise AuthorizationError("Organization admin must belong to an organization")
-            if course.organization_id != user.organization_id:
-                raise AuthorizationError("You can only delete courses in your organization")
-        else:
-            # Other roles cannot delete courses
-            raise AuthorizationError("You don't have permission to delete this course")
-        
-        await db.delete(course)
-        await db.commit()
-        
-        return True
+        try:
+            course = await CourseService.get_course(db, course_id)
+            if not course:
+                raise ResourceNotFoundError("Course not found")
+            
+            # Get the user making the request
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            if not user:
+                raise AuthorizationError("User not found")
+            
+            # Check if user has permission to delete this course
+            if course.created_by == user_id:
+                # Tutors can delete courses they created
+                pass
+            elif user.role == "super_admin":
+                # Super admins can delete any course
+                pass
+            elif user.role == "organization_admin":
+                # Organization admins can only delete courses in their organization
+                if not user.organization_id:
+                    raise AuthorizationError("Organization admin must belong to an organization")
+                if course.organization_id != user.organization_id:
+                    raise AuthorizationError("You can only delete courses in your organization")
+            else:
+                # Other roles cannot delete courses
+                raise AuthorizationError("You don't have permission to delete this course")
+            
+            # Use delete statement for proper async deletion
+            from sqlalchemy import delete
+            delete_stmt = delete(Course).where(Course.id == course_id)
+            await db.execute(delete_stmt)
+            await db.commit()
+            
+            return True
+        except (ResourceNotFoundError, AuthorizationError):
+            # Re-raise these exceptions as-is
+            raise
+        except Exception as e:
+            # Rollback on any other error
+            await db.rollback()
+            raise Exception(f"Error deleting course: {str(e)}")
     
     @staticmethod
     async def set_course_pricing(
