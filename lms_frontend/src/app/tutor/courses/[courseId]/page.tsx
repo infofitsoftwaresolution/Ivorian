@@ -364,9 +364,14 @@ export default function CourseDetailView() {
                 <div key={topic.id} className="border border-gray-200 rounded-lg">
                   <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                     <h3 className="text-lg font-medium text-gray-900">
-                      {topic.title?.trim().toLowerCase().startsWith('module') 
-                        ? topic.title 
-                        : `Module ${topic.order || 0}: ${topic.title}`}
+                      {(() => {
+                        // Always use the order field from database for module number
+                        const moduleNumber = topic.order || 0;
+                        // If title starts with "Module X:", extract the part after the colon
+                        const titleMatch = topic.title?.match(/^Module\s+\d+:\s*(.+)$/i);
+                        const displayTitle = titleMatch ? titleMatch[1].trim() : topic.title;
+                        return `Module ${moduleNumber}: ${displayTitle}`;
+                      })()}
                     </h3>
                     {topic.description && (
                       <p className="text-sm text-gray-600 mt-1">{topic.description}</p>
