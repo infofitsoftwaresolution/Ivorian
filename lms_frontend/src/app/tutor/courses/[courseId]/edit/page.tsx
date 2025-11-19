@@ -624,13 +624,25 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: Con
       
       case 'topic':
         const topic = course.topics.find(t => t.id === selectedContent.id);
-        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onSelectLesson={(lessonId) => handleContentSelect({ type: 'lesson', id: lessonId, parentId: topic.id })} onDelete={() => setSelectedContent({ type: 'course-overview' })} /> : null;
+        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onSelectLesson={(lessonId) => {
+          const selectedLesson = topic.lessons.find(l => l.id === lessonId);
+          if (selectedLesson) {
+            setSelectedContent({ type: 'lesson', id: lessonId, parentId: topic.id });
+          }
+        }} onDelete={() => setSelectedContent({ type: 'course-overview' })} /> : null;
       
       case 'lesson':
         const lesson = course.topics
           .flatMap(t => t.lessons)
           .find(l => l.id === selectedContent.id);
-        return lesson ? <LessonEditor lesson={lesson} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} /> : null;
+        const lessonTopic = lesson ? course.topics.find(t => t.lessons.some(l => l.id === lesson.id)) : null;
+        return lesson ? <LessonEditor lesson={lesson} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onDelete={() => {
+          if (lessonTopic) {
+            setSelectedContent({ type: 'topic', id: lessonTopic.id });
+          } else {
+            setSelectedContent({ type: 'course-overview' });
+          }
+        }} /> : null;
       
       case 'new-topic':
         return <NewTopicEditor course={course} onUpdate={onContentUpdate} onSave={onSave} />;
@@ -1089,12 +1101,14 @@ function TopicEditor({ topic, course, onUpdate, onRefresh, onSelectLesson, onDel
 }
 
 // Lesson Editor
-function LessonEditor({ lesson, course, onUpdate, onRefresh }: { lesson: Lesson; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void }) {
+function LessonEditor({ lesson, course, onUpdate, onRefresh, onDelete }: { lesson: Lesson; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void; onDelete?: () => void }) {
   const [localLesson, setLocalLesson] = useState(lesson);
   const [activeTab, setActiveTab] = useState<'content' | 'video' | 'attachments' | 'knowledge-checks'>('content');
   const [showKnowledgeCheckBuilder, setShowKnowledgeCheckBuilder] = useState(false);
   const [showStudentPreview, setShowStudentPreview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Update local lesson state when lesson prop changes (when clicking different lesson)
   useEffect(() => {
@@ -1135,6 +1149,128 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh }: { lesson: Lesson;
     setShowKnowledgeCheckBuilder(false);
   };
 
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      
+      // Prepare update data - only send changed fields
+      const updateData: any = {};
+      if (localLesson.title !== lesson.title) {
+        updateData.title = localLesson.title;
+      }
+      if (localLesson.description !== lesson.description) {
+        updateData.description = localLesson.description;
+      }
+      if (localLesson.content !== lesson.content) {
+        updateData.content = localLesson.content;
+      }
+      if (localLesson.video_url !== lesson.video_url) {
+        updateData.video_url = localLesson.video_url;
+      }
+      if (localLesson.content_type !== lesson.content_type) {
+        updateData.content_type = localLesson.content_type;
+      }
+      if (localLesson.order !== lesson.order) {
+        updateData.order = localLesson.order;
+      }
+      if (localLesson.estimated_duration !== lesson.estimated_duration) {
+        updateData.estimated_duration = localLesson.estimated_duration;
+      }
+      if (localLesson.is_free_preview !== lesson.is_free_preview) {
+        updateData.is_free_preview = localLesson.is_free_preview;
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        showToast('No changes to save', 'info', 2000);
+        return;
+      }
+      
+      console.log('Updating lesson:', lesson.id, updateData);
+      const response = await apiClient.updateLesson(lesson.id, updateData);
+      console.log('Lesson updated successfully:', response.data);
+      
+      // Update local state with response data
+      const updatedLesson = {
+        ...localLesson,
+        ...response.data
+      };
+      setLocalLesson(updatedLesson);
+      
+      const updatedCourse = {
+        ...course,
+        topics: course.topics.map(topic => ({
+          ...topic,
+          lessons: topic.lessons.map(l => l.id === lesson.id ? updatedLesson : l)
+        }))
+      };
+      onUpdate(updatedCourse);
+      
+      showToast('Lesson updated successfully! Refreshing...', 'success', 3000);
+      
+      // Refresh course data from server
+      setTimeout(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error updating lesson:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to update lesson: ${errorMessage}`, 'error', 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      setDeleting(true);
+      
+      console.log('Deleting lesson:', lesson.id);
+      await apiClient.deleteLesson(lesson.id);
+      console.log('Lesson deleted successfully');
+      
+      showToast('Lesson deleted successfully!', 'success', 3000);
+      
+      // Remove from local state
+      const updatedCourse = {
+        ...course,
+        topics: course.topics.map(topic => ({
+          ...topic,
+          lessons: topic.lessons.filter(l => l.id !== lesson.id)
+        }))
+      };
+      onUpdate(updatedCourse);
+      
+      // Navigate back to topic view
+      if (onDelete) {
+        onDelete();
+      }
+      
+      // Refresh course data from server
+      setTimeout(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error deleting lesson:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to delete lesson: ${errorMessage}`, 'error', 5000);
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -1146,7 +1282,7 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh }: { lesson: Lesson;
           <div className="flex items-center space-x-2">
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || deleting}
               className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center space-x-2"
             >
               {saving && <LoadingSpinner size="sm" />}
@@ -1158,6 +1294,14 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh }: { lesson: Lesson;
             >
               <EyeIcon className="h-4 w-4" />
               <span>Preview as Student</span>
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              disabled={saving || deleting}
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center space-x-2"
+            >
+              <TrashIcon className="h-4 w-4" />
+              <span>Delete Lesson</span>
             </button>
           </div>
         </div>
@@ -1411,6 +1555,19 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh }: { lesson: Lesson;
           onClose={() => setShowStudentPreview(false)}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Lesson"
+        message={`Are you sure you want to delete "${lesson.title}"? This will permanently delete the lesson and all its content. This action cannot be undone.`}
+        confirmText="Delete Lesson"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={deleting}
+      />
     </div>
   );
 }
