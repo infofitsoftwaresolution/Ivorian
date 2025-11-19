@@ -379,7 +379,7 @@ export default function CourseBuilder() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Content Tree */}
-        <div className="w-80 bg-white/95 backdrop-blur-sm border-r border-gray-200/50 overflow-y-auto shadow-lg">
+        <div className="w-80 bg-white/95 backdrop-blur-sm border-r border-gray-200/50 overflow-y-auto shadow-lg flex-shrink-0">
           <div className="p-4">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Course Content</h2>
             
@@ -421,7 +421,7 @@ export default function CourseBuilder() {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">
-                        {topic.title || `Topic ${index + 1}`}
+                        {topic.title || `Module ${index + 1}`}
                       </div>
                       <div className="text-xs text-gray-500">
                         {topic.lessons.length} lessons
@@ -518,13 +518,13 @@ export default function CourseBuilder() {
                 </div>
               ))}
               
-              {/* Add Topic Button */}
+              {/* Add Module Button */}
               <button
                 onClick={() => handleContentSelect({ type: 'new-topic' })}
                 className="w-full flex items-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
               >
                 <PlusIcon className="h-5 w-5 mr-3" />
-                <span className="font-medium">Add Topic</span>
+                <span className="font-medium">Add Module</span>
               </button>
             </div>
           </div>
@@ -728,15 +728,15 @@ function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Edit Topic</h2>
-        <p className="text-gray-600">Configure this topic's content and settings.</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Edit Module</h2>
+        <p className="text-gray-600">Configure this module's content and settings.</p>
       </div>
 
       <div className="space-y-6">
         {/* Topic Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Topic Title
+            Module Title
           </label>
           <input
             type="text"
@@ -747,10 +747,10 @@ function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course
           />
         </div>
 
-        {/* Topic Description */}
+        {/* Module Description */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Topic Description
+            Module Description
           </label>
           <textarea
             rows={3}
@@ -763,7 +763,7 @@ function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course
 
         {/* Lessons in Topic */}
         <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-3">Lessons in this Topic</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Lessons in this Module</h3>
           <div className="space-y-2">
             {localTopic.lessons.map((lesson, index) => (
               <div key={lesson.id} className="flex items-center p-3 bg-gray-50 rounded-md">
@@ -1125,14 +1125,14 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Create New Topic</h2>
-        <p className="text-gray-600">Add a new topic to organize your course content.</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Create New Module</h2>
+        <p className="text-gray-600">Add a new module to organize your course content.</p>
       </div>
 
       <div className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Topic Title *
+            Module Title *
           </label>
           <input
             type="text"
@@ -1145,13 +1145,13 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Topic Description
+            Module Description
           </label>
           <textarea
             rows={3}
             value={topicData.description}
             onChange={(e) => setTopicData(prev => ({ ...prev, description: e.target.value }))}
-            placeholder="Describe what students will learn in this topic..."
+            placeholder="Describe what students will learn in this module..."
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
@@ -1161,7 +1161,7 @@ function NewTopicEditor({ course, onUpdate, onSave }: { course: Course; onUpdate
             onClick={handleCreate}
             className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            Create Topic
+            Create Module
           </button>
           <button
             onClick={() => window.history.back()}
