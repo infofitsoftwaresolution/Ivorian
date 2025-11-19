@@ -203,12 +203,13 @@ export default function CourseBuilder() {
         });
         const uniqueTopics = Array.from(uniqueTopicsMap.values());
         
-        // Check for duplicate orders and warn
+        // Check for duplicate orders (informational only - duplicate orders are allowed)
         const orderMap = new Map();
         uniqueTopics.forEach((topic: any) => {
           const order = Number(topic.order) || 0;
           if (orderMap.has(order)) {
-            console.warn(`Duplicate order ${order} found: Topic ${orderMap.get(order).id} (${orderMap.get(order).title}) and Topic ${topic.id} (${topic.title})`);
+            // Just log for debugging - duplicate orders are allowed with dynamic ordering
+            console.log(`[Info] Multiple modules with order ${order}: Topic ${orderMap.get(order).id} and Topic ${topic.id}`);
           } else {
             orderMap.set(order, topic);
           }
