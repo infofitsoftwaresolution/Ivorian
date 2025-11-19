@@ -448,7 +448,7 @@ export default function CourseBuilder() {
                           className={`w-full flex items-center p-3 text-left transition-colors border-b border-gray-200 last:border-b-0 ${
                             selectedContent.type === 'lesson' && selectedContent.id === lesson.id
                               ? 'bg-green-50 text-green-700'
-                              : 'hover:bg-gray-100'
+                              : 'text-gray-700 hover:bg-gray-100'
                           }`}
                         >
                           <div className="w-6 flex justify-center mr-3">
@@ -459,7 +459,11 @@ export default function CourseBuilder() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium break-words text-sm">
+                            <div className={`font-medium break-words text-sm ${
+                              selectedContent.type === 'lesson' && selectedContent.id === lesson.id
+                                ? 'text-green-700'
+                                : 'text-gray-700'
+                            }`}>
                               {lesson.title || `Lesson ${lessonIndex + 1}`}
                             </div>
                             <div className="text-xs text-gray-500">
@@ -796,6 +800,12 @@ function LessonEditor({ lesson, course, onUpdate }: { lesson: Lesson; course: Co
   const [activeTab, setActiveTab] = useState<'content' | 'video' | 'attachments' | 'knowledge-checks'>('content');
   const [showKnowledgeCheckBuilder, setShowKnowledgeCheckBuilder] = useState(false);
   const [showStudentPreview, setShowStudentPreview] = useState(false);
+
+  // Update local lesson state when lesson prop changes (when clicking different lesson)
+  useEffect(() => {
+    setLocalLesson(lesson);
+    setActiveTab('content'); // Reset to content tab when switching lessons
+  }, [lesson.id]);
 
   const handleUpdate = (field: string, value: any) => {
     const updated = { ...localLesson, [field]: value };
