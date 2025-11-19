@@ -133,6 +133,7 @@ export default function CourseBuilder() {
   const [publishing, setPublishing] = useState(false);
   const [selectedContent, setSelectedContent] = useState<SelectedContent>({ type: 'course-overview' });
   const [showCoursePreview, setShowCoursePreview] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // Key to trigger refresh
 
   // Load course data
   useEffect(() => {
@@ -270,7 +271,7 @@ export default function CourseBuilder() {
       console.error('Invalid course ID:', courseId);
       setLoading(false);
     }
-  }, [courseId]);
+  }, [courseId, refreshKey]); // Add refreshKey as dependency
 
   const toggleTopicExpansion = (topicId: number) => {
     setCourse(prev => {
@@ -620,7 +621,7 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: Con
       
       case 'topic':
         const topic = course.topics.find(t => t.id === selectedContent.id);
-        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} /> : null;
+        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} /> : null;
       
       case 'lesson':
         const lesson = course.topics
@@ -761,9 +762,14 @@ function CourseOverviewEditor({ course, onUpdate }: { course: Course; onUpdate: 
 }
 
 // Topic Editor
-function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course; onUpdate: (course: Course) => void }) {
+function TopicEditor({ topic, course, onUpdate, onRefresh }: { topic: Topic; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void }) {
   const [localTopic, setLocalTopic] = useState(topic);
   const [saving, setSaving] = useState(false);
+  
+  // Update local topic when prop changes
+  useEffect(() => {
+    setLocalTopic(topic);
+  }, [topic.id, topic.order, topic.title]);
 
   const handleUpdate = (field: string, value: any) => {
     const updated = { ...localTopic, [field]: value };
@@ -801,10 +807,26 @@ function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course
       const response = await apiClient.updateTopic(topic.id, updateData);
       console.log('Topic updated successfully:', response.data);
       
-      // Update local state with response data
+      // Helper function to clean module title
+      const cleanModuleTitle = (title: string): string => {
+        if (!title) return '';
+        let cleaned = title.trim();
+        let previousLength = 0;
+        while (cleaned.length !== previousLength) {
+          previousLength = cleaned.length;
+          cleaned = cleaned.replace(/^Module\s*\d+\s*:\s*/i, '').trim();
+        }
+        return cleaned;
+      };
+      
+      // Update local state with response data, cleaning the title
+      const responseData = response.data;
+      const cleanedTitle = cleanModuleTitle(responseData.title || localTopic.title);
       const updatedTopic = {
         ...localTopic,
-        ...response.data
+        ...responseData,
+        title: cleanedTitle,
+        order: Number(responseData.order) || localTopic.order
       };
       setLocalTopic(updatedTopic);
       
@@ -814,7 +836,14 @@ function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course
       };
       onUpdate(updatedCourse);
       
-      showToast('Module updated successfully!', 'success', 3000);
+      showToast('Module updated successfully! Refreshing...', 'success', 3000);
+      
+      // Refresh course data from server after a short delay to ensure backend has processed
+      setTimeout(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 500);
     } catch (error) {
       console.error('Error updating topic:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
