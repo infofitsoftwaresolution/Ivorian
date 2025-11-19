@@ -364,7 +364,9 @@ export default function CourseDetailView() {
                 <div key={topic.id} className="border border-gray-200 rounded-lg">
                   <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
                     <h3 className="text-lg font-medium text-gray-900">
-                      Module {topic.order || 0}: {topic.title}
+                      {topic.title?.trim().toLowerCase().startsWith('module') 
+                        ? topic.title 
+                        : `Module ${topic.order || 0}: ${topic.title}`}
                     </h3>
                     {topic.description && (
                       <p className="text-sm text-gray-600 mt-1">{topic.description}</p>
