@@ -21,7 +21,8 @@ import {
   ArrowLeftIcon,
   VideoCameraIcon,
   PaperClipIcon,
-  QuestionMarkCircleIcon
+  QuestionMarkCircleIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import RichTextEditor from '@/components/editor/RichTextEditor';
@@ -32,6 +33,7 @@ import StudentPreview from '@/components/editor/StudentPreview';
 import CoursePreview from '@/components/editor/CoursePreview';
 import AssessmentEditor from '@/components/course/AssessmentEditor';
 import { showToast } from '@/components/ui/Toast';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
 // Interfaces
 interface Course {
@@ -622,7 +624,7 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: Con
       
       case 'topic':
         const topic = course.topics.find(t => t.id === selectedContent.id);
-        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onSelectLesson={(lessonId) => setSelectedContent({ type: 'lesson', id: lessonId, parentId: topic.id })} /> : null;
+        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onSelectLesson={(lessonId) => handleContentSelect({ type: 'lesson', id: lessonId, parentId: topic.id })} onDelete={() => handleContentSelect({ type: 'course-overview' })} /> : null;
       
       case 'lesson':
         const lesson = course.topics
@@ -829,9 +831,11 @@ function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course;
 }
 
 // Topic Editor
-function TopicEditor({ topic, course, onUpdate, onRefresh, onSelectLesson }: { topic: Topic; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void; onSelectLesson?: (lessonId: number) => void }) {
+function TopicEditor({ topic, course, onUpdate, onRefresh, onSelectLesson, onDelete }: { topic: Topic; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void; onSelectLesson?: (lessonId: number) => void; onDelete?: () => void }) {
   const [localTopic, setLocalTopic] = useState(topic);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   // Update local topic when prop changes
   useEffect(() => {
@@ -920,6 +924,52 @@ function TopicEditor({ topic, course, onUpdate, onRefresh, onSelectLesson }: { t
     }
   };
 
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      setDeleting(true);
+      
+      console.log('Deleting topic:', topic.id);
+      await apiClient.deleteTopic(topic.id);
+      console.log('Topic deleted successfully');
+      
+      showToast('Module deleted successfully!', 'success', 3000);
+      
+      // Remove from local state
+      const updatedCourse = {
+        ...course,
+        topics: course.topics.filter(t => t.id !== topic.id)
+      };
+      onUpdate(updatedCourse);
+      
+      // Navigate back to course overview
+      if (onDelete) {
+        onDelete();
+      }
+      
+      // Refresh course data from server
+      setTimeout(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error deleting topic:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to delete module: ${errorMessage}`, 'error', 5000);
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
@@ -927,15 +977,38 @@ function TopicEditor({ topic, course, onUpdate, onRefresh, onSelectLesson }: { t
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Edit Module</h2>
           <p className="text-gray-600">Configure this module's content and settings.</p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center space-x-2"
-        >
-          {saving && <LoadingSpinner size="sm" />}
-          <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={handleSave}
+            disabled={saving || deleting}
+            className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center space-x-2"
+          >
+            {saving && <LoadingSpinner size="sm" />}
+            <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+          </button>
+          <button
+            onClick={handleDeleteClick}
+            disabled={saving || deleting}
+            className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center space-x-2"
+          >
+            <TrashIcon className="h-4 w-4" />
+            <span>Delete Module</span>
+          </button>
+        </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Module"
+        message={`Are you sure you want to delete "${topic.title}"? This will permanently delete the module and all its lessons. This action cannot be undone.`}
+        confirmText="Delete Module"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={deleting}
+      />
 
       <div className="space-y-6">
         {/* Module Order */}
