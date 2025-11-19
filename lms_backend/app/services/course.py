@@ -4,7 +4,7 @@ Course service for the LMS application
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy import and_, or_, func, desc, select, cast, String, delete
+from sqlalchemy import and_, or_, func, desc, select, cast, String, delete, text
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 
@@ -758,25 +758,49 @@ class TopicService:
                 )
                 await db.flush()
             
-            # Delete assignment submissions first
-            assignments_result = await db.execute(
-                select(Assignment).where(Assignment.topic_id == topic_id)
-            )
-            assignments = assignments_result.scalars().all()
-            assignment_ids = [assignment.id for assignment in assignments]
-            
-            if assignment_ids:
-                # Delete assignment submissions
-                await db.execute(
-                    delete(AssignmentSubmission).where(AssignmentSubmission.assignment_id.in_(assignment_ids))
-                )
-                await db.flush()
+            # Delete assignments and their submissions (if assignments table has topic_id column)
+            try:
+                from sqlalchemy import text
+                # Check if assignments table has topic_id column
+                check_query = text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'assignments' AND column_name = 'topic_id'
+                """)
+                result = await db.execute(check_query)
+                has_topic_id_column = result.scalar() is not None
                 
-                # Delete assignments
-                await db.execute(
-                    delete(Assignment).where(Assignment.id.in_(assignment_ids))
-                )
-                await db.flush()
+                if has_topic_id_column:
+                    # Get assignment IDs for this topic using raw SQL
+                    assignment_query = text("""
+                        SELECT id FROM assignments 
+                        WHERE topic_id = :topic_id
+                    """)
+                    assignment_result = await db.execute(
+                        assignment_query, 
+                        {"topic_id": topic_id}
+                    )
+                    assignment_ids = [row[0] for row in assignment_result.fetchall()]
+                    
+                    if assignment_ids:
+                        # Delete assignment submissions first
+                        await db.execute(
+                            text("DELETE FROM assignments_submissions WHERE assignment_id = ANY(:assignment_ids)"),
+                            {"assignment_ids": assignment_ids}
+                        )
+                        await db.flush()
+                        
+                        # Delete assignments
+                        await db.execute(
+                            text("DELETE FROM assignments WHERE topic_id = :topic_id"),
+                            {"topic_id": topic_id}
+                        )
+                        await db.flush()
+            except Exception as assignment_error:
+                # Log but don't fail - assignments might not exist or have different schema
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Could not delete assignments (table may not exist or have different schema): {assignment_error}")
             
             # Finally, delete the topic itself
             await db.execute(
