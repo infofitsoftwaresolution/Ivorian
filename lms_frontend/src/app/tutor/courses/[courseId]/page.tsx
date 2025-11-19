@@ -110,16 +110,25 @@ export default function CourseDetailView() {
         topics.forEach((topic: any) => {
           if (!uniqueTopicsMap.has(topic.id)) {
             uniqueTopicsMap.set(topic.id, topic);
+          } else {
+            console.warn(`Duplicate topic ID found: ${topic.id} - ${topic.title}`);
           }
         });
         const uniqueTopics = Array.from(uniqueTopicsMap.values());
+        
+        // Log topics for debugging
+        console.log('Topics before normalization:', uniqueTopics.map((t: any) => ({
+          id: t.id,
+          order: t.order,
+          title: t.title
+        })));
         
         const normalizedCourseData = {
           ...courseData,
           topics: uniqueTopics
             .map((topic: any) => ({
               ...topic,
-              order: topic.order || 0, // Ensure order is always a number
+              order: Number(topic.order) || 0, // Ensure order is always a number
               lessons: (topic.lessons || [])
                 .filter((lesson: any) => lesson && lesson.id) // Filter out invalid lessons
                 .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
@@ -128,6 +137,13 @@ export default function CourseDetailView() {
             .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
           enrollments: courseData.enrollments || []
         };
+        
+        // Log normalized topics for debugging
+        console.log('Topics after normalization:', normalizedCourseData.topics.map((t: any) => ({
+          id: t.id,
+          order: t.order,
+          title: t.title
+        })));
         
         setCourse(normalizedCourseData);
       } catch (error: any) {
@@ -366,10 +382,26 @@ export default function CourseDetailView() {
                     <h3 className="text-lg font-medium text-gray-900">
                       {(() => {
                         // Always use the order field from database for module number
-                        const moduleNumber = topic.order || 0;
-                        // If title starts with "Module X:", extract the part after the colon
-                        const titleMatch = topic.title?.match(/^Module\s+\d+:\s*(.+)$/i);
-                        const displayTitle = titleMatch ? titleMatch[1].trim() : topic.title;
+                        const moduleNumber = Number(topic.order) || 0;
+                        let displayTitle = topic.title || '';
+                        
+                        // Remove any "Module X:" prefix from title (handle multiple formats)
+                        // Match patterns like "Module 4:", "Module 4 :", "Module4:", etc.
+                        const titleMatch = displayTitle.match(/^Module\s*\d+\s*:\s*(.+)$/i);
+                        if (titleMatch) {
+                          displayTitle = titleMatch[1].trim();
+                        }
+                        
+                        // Also handle cases where title might have "Module X: Module X:" pattern
+                        while (displayTitle.match(/^Module\s*\d+\s*:\s*(.+)$/i)) {
+                          const match = displayTitle.match(/^Module\s*\d+\s*:\s*(.+)$/i);
+                          if (match) {
+                            displayTitle = match[1].trim();
+                          } else {
+                            break;
+                          }
+                        }
+                        
                         return `Module ${moduleNumber}: ${displayTitle}`;
                       })()}
                     </h3>
