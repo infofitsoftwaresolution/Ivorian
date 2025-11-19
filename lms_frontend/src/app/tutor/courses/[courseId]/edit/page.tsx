@@ -763,6 +763,7 @@ function CourseOverviewEditor({ course, onUpdate }: { course: Course; onUpdate: 
 // Topic Editor
 function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course; onUpdate: (course: Course) => void }) {
   const [localTopic, setLocalTopic] = useState(topic);
+  const [saving, setSaving] = useState(false);
 
   const handleUpdate = (field: string, value: any) => {
     const updated = { ...localTopic, [field]: value };
@@ -775,14 +776,87 @@ function TopicEditor({ topic, course, onUpdate }: { topic: Topic; course: Course
     onUpdate(updatedCourse);
   };
 
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      
+      // Prepare update data - only send changed fields
+      const updateData: any = {};
+      if (localTopic.title !== topic.title) {
+        updateData.title = localTopic.title;
+      }
+      if (localTopic.description !== topic.description) {
+        updateData.description = localTopic.description;
+      }
+      if (localTopic.order !== topic.order) {
+        updateData.order = localTopic.order;
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        showToast('No changes to save', 'info', 2000);
+        return;
+      }
+      
+      console.log('Updating topic:', topic.id, updateData);
+      const response = await apiClient.updateTopic(topic.id, updateData);
+      console.log('Topic updated successfully:', response.data);
+      
+      // Update local state with response data
+      const updatedTopic = {
+        ...localTopic,
+        ...response.data
+      };
+      setLocalTopic(updatedTopic);
+      
+      const updatedCourse = {
+        ...course,
+        topics: course.topics.map(t => t.id === topic.id ? updatedTopic : t)
+      };
+      onUpdate(updatedCourse);
+      
+      showToast('Module updated successfully!', 'success', 3000);
+    } catch (error) {
+      console.error('Error updating topic:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to update module: ${errorMessage}`, 'error', 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Edit Module</h2>
-        <p className="text-gray-600">Configure this module's content and settings.</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Edit Module</h2>
+          <p className="text-gray-600">Configure this module's content and settings.</p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center space-x-2"
+        >
+          {saving && <LoadingSpinner size="sm" />}
+          <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+        </button>
       </div>
 
       <div className="space-y-6">
+        {/* Module Order */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Module Order
+          </label>
+          <input
+            type="number"
+            min="1"
+            value={localTopic.order}
+            onChange={(e) => handleUpdate('order', parseInt(e.target.value) || 1)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">The order in which this module appears in the course (1, 2, 3, etc.)</p>
+        </div>
+
         {/* Topic Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
