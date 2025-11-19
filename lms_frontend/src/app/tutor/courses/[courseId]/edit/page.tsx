@@ -618,17 +618,17 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: Con
   const renderContent = () => {
     switch (selectedContent.type) {
       case 'course-overview':
-        return <CourseOverviewEditor course={course} onUpdate={onContentUpdate} />;
+        return <CourseOverviewEditor course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} />;
       
       case 'topic':
         const topic = course.topics.find(t => t.id === selectedContent.id);
-        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} /> : null;
+        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onSelectLesson={(lessonId) => setSelectedContent({ type: 'lesson', id: lessonId, parentId: topic.id })} /> : null;
       
       case 'lesson':
         const lesson = course.topics
           .flatMap(t => t.lessons)
           .find(l => l.id === selectedContent.id);
-        return lesson ? <LessonEditor lesson={lesson} course={course} onUpdate={onContentUpdate} /> : null;
+        return lesson ? <LessonEditor lesson={lesson} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} /> : null;
       
       case 'new-topic':
         return <NewTopicEditor course={course} onUpdate={onContentUpdate} onSave={onSave} />;
@@ -655,8 +655,14 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: Con
 }
 
 // Course Overview Editor
-function CourseOverviewEditor({ course, onUpdate }: { course: Course; onUpdate: (course: Course) => void }) {
+function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void }) {
   const [localCourse, setLocalCourse] = useState(course);
+  const [saving, setSaving] = useState(false);
+
+  // Update local course when prop changes
+  useEffect(() => {
+    setLocalCourse(course);
+  }, [course.id, course.title, course.description, course.status]);
 
   const handleUpdate = (field: string, value: any) => {
     const updated = { ...localCourse, [field]: value };
@@ -664,11 +670,71 @@ function CourseOverviewEditor({ course, onUpdate }: { course: Course; onUpdate: 
     onUpdate(updated);
   };
 
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      
+      // Prepare update data - only send changed fields
+      const updateData: any = {};
+      if (localCourse.title !== course.title) {
+        updateData.title = localCourse.title;
+      }
+      if (localCourse.description !== course.description) {
+        updateData.description = localCourse.description;
+      }
+      if (localCourse.status !== course.status) {
+        updateData.status = localCourse.status;
+      }
+      
+      if (Object.keys(updateData).length === 0) {
+        showToast('No changes to save', 'info', 2000);
+        return;
+      }
+      
+      console.log('Updating course:', course.id, updateData);
+      const response = await apiClient.updateCourse(course.id, updateData);
+      console.log('Course updated successfully:', response.data);
+      
+      // Update local state with response data
+      const updatedCourse = {
+        ...localCourse,
+        ...response.data
+      };
+      setLocalCourse(updatedCourse);
+      onUpdate(updatedCourse);
+      
+      showToast('Course updated successfully! Refreshing...', 'success', 3000);
+      
+      // Refresh course data from server
+      setTimeout(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 500);
+    } catch (error) {
+      console.error('Error updating course:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showToast(`Failed to update course: ${errorMessage}`, 'error', 5000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Course Overview</h2>
-        <p className="text-gray-600">Manage your course's basic information and settings.</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Course Overview</h2>
+          <p className="text-gray-600">Manage your course's basic information and settings.</p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center space-x-2"
+        >
+          {saving && <LoadingSpinner size="sm" />}
+          <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+        </button>
       </div>
 
       <div className="space-y-6">
@@ -763,7 +829,7 @@ function CourseOverviewEditor({ course, onUpdate }: { course: Course; onUpdate: 
 }
 
 // Topic Editor
-function TopicEditor({ topic, course, onUpdate, onRefresh }: { topic: Topic; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void }) {
+function TopicEditor({ topic, course, onUpdate, onRefresh, onSelectLesson }: { topic: Topic; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void; onSelectLesson?: (lessonId: number) => void }) {
   const [localTopic, setLocalTopic] = useState(topic);
   const [saving, setSaving] = useState(false);
   
@@ -934,7 +1000,10 @@ function TopicEditor({ topic, course, onUpdate, onRefresh }: { topic: Topic; cou
                     <div className="text-xs text-gray-500">{lesson.estimated_duration || 0} minutes</div>
                   </div>
                 </div>
-                <button className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                <button 
+                  onClick={() => onSelectLesson && onSelectLesson(lesson.id)}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                >
                   Edit
                 </button>
               </div>
@@ -947,11 +1016,12 @@ function TopicEditor({ topic, course, onUpdate, onRefresh }: { topic: Topic; cou
 }
 
 // Lesson Editor
-function LessonEditor({ lesson, course, onUpdate }: { lesson: Lesson; course: Course; onUpdate: (course: Course) => void }) {
+function LessonEditor({ lesson, course, onUpdate, onRefresh }: { lesson: Lesson; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void }) {
   const [localLesson, setLocalLesson] = useState(lesson);
   const [activeTab, setActiveTab] = useState<'content' | 'video' | 'attachments' | 'knowledge-checks'>('content');
   const [showKnowledgeCheckBuilder, setShowKnowledgeCheckBuilder] = useState(false);
   const [showStudentPreview, setShowStudentPreview] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Update local lesson state when lesson prop changes (when clicking different lesson)
   useEffect(() => {
@@ -1000,14 +1070,41 @@ function LessonEditor({ lesson, course, onUpdate }: { lesson: Lesson; course: Co
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Edit Lesson</h2>
             <p className="text-gray-600">Create engaging lesson content for your students.</p>
           </div>
-          <button
-            onClick={() => setShowStudentPreview(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center space-x-2"
-          >
-            <EyeIcon className="h-4 w-4" />
-            <span>Preview as Student</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center space-x-2"
+            >
+              {saving && <LoadingSpinner size="sm" />}
+              <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+            </button>
+            <button
+              onClick={() => setShowStudentPreview(true)}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center space-x-2"
+            >
+              <EyeIcon className="h-4 w-4" />
+              <span>Preview as Student</span>
+            </button>
+          </div>
         </div>
+      </div>
+
+      {/* Lesson Order */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Lesson Order
+        </label>
+        <input
+          type="number"
+          value={localLesson.order}
+          onChange={(e) => {
+            const value = e.target.value === '' ? 0 : parseInt(e.target.value);
+            handleUpdate('order', isNaN(value) ? 0 : value);
+          }}
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+        />
+        <p className="text-xs text-gray-500 mt-1">Set the order number for this lesson. You can use any number to control the display order.</p>
       </div>
 
       {/* Lesson Title */}
@@ -1020,6 +1117,20 @@ function LessonEditor({ lesson, course, onUpdate }: { lesson: Lesson; course: Co
           value={localLesson.title}
           onChange={(e) => handleUpdate('title', e.target.value)}
           placeholder="e.g., Variables and Data Types"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      {/* Lesson Description */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Lesson Description
+        </label>
+        <textarea
+          rows={3}
+          value={localLesson.description || ''}
+          onChange={(e) => handleUpdate('description', e.target.value)}
+          placeholder="Describe what students will learn in this lesson..."
           className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>
