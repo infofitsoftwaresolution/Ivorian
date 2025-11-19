@@ -229,7 +229,7 @@ export default function CoursePreview({ course, onClose, className = '' }: Cours
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">
+                              <div className="font-medium text-sm break-words">
                                 {lesson.title || `Lesson ${lessonIndex + 1}`}
                               </div>
                               <div className="text-xs text-gray-500">

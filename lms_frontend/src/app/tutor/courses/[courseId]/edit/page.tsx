@@ -420,7 +420,7 @@ export default function CourseBuilder() {
                       <ChevronRightIcon className="h-4 w-4 mr-2 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">
+                      <div className="font-medium break-words">
                         {topic.title || `Module ${index + 1}`}
                       </div>
                       <div className="text-xs text-gray-500">
@@ -459,7 +459,7 @@ export default function CourseBuilder() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate text-sm">
+                            <div className="font-medium break-words text-sm">
                               {lesson.title || `Lesson ${lessonIndex + 1}`}
                             </div>
                             <div className="text-xs text-gray-500">
@@ -504,7 +504,7 @@ export default function CourseBuilder() {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate text-sm">
+                            <div className="font-medium break-words text-sm">
                               {assessment.title}
                             </div>
                             <div className="text-xs text-purple-600">
