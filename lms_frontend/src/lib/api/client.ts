@@ -694,14 +694,14 @@ class ApiClient {
   }
 
   async updateLesson(lessonId: number, lessonData: any): Promise<ApiResponse> {
-    return this.request(`/api/v1/lessons/${lessonId}`, {
+    return this.request(`/api/v1/courses/lessons/${lessonId}`, {
       method: 'PUT',
       body: JSON.stringify(lessonData),
     });
   }
 
   async deleteLesson(lessonId: number): Promise<ApiResponse> {
-    return this.request(`/api/v1/lessons/${lessonId}`, {
+    return this.request(`/api/v1/courses/lessons/${lessonId}`, {
       method: 'DELETE',
     });
   }
