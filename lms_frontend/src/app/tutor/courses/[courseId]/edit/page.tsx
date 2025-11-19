@@ -624,7 +624,7 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave }: Con
       
       case 'topic':
         const topic = course.topics.find(t => t.id === selectedContent.id);
-        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onSelectLesson={(lessonId) => handleContentSelect({ type: 'lesson', id: lessonId, parentId: topic.id })} onDelete={() => handleContentSelect({ type: 'course-overview' })} /> : null;
+        return topic ? <TopicEditor topic={topic} course={course} onUpdate={onContentUpdate} onRefresh={() => setRefreshKey(prev => prev + 1)} onSelectLesson={(lessonId) => handleContentSelect({ type: 'lesson', id: lessonId, parentId: topic.id })} onDelete={() => setSelectedContent({ type: 'course-overview' })} /> : null;
       
       case 'lesson':
         const lesson = course.topics
