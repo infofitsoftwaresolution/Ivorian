@@ -20,6 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { apiClient } from '@/lib/api/client';
 import { showToast } from '@/components/ui/Toast';
 
@@ -69,6 +70,17 @@ export default function CoursesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCourses, setTotalCourses] = useState(0);
+
+  // Delete confirmation modal state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    courseId: number | null;
+    courseName: string;
+  }>({
+    isOpen: false,
+    courseId: null,
+    courseName: '',
+  });
 
   // Check if user is super admin or organization admin
   useEffect(() => {
@@ -205,32 +217,41 @@ export default function CoursesPage() {
     router.push(`/admin/courses/${courseId}/edit`);
   };
 
-  const handleDeleteCourse = async (courseId: number) => {
+  const handleDeleteCourse = (courseId: number) => {
     const courseToDelete = courses.find(c => c.id === courseId);
     const courseName = courseToDelete?.title || 'this course';
     
-    if (confirm(`Are you sure you want to delete "${courseName}"? This action cannot be undone.`)) {
-      try {
-        setLoading(true);
-        await apiClient.deleteCourse(courseId);
-        showToast(`"${courseName}" deleted successfully`, 'success');
-        await loadCourses();
-      } catch (error: unknown) {
-        console.error('Error deleting course:', error);
-        let errorMessage = 'Failed to delete course. Please try again.';
-        if (error && typeof error === 'object') {
-          if ('message' in error && typeof (error as any).message === 'string') {
-            errorMessage = (error as any).message;
-          } else if ('response' in error) {
-            const apiError = error as { response?: { data?: { detail?: string } } };
-            errorMessage = apiError.response?.data?.detail || errorMessage;
-          }
+    setDeleteConfirm({
+      isOpen: true,
+      courseId,
+      courseName,
+    });
+  };
+
+  const confirmDeleteCourse = async () => {
+    if (!deleteConfirm.courseId) return;
+
+    try {
+      setLoading(true);
+      await apiClient.deleteCourse(deleteConfirm.courseId);
+      showToast(`"${deleteConfirm.courseName}" deleted successfully`, 'success');
+      setDeleteConfirm({ isOpen: false, courseId: null, courseName: '' });
+      await loadCourses();
+    } catch (error: unknown) {
+      console.error('Error deleting course:', error);
+      let errorMessage = 'Failed to delete course. Please try again.';
+      if (error && typeof error === 'object') {
+        if ('message' in error && typeof (error as any).message === 'string') {
+          errorMessage = (error as any).message;
+        } else if ('response' in error) {
+          const apiError = error as { response?: { data?: { detail?: string } } };
+          errorMessage = apiError.response?.data?.detail || errorMessage;
         }
-        setError(errorMessage);
-        showToast(errorMessage, 'error', 7000);
-      } finally {
-        setLoading(false);
       }
+      setError(errorMessage);
+      showToast(errorMessage, 'error', 7000);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -645,6 +666,19 @@ export default function CoursesPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, courseId: null, courseName: '' })}
+        onConfirm={confirmDeleteCourse}
+        title="Delete Course"
+        message={`Are you sure you want to delete "${deleteConfirm.courseName}"? This action cannot be undone.`}
+        confirmText="Delete Course"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={loading}
+      />
     </div>
   );
 }
