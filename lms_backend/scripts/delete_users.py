@@ -119,13 +119,20 @@ async def delete_users_except_preserved():
                 )
                 await db.flush()
                 
-                # 4. Delete lesson progress
+                # 4. Delete lesson progress (via enrollment_id)
                 logger.info("Deleting lesson progress...")
-                await db.execute(
-                    text("DELETE FROM lesson_progress WHERE student_id = ANY(:user_ids)"),
+                # First get enrollment IDs for these users
+                enrollment_result = await db.execute(
+                    text("SELECT id FROM enrollments WHERE student_id = ANY(:user_ids)"),
                     {"user_ids": user_ids_to_delete}
                 )
-                await db.flush()
+                enrollment_ids = [row[0] for row in enrollment_result.fetchall()]
+                if enrollment_ids:
+                    await db.execute(
+                        text("DELETE FROM lesson_progress WHERE enrollment_id = ANY(:enrollment_ids)"),
+                        {"enrollment_ids": enrollment_ids}
+                    )
+                    await db.flush()
                 
                 # 5. Delete enrollments
                 logger.info("Deleting enrollments...")
