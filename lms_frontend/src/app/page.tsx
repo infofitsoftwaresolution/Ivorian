@@ -127,6 +127,7 @@ export default function HomePage() {
   const [allCourses, setAllCourses] = useState<any[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [showAllCourses, setShowAllCourses] = useState(false);
+  const [popularCategories, setPopularCategories] = useState<string[]>([]);
 
   const formatDate = (dateString: string) => {
     // Use a consistent date format to avoid hydration issues
@@ -202,14 +203,32 @@ export default function HomePage() {
               price: course.price ? `$${course.price}` : 'Free',
               originalPrice: course.original_price ? `$${course.original_price}` : undefined,
               image: course.thumbnail_url || course.image || '/courses/default.jpg',
-              category: course.category || 'General',
+              category: course.category || 'Technology',
               level: course.difficulty_level || course.level || 'All Levels',
-              featured: true
+              featured: true,
+              created_at: course.created_at || new Date().toISOString()
             };
+          })
+          // Sort by most recent first (by created_at date)
+          .sort((a: any, b: any) => {
+            const dateA = new Date(a.created_at).getTime();
+            const dateB = new Date(b.created_at).getTime();
+            return dateB - dateA; // Descending order (newest first)
           });
         
         console.log('✨ Transformed courses:', transformedCourses);
         console.log('✨ Number of transformed courses:', transformedCourses.length);
+        
+        // Extract popular categories from courses
+        const categories = transformedCourses
+          .map((course: any) => course.category)
+          .filter((cat: string) => cat && cat.trim() !== '')
+          .filter((cat: string, index: number, self: string[]) => self.indexOf(cat) === index) // Unique
+          .slice(0, 4); // Top 4 categories
+        
+        // If we have categories, use them; otherwise use defaults
+        const defaultCategories = ['React', 'Python', 'Design', 'Marketing'];
+        setPopularCategories(categories.length > 0 ? categories : defaultCategories);
         
         // Store all courses
         setAllCourses(transformedCourses);
@@ -285,7 +304,7 @@ export default function HomePage() {
           </form>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <span className="text-sm text-gray-600">Popular:</span>
-            {['React', 'Python', 'Design', 'Marketing'].map((tag) => (
+            {popularCategories.map((tag) => (
               <button
                 key={tag}
                 onClick={() => {
@@ -416,9 +435,10 @@ export default function HomePage() {
             </div>
           ) : (
           <>
-          <div className={`grid grid-cols-1 md:grid-cols-2 ${showAllCourses ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6`}>
+          <div className={`flex flex-wrap justify-center gap-6`}>
             {(showAllCourses ? allCourses : featuredCourses).map((course) => (
-              <Link key={course.id} href={`/courses/${course.id}`} className="group block">
+              <div key={course.id} className={`w-full ${showAllCourses ? 'md:w-[calc(50%-12px)] lg:w-[calc(25%-18px)]' : 'md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)]'} max-w-sm`}>
+              <Link href={`/courses/${course.id}`} className="group block">
                 <div className="relative overflow-hidden rounded-xl mb-3 shadow-lg hover:shadow-xl transition-all duration-300">
                   <div className="aspect-video bg-gradient-to-br from-green-100 via-blue-100 to-purple-100 flex items-center justify-center">
                     <PlayCircleIcon className="w-12 h-12 text-green-600 group-hover:text-blue-600 transition-colors" />
@@ -426,7 +446,7 @@ export default function HomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
                   <div className="absolute top-3 right-3">
                     <span className="px-3 py-1 bg-white/90 backdrop-blur-sm text-gray-800 text-xs font-semibold rounded-full">
-                      {course.category}
+                      {course.category || 'Technology'}
                     </span>
                   </div>
                 </div>
@@ -447,7 +467,9 @@ export default function HomePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className="text-lg font-bold text-gray-900">{course.price}</span>
-                      <span className="text-sm text-gray-500 line-through">{course.originalPrice}</span>
+                      {course.originalPrice && (
+                        <span className="text-sm text-gray-500 line-through">{course.originalPrice}</span>
+                      )}
                     </div>
                     <span className="text-xs bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-1 rounded-full font-bold shadow-sm">
                       Bestseller
@@ -455,6 +477,7 @@ export default function HomePage() {
                   </div>
                 </div>
               </Link>
+              </div>
             ))}
           </div>
           
