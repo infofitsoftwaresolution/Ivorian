@@ -41,6 +41,8 @@ interface Course {
   title: string;
   description: string;
   status: string;
+  price?: number;
+  currency?: string;
   topics: Topic[];
 }
 
@@ -223,6 +225,8 @@ export default function CourseBuilder() {
           title: response.data.title,
           description: response.data.description || response.data.short_description,
           status: response.data.status,
+          price: response.data.price || 0,
+          currency: response.data.currency || 'USD',
           topics: uniqueTopics
             .map((topic: any) => {
               // Clean the title to remove any "Module X:" prefixes
@@ -699,7 +703,7 @@ function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course;
   // Update local course when prop changes
   useEffect(() => {
     setLocalCourse(course);
-  }, [course.id, course.title, course.description, course.status]);
+  }, [course.id, course.title, course.description, course.status, course.price, course.currency]);
 
   const handleUpdate = (field: string, value: any) => {
     const updated = { ...localCourse, [field]: value };
@@ -721,6 +725,12 @@ function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course;
       }
       if (localCourse.status !== course.status) {
         updateData.status = localCourse.status;
+      }
+      if (localCourse.price !== course.price) {
+        updateData.price = localCourse.price;
+      }
+      if (localCourse.currency !== course.currency) {
+        updateData.currency = localCourse.currency || 'USD';
       }
       
       if (Object.keys(updateData).length === 0) {
@@ -799,6 +809,48 @@ function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course;
             onChange={(e) => handleUpdate('description', e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
           />
+        </div>
+
+        {/* Course Price */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Course Price
+          </label>
+          <div className="flex items-center space-x-4">
+            <div className="flex-1">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 sm:text-sm">
+                    {localCourse.currency || 'USD'}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={localCourse.price || 0}
+                  onChange={(e) => handleUpdate('price', parseFloat(e.target.value) || 0)}
+                  className="w-full pl-16 pr-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            <div className="w-32">
+              <select
+                value={localCourse.currency || 'USD'}
+                onChange={(e) => handleUpdate('currency', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="INR">INR</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Set price to 0 for a free course, or enter your desired price.
+          </p>
         </div>
 
         {/* Course Status */}
