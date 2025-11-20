@@ -303,7 +303,7 @@ export default function HomePage() {
             </button>
           </form>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <span className="text-sm text-gray-600">Popular:</span>
+            <span className="text-sm text-gray-600 font-medium">Popular:</span>
             {popularCategories.map((tag) => (
               <button
                 key={tag}
@@ -311,7 +311,7 @@ export default function HomePage() {
                   setSearchQuery(tag);
                   router.push(`/courses?search=${encodeURIComponent(tag)}`);
                 }}
-                className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-full hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
               >
                 {tag}
               </button>
