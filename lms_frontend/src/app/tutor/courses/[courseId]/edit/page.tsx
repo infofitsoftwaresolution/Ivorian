@@ -698,17 +698,19 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave, onCon
 // Course Overview Editor
 function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void }) {
   const [localCourse, setLocalCourse] = useState(course);
+  const [originalCourse, setOriginalCourse] = useState(course); // Keep original for comparison
   const [saving, setSaving] = useState(false);
 
-  // Update local course when prop changes
+  // Update local course and original course when prop changes (only on initial load or refresh)
   useEffect(() => {
     setLocalCourse(course);
-  }, [course.id, course.title, course.description, course.status, course.price, course.currency]);
+    setOriginalCourse(course); // Update original when course prop changes
+  }, [course.id]); // Only depend on course.id to avoid resetting during edits
 
   const handleUpdate = (field: string, value: any) => {
     const updated = { ...localCourse, [field]: value };
     setLocalCourse(updated);
-    onUpdate(updated);
+    // Don't call onUpdate here - only update parent on save
   };
 
   const handleSave = async () => {
@@ -716,27 +718,34 @@ function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course;
       setSaving(true);
       
       // Prepare update data - only send changed fields
+      // Compare against originalCourse, not course (which might have been updated by onUpdate)
       const updateData: any = {};
-      if (localCourse.title !== course.title) {
+      if (localCourse.title !== originalCourse.title) {
         updateData.title = localCourse.title;
       }
-      if (localCourse.description !== course.description) {
+      if (localCourse.description !== originalCourse.description) {
         updateData.description = localCourse.description;
       }
-      if (localCourse.status !== course.status) {
+      if (localCourse.status !== originalCourse.status) {
         updateData.status = localCourse.status;
       }
       // Compare price as numbers to handle type differences
       const currentPrice = Number(localCourse.price) || 0;
-      const originalPrice = Number(course.price) || 0;
-      console.log('Price comparison:', { currentPrice, originalPrice, localCoursePrice: localCourse.price, coursePrice: course.price });
+      const originalPrice = Number(originalCourse.price) || 0;
+      console.log('Price comparison:', { 
+        currentPrice, 
+        originalPrice, 
+        localCoursePrice: localCourse.price, 
+        originalCoursePrice: originalCourse.price,
+        difference: Math.abs(currentPrice - originalPrice)
+      });
       if (Math.abs(currentPrice - originalPrice) > 0.01) { // Use small epsilon for float comparison
         updateData.price = currentPrice;
         console.log('Price changed, adding to updateData:', currentPrice);
       }
       // Compare currency, defaulting to 'USD' if not set
       const currentCurrency = localCourse.currency || 'USD';
-      const originalCurrency = course.currency || 'USD';
+      const originalCurrency = originalCourse.currency || 'USD';
       if (currentCurrency !== originalCurrency) {
         updateData.currency = currentCurrency;
         console.log('Currency changed, adding to updateData:', currentCurrency);
@@ -756,9 +765,12 @@ function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course;
       // Update local state with response data
       const updatedCourse = {
         ...localCourse,
-        ...response.data
+        ...response.data,
+        price: response.data.price || 0,
+        currency: response.data.currency || 'USD'
       };
       setLocalCourse(updatedCourse);
+      setOriginalCourse(updatedCourse); // Update original to reflect saved state
       onUpdate(updatedCourse);
       
       showToast('Course updated successfully! Refreshing...', 'success', 3000);
