@@ -63,7 +63,8 @@ interface Lesson {
   title: string;
   description: string;
   content_type: 'video' | 'text' | 'interactive';
-  duration: number;
+  duration?: number;
+  estimated_duration?: number;
   order: number;
   is_preview: boolean;
 }
@@ -93,7 +94,25 @@ export default function CourseDetailPage() {
 
         // Fetch course topics and lessons
         const topicsResponse = await apiClient.getCourseTopics(parseInt(courseId));
-        setTopics(topicsResponse.data);
+        const topicsData = topicsResponse.data || [];
+        
+        // Fetch lessons for each topic if not included
+        const topicsWithLessons = await Promise.all(
+          topicsData.map(async (topic: any) => {
+            if (!topic.lessons || topic.lessons.length === 0) {
+              try {
+                const lessonsResponse = await apiClient.getTopicLessons(topic.id);
+                topic.lessons = lessonsResponse.data || [];
+              } catch (error) {
+                console.error(`Error fetching lessons for topic ${topic.id}:`, error);
+                topic.lessons = [];
+              }
+            }
+            return topic;
+          })
+        );
+        
+        setTopics(topicsWithLessons);
 
       } catch (error) {
         console.error('Error fetching course data:', error);
@@ -147,9 +166,13 @@ export default function CourseDetailPage() {
     }
   };
 
-  const formatDuration = (minutes: number) => {
+  const formatDuration = (minutes?: number | null) => {
+    // Handle NaN, null, undefined, or invalid values
+    if (!minutes || isNaN(minutes) || minutes <= 0) {
+      return '—';
+    }
     const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    const mins = Math.floor(minutes % 60);
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
@@ -317,7 +340,9 @@ export default function CourseDetailPage() {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <span className="text-sm text-gray-500">{formatDuration(lesson.duration)}</span>
+                            <span className="text-sm text-gray-500">
+                              {formatDuration(lesson.estimated_duration || lesson.duration)}
+                            </span>
                             {lesson.is_preview && (
                               <PlayIcon className="h-4 w-4 text-indigo-600" />
                             )}
