@@ -17,7 +17,7 @@ backend_dir = script_dir.parent
 sys.path.insert(0, str(backend_dir))
 os.chdir(backend_dir)
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
@@ -86,59 +86,71 @@ async def delete_users_except_preserved():
                 logger.info("Deletion cancelled by user.")
                 return
             
-            # Delete users using bulk delete
-            # First, get all user IDs to delete
+            # Get all user IDs to delete
             user_ids_to_delete = [user.id for user in users_to_delete]
+            user_ids_tuple = tuple(user_ids_to_delete)
             
-            # Use bulk delete with cascade handling
+            logger.info("Deleting related records first...")
+            
+            # Delete related records in the correct order to avoid foreign key constraints
+            # Use raw SQL to avoid schema mismatch issues
             try:
-                # Delete users (this will fail if there are foreign key constraints)
-                # We'll handle related records if needed
+                # 1. Delete user_roles associations
+                logger.info("Deleting user_roles associations...")
+                await db.execute(
+                    text("DELETE FROM user_roles WHERE user_id = ANY(:user_ids)"),
+                    {"user_ids": user_ids_to_delete}
+                )
+                await db.flush()
+                
+                # 2. Delete quiz submissions
+                logger.info("Deleting quiz submissions...")
+                await db.execute(
+                    text("DELETE FROM quiz_submissions WHERE student_id = ANY(:user_ids)"),
+                    {"user_ids": user_ids_to_delete}
+                )
+                await db.flush()
+                
+                # 3. Delete assignment submissions
+                logger.info("Deleting assignment submissions...")
+                await db.execute(
+                    text("DELETE FROM assignment_submissions WHERE student_id = ANY(:user_ids) OR graded_by = ANY(:user_ids)"),
+                    {"user_ids": user_ids_to_delete}
+                )
+                await db.flush()
+                
+                # 4. Delete lesson progress
+                logger.info("Deleting lesson progress...")
+                await db.execute(
+                    text("DELETE FROM lesson_progress WHERE student_id = ANY(:user_ids)"),
+                    {"user_ids": user_ids_to_delete}
+                )
+                await db.flush()
+                
+                # 5. Delete enrollments
+                logger.info("Deleting enrollments...")
+                await db.execute(
+                    text("DELETE FROM enrollments WHERE student_id = ANY(:user_ids)"),
+                    {"user_ids": user_ids_to_delete}
+                )
+                await db.flush()
+                
+                # 6. Delete users
+                logger.info("Deleting users...")
                 delete_stmt = delete(User).where(User.id.in_(user_ids_to_delete))
                 result = await db.execute(delete_stmt)
                 deleted_count = result.rowcount
                 
                 # Commit the transaction
                 await db.commit()
-                logger.info(f"✅ Successfully deleted {deleted_count} users.")
+                logger.info(f"✅ Successfully deleted {deleted_count} users and all related records.")
                 logger.info(f"✅ Preserved {len(preserved_users)} users.")
                 
             except Exception as e:
-                # If bulk delete fails due to foreign key constraints, try individual deletes
-                logger.warning(f"Bulk delete failed, trying individual deletes: {str(e)}")
                 await db.rollback()
-                
-                deleted_count = 0
-                failed_deletions = []
-                
-                for user in users_to_delete:
-                    try:
-                        # Try to delete the user
-                        await db.delete(user)
-                        await db.flush()  # Flush to check for immediate errors
-                        deleted_count += 1
-                        logger.info(f"Deleted user: {user.email} (ID: {user.id})")
-                    except Exception as delete_error:
-                        failed_deletions.append({
-                            'email': user.email,
-                            'id': user.id,
-                            'error': str(delete_error)
-                        })
-                        logger.warning(f"Could not delete user {user.email} (ID: {user.id}): {str(delete_error)}")
-                        await db.rollback()
-                        # Continue with next user
-                        continue
-                
-                # Commit successful deletions
-                await db.commit()
-                
-                logger.info(f"✅ Successfully deleted {deleted_count} users.")
-                if failed_deletions:
-                    logger.warning(f"⚠️  Failed to delete {len(failed_deletions)} users due to foreign key constraints:")
-                    for failed in failed_deletions:
-                        logger.warning(f"  - {failed['email']} (ID: {failed['id']}): {failed['error']}")
-                    logger.warning("You may need to delete related records (enrollments, submissions, etc.) first.")
-                logger.info(f"✅ Preserved {len(preserved_users)} users.")
+                logger.error(f"Error during deletion: {str(e)}")
+                logger.error("Transaction rolled back. No users were deleted.")
+                raise
             
         except Exception as e:
             await db.rollback()
