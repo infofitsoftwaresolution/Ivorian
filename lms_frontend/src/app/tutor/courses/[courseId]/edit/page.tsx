@@ -726,12 +726,23 @@ function CourseOverviewEditor({ course, onUpdate, onRefresh }: { course: Course;
       if (localCourse.status !== course.status) {
         updateData.status = localCourse.status;
       }
-      if (localCourse.price !== course.price) {
-        updateData.price = localCourse.price;
+      // Compare price as numbers to handle type differences
+      const currentPrice = Number(localCourse.price) || 0;
+      const originalPrice = Number(course.price) || 0;
+      console.log('Price comparison:', { currentPrice, originalPrice, localCoursePrice: localCourse.price, coursePrice: course.price });
+      if (Math.abs(currentPrice - originalPrice) > 0.01) { // Use small epsilon for float comparison
+        updateData.price = currentPrice;
+        console.log('Price changed, adding to updateData:', currentPrice);
       }
-      if (localCourse.currency !== course.currency) {
-        updateData.currency = localCourse.currency || 'USD';
+      // Compare currency, defaulting to 'USD' if not set
+      const currentCurrency = localCourse.currency || 'USD';
+      const originalCurrency = course.currency || 'USD';
+      if (currentCurrency !== originalCurrency) {
+        updateData.currency = currentCurrency;
+        console.log('Currency changed, adding to updateData:', currentCurrency);
       }
+      
+      console.log('Update data prepared:', updateData);
       
       if (Object.keys(updateData).length === 0) {
         showToast('No changes to save', 'info', 2000);
