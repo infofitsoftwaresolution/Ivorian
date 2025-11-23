@@ -22,7 +22,8 @@ import {
   VideoCameraIcon,
   PaperClipIcon,
   QuestionMarkCircleIcon,
-  TrashIcon
+  TrashIcon,
+  Bars3Icon
 } from '@heroicons/react/24/outline';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import RichTextEditor from '@/components/editor/RichTextEditor';
@@ -123,7 +124,7 @@ interface SelectedContent {
   type: ContentType;
   id?: number | string;
   parentId?: number; // For lessons, this is the topic ID
-  insertAfterOrder?: number; // For new-topic, the order after which to insert
+  insertAfterOrder?: number; // For new-topic or new-lesson, the order after which to insert
 }
 
 export default function CourseBuilder() {
@@ -139,6 +140,8 @@ export default function CourseBuilder() {
   const [selectedContent, setSelectedContent] = useState<SelectedContent>({ type: 'course-overview' });
   const [showCoursePreview, setShowCoursePreview] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0); // Key to trigger refresh
+  const [draggedLesson, setDraggedLesson] = useState<{ lessonId: number; topicId: number } | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<{ topicId: number; index: number } | null>(null);
 
   // Load course data
   useEffect(() => {
@@ -496,46 +499,183 @@ export default function CourseBuilder() {
                   {/* Lessons */}
                   {topic.isExpanded && (
                     <div className="border-t border-gray-200 bg-gray-50">
-                      {topic.lessons.map((lesson, lessonIndex) => (
-                        <button
-                          key={lesson.id}
-                          onClick={() => handleContentSelect({ type: 'lesson', id: lesson.id, parentId: topic.id })}
-                          className={`w-full flex items-center p-3 text-left transition-colors border-b border-gray-200 last:border-b-0 ${
-                            selectedContent.type === 'lesson' && selectedContent.id === lesson.id
-                              ? 'bg-green-50 text-green-700'
-                              : 'text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          <div className="w-6 flex justify-center mr-3">
-                            {lesson.content_type === 'video' ? (
-                              <PlayIcon className="h-4 w-4" />
-                            ) : (
-                              <DocumentTextIcon className="h-4 w-4" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className={`font-medium break-words text-sm ${
-                              selectedContent.type === 'lesson' && selectedContent.id === lesson.id
-                                ? 'text-green-700'
-                                : 'text-gray-700'
-                            }`}>
-                              {lesson.title || `Lesson ${lessonIndex + 1}`}
+                      {/* Sort lessons by order before rendering */}
+                      {[...(topic.lessons || [])]
+                        .sort((a, b) => (a.order || 0) - (b.order || 0))
+                        .map((lesson, lessonIndex) => {
+                          const isDragOver = dragOverIndex?.topicId === topic.id && dragOverIndex?.index === lessonIndex;
+                          const isDragging = draggedLesson?.lessonId === lesson.id && draggedLesson?.topicId === topic.id;
+                          
+                          return (
+                            <div key={lesson.id}>
+                              {/* Add Lesson Button - Before first lesson or between lessons */}
+                              {lessonIndex === 0 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleContentSelect({ 
+                                      type: 'new-lesson', 
+                                      parentId: topic.id,
+                                      insertAfterOrder: 0 // Insert at the beginning
+                                    });
+                                  }}
+                                  className="w-full flex items-center p-2 text-left text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors border-b border-gray-200"
+                                >
+                                  <PlusIcon className="h-3 w-3 mr-2" />
+                                  <span className="text-xs font-medium">Add Lesson</span>
+                                </button>
+                              )}
+                              
+                              {/* Drop Zone */}
+                              <div
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setDragOverIndex({ topicId: topic.id, index: lessonIndex });
+                                }}
+                                onDragLeave={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  // Only clear if we're actually leaving the drop zone
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const x = e.clientX;
+                                  const y = e.clientY;
+                                  if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                                    setDragOverIndex(null);
+                                  }
+                                }}
+                                onDrop={async (e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setDragOverIndex(null);
+                                  
+                                  if (draggedLesson && draggedLesson.lessonId !== lesson.id) {
+                                    // Calculate new order
+                                    const sortedLessons = [...(topic.lessons || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+                                    
+                                    // If dragging from same topic, adjust order
+                                    if (draggedLesson.topicId === topic.id) {
+                                      const draggedLessonObj = sortedLessons.find(l => l.id === draggedLesson.lessonId);
+                                      if (draggedLessonObj) {
+                                        const oldIndex = sortedLessons.findIndex(l => l.id === draggedLesson.lessonId);
+                                        const newIndex = lessonIndex;
+                                        
+                                        // Reorder lessons
+                                        const reorderedLessons = [...sortedLessons];
+                                        const [removed] = reorderedLessons.splice(oldIndex, 1);
+                                        reorderedLessons.splice(newIndex, 0, removed);
+                                        
+                                        // Update orders
+                                        for (let i = 0; i < reorderedLessons.length; i++) {
+                                          const newOrder = i + 1;
+                                          if (reorderedLessons[i].order !== newOrder) {
+                                            try {
+                                              await apiClient.updateLesson(reorderedLessons[i].id, { order: newOrder });
+                                            } catch (error) {
+                                              console.error('Error updating lesson order:', error);
+                                              showToast('Failed to update lesson order', 'error', 3000);
+                                            }
+                                          }
+                                        }
+                                        
+                                        // Refresh course data
+                                        const response = await apiClient.getCourse(courseId);
+                                        const rawCourseData = response.data;
+                                        let topics = rawCourseData.topics || [];
+                                        if (topics.length === 0) {
+                                          const topicsResponse = await apiClient.getCourseTopics(courseId);
+                                          topics = topicsResponse.data || [];
+                                          for (let i = 0; i < topics.length; i++) {
+                                            const lessonsResponse = await apiClient.getTopicLessons(topics[i].id);
+                                            topics[i].lessons = lessonsResponse.data || [];
+                                          }
+                                        }
+                                        setCourse({ ...rawCourseData, topics });
+                                        showToast('Lesson order updated', 'success', 2000);
+                                      }
+                                    }
+                                  }
+                                  setDraggedLesson(null);
+                                }}
+                                className={isDragOver ? 'border-t-2 border-indigo-400' : ''}
+                              >
+                                <div
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.stopPropagation();
+                                    setDraggedLesson({ lessonId: lesson.id, topicId: topic.id });
+                                    e.dataTransfer.effectAllowed = 'move';
+                                  }}
+                                  onDragEnd={(e) => {
+                                    e.stopPropagation();
+                                    setDraggedLesson(null);
+                                    setDragOverIndex(null);
+                                  }}
+                                  className={`flex items-center group ${
+                                    isDragging ? 'opacity-50' : ''
+                                  }`}
+                                >
+                                  <button
+                                    onClick={() => handleContentSelect({ type: 'lesson', id: lesson.id, parentId: topic.id })}
+                                    className={`flex-1 flex items-center p-3 text-left transition-colors border-b border-gray-200 ${
+                                      selectedContent.type === 'lesson' && selectedContent.id === lesson.id
+                                        ? 'bg-green-50 text-green-700'
+                                        : 'text-gray-700 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    <Bars3Icon className="h-4 w-4 mr-2 text-gray-400 group-hover:text-gray-600 cursor-move flex-shrink-0" />
+                                    <div className="w-6 flex justify-center mr-3">
+                                      {lesson.content_type === 'video' ? (
+                                        <PlayIcon className="h-4 w-4" />
+                                      ) : (
+                                        <DocumentTextIcon className="h-4 w-4" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className={`font-medium break-words text-sm ${
+                                        selectedContent.type === 'lesson' && selectedContent.id === lesson.id
+                                          ? 'text-green-700'
+                                          : 'text-gray-700'
+                                      }`}>
+                                        {lesson.title || `Lesson ${lessonIndex + 1}`}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {lesson.estimated_duration || 0} min
+                                      </div>
+                                    </div>
+                                  </button>
+                                </div>
+                              </div>
+                              
+                              {/* Add Lesson Button - After each lesson */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleContentSelect({ 
+                                    type: 'new-lesson', 
+                                    parentId: topic.id,
+                                    insertAfterOrder: lesson.order || lessonIndex + 1
+                                  });
+                                }}
+                                className="w-full flex items-center p-2 text-left text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors border-b border-gray-200"
+                              >
+                                <PlusIcon className="h-3 w-3 mr-2" />
+                                <span className="text-xs font-medium">Add Lesson</span>
+                              </button>
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {lesson.estimated_duration || 0} min
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+                          );
+                        })}
                       
-                      {/* Add Lesson Button */}
-                      <button
-                        onClick={() => handleContentSelect({ type: 'new-lesson', parentId: topic.id })}
-                        className="w-full flex items-center p-3 text-left text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                      >
-                        <PlusIcon className="h-4 w-4 mr-3" />
-                        <span className="text-sm font-medium">Add Lesson</span>
-                      </button>
+                      {/* Add Lesson Button - At the end (if there are no lessons) */}
+                      {(!topic.lessons || topic.lessons.length === 0) && (
+                        <button
+                          onClick={() => handleContentSelect({ type: 'new-lesson', parentId: topic.id })}
+                          className="w-full flex items-center p-3 text-left text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        >
+                          <PlusIcon className="h-4 w-4 mr-3" />
+                          <span className="text-sm font-medium">Add Lesson</span>
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -675,7 +815,7 @@ function ContentEditor({ course, selectedContent, onContentUpdate, onSave, onCon
         return <NewTopicEditor course={course} onUpdate={onContentUpdate} onSave={onSave} insertAfterOrder={selectedContent.insertAfterOrder} />;
       
       case 'new-lesson':
-        return <NewLessonEditor course={course} topicId={selectedContent.parentId!} onUpdate={onContentUpdate} onSave={onSave} />;
+        return <NewLessonEditor course={course} topicId={selectedContent.parentId!} onUpdate={onContentUpdate} onSave={onSave} insertAfterOrder={selectedContent.insertAfterOrder} />;
       
       case 'assessment':
         const assessment = course.topics
@@ -1826,8 +1966,31 @@ function NewTopicEditor({ course, onUpdate, onSave, insertAfterOrder }: { course
 }
 
 // New Lesson Editor
-function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course; topicId: number; onUpdate: (course: Course) => void; onSave: () => void }) {
+function NewLessonEditor({ course, topicId, onUpdate, onSave, insertAfterOrder }: { course: Course; topicId: number; onUpdate: (course: Course) => void; onSave: () => void; insertAfterOrder?: number }) {
   const topic = course.topics.find(t => t.id === topicId);
+  
+  // Calculate the order number based on insertAfterOrder or use next available
+  const getNextOrder = () => {
+    if (insertAfterOrder !== undefined) {
+      // Insert after the specified order
+      const sortedLessons = [...(topic?.lessons || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+      // Find the next order that's greater than insertAfterOrder
+      const nextOrder = insertAfterOrder + 1;
+      // Check if there are conflicts
+      const conflictingLessons = sortedLessons.filter(l => (l.order || 0) >= nextOrder);
+      if (conflictingLessons.length > 0) {
+        // Shift all conflicting lessons by 1
+        return nextOrder;
+      }
+      return nextOrder;
+    }
+    // Default: add at the end
+    if (!topic?.lessons || topic.lessons.length === 0) return 1;
+    const sortedLessons = [...topic.lessons].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const maxOrder = Math.max(...sortedLessons.map(l => l.order || 0));
+    return maxOrder + 1;
+  };
+  
   const [lessonData, setLessonData] = useState({
     title: '',
     description: '',
@@ -1836,7 +1999,7 @@ function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course
     content_type: 'video',
     estimated_duration: 15,
     is_free_preview: false,
-    order: (topic?.lessons.length || 0) + 1
+    order: getNextOrder()
   });
 
   const handleCreate = async () => {
@@ -1875,13 +2038,37 @@ function NewLessonEditor({ course, topicId, onUpdate, onSave }: { course: Course
         is_free_preview: response.data.is_free_preview
       };
 
+      // If insertAfterOrder is specified, we need to shift other lessons
+      if (insertAfterOrder !== undefined && insertAfterOrder >= 0) {
+        const sortedLessons = [...(topic?.lessons || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+        const lessonsToShift = sortedLessons.filter(l => (l.order || 0) > insertAfterOrder);
+        
+        // Shift lessons that come after the insertion point
+        for (const lessonToShift of lessonsToShift) {
+          try {
+            await apiClient.updateLesson(lessonToShift.id, { order: (lessonToShift.order || 0) + 1 });
+          } catch (error) {
+            console.error('Error shifting lesson order:', error);
+          }
+        }
+      }
+      
+      // Refresh course data to get updated lesson orders
+      const courseResponse = await apiClient.getCourse(course.id);
+      const rawCourseData = courseResponse.data;
+      let topics = rawCourseData.topics || [];
+      if (topics.length === 0) {
+        const topicsResponse = await apiClient.getCourseTopics(course.id);
+        topics = topicsResponse.data || [];
+        for (let i = 0; i < topics.length; i++) {
+          const lessonsResponse = await apiClient.getTopicLessons(topics[i].id);
+          topics[i].lessons = lessonsResponse.data || [];
+        }
+      }
+      
       const updatedCourse = {
-        ...course,
-        topics: course.topics.map(topic => 
-          topic.id === topicId 
-            ? { ...topic, lessons: [...topic.lessons, newLesson] }
-            : topic
-        )
+        ...rawCourseData,
+        topics
       };
 
       onUpdate(updatedCourse);
