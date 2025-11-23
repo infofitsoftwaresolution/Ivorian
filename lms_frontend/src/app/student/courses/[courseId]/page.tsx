@@ -82,50 +82,76 @@ export default function CourseDetailPage() {
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
-  // Fetch course data
-  useEffect(() => {
-    const fetchCourseData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch course details
-        const courseResponse = await apiClient.getCourse(parseInt(courseId));
-        setCourse(courseResponse.data);
+  // Fetch course data function
+  const fetchCourseData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch course details
+      const courseResponse = await apiClient.getCourse(parseInt(courseId));
+      setCourse(courseResponse.data);
 
-        // Fetch course topics and lessons
-        const topicsResponse = await apiClient.getCourseTopics(parseInt(courseId));
-        const topicsData = topicsResponse.data || [];
-        
-        // Fetch lessons for each topic if not included
-        const topicsWithLessons = await Promise.all(
-          topicsData.map(async (topic: any) => {
-            if (!topic.lessons || topic.lessons.length === 0) {
-              try {
-                const lessonsResponse = await apiClient.getTopicLessons(topic.id);
-                topic.lessons = lessonsResponse.data || [];
-              } catch (error) {
-                console.error(`Error fetching lessons for topic ${topic.id}:`, error);
-                topic.lessons = [];
-              }
+      // Fetch course topics and lessons
+      const topicsResponse = await apiClient.getCourseTopics(parseInt(courseId));
+      const topicsData = topicsResponse.data || [];
+      
+      // Fetch lessons for each topic if not included
+      const topicsWithLessons = await Promise.all(
+        topicsData.map(async (topic: any) => {
+          if (!topic.lessons || topic.lessons.length === 0) {
+            try {
+              const lessonsResponse = await apiClient.getTopicLessons(topic.id);
+              topic.lessons = lessonsResponse.data || [];
+            } catch (error) {
+              console.error(`Error fetching lessons for topic ${topic.id}:`, error);
+              topic.lessons = [];
             }
-            return topic;
-          })
-        );
-        
-        setTopics(topicsWithLessons);
+          }
+          return topic;
+        })
+      );
+      
+      setTopics(topicsWithLessons);
 
-      } catch (error) {
-        console.error('Error fetching course data:', error);
-        setError('Failed to load course. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
+    } catch (error) {
+      console.error('Error fetching course data:', error);
+      setError('Failed to load course. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId]);
 
+  // Initial fetch when component mounts
+  useEffect(() => {
     if (courseId) {
       fetchCourseData();
     }
-  }, [courseId]);
+  }, [courseId, fetchCourseData]);
+
+  // Refresh course data when page becomes visible (to get latest updates from tutor)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && courseId && !loading) {
+        console.log('🔄 Page became visible, refreshing course data...');
+        fetchCourseData();
+      }
+    };
+
+    const handleFocus = () => {
+      if (courseId && !loading) {
+        console.log('🔄 Window focused, refreshing course data...');
+        fetchCourseData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [courseId, loading, fetchCourseData]);
 
   const handleEnroll = async () => {
     if (!course) return;

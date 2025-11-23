@@ -176,28 +176,27 @@ export default function CourseLearningPage() {
     }
   }, [authLoading, isAuthenticated, router, courseId]);
 
-  // Fetch course data
-  useEffect(() => {
+  // Fetch course data function - wrapped in useCallback to prevent infinite loops
+  const fetchCourseData = useCallback(async () => {
     // Don't fetch if not authenticated or still loading auth
     if (authLoading || !isAuthenticated) {
       return;
     }
 
-    const fetchCourseData = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        
-        // Fetch course details
-        const courseResponse = await apiClient.getCourse(parseInt(courseId));
-        setCourse(courseResponse.data);
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Fetch course details
+      const courseResponse = await apiClient.getCourse(parseInt(courseId));
+      setCourse(courseResponse.data);
 
-        // Fetch course topics and lessons
-        console.log('🔍 Fetching topics for course:', courseId);
-        const topicsResponse = await apiClient.getCourseTopics(parseInt(courseId));
-        console.log('📚 Topics response:', topicsResponse);
-        const topicsData = topicsResponse.data || [];
-        console.log('📚 Topics data:', topicsData);
+      // Fetch course topics and lessons
+      console.log('🔍 Fetching topics for course:', courseId);
+      const topicsResponse = await apiClient.getCourseTopics(parseInt(courseId));
+      console.log('📚 Topics response:', topicsResponse);
+      const topicsData = topicsResponse.data || [];
+      console.log('📚 Topics data:', topicsData);
         
         // Log lesson structure for debugging
         if (topicsData.length > 0 && topicsData[0].lessons && topicsData[0].lessons.length > 0) {
@@ -407,12 +406,40 @@ export default function CourseLearningPage() {
       } finally {
         setLoading(false);
       }
-    };
+    }
+  }, [courseId, authLoading, isAuthenticated, router]);
 
+  // Initial fetch when component mounts or dependencies change
+  useEffect(() => {
     if (courseId) {
       fetchCourseData();
     }
-  }, [courseId, authLoading, isAuthenticated, router]);
+  }, [courseId, fetchCourseData]);
+
+  // Refresh course data when page becomes visible (to get latest updates from tutor)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated && courseId && !loading) {
+        console.log('🔄 Page became visible, refreshing course data...');
+        fetchCourseData();
+      }
+    };
+
+    const handleFocus = () => {
+      if (isAuthenticated && courseId && !loading) {
+        console.log('🔄 Window focused, refreshing course data...');
+        fetchCourseData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [courseId, isAuthenticated, loading, fetchCourseData]);
 
   // Video player controls
   const handlePlayPause = () => {
