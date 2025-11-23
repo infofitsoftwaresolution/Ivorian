@@ -145,6 +145,38 @@ export default function VideoUploader({
     }
   };
 
+  // Utility functions to detect and convert YouTube/Vimeo URLs
+  const isYouTubeUrl = (url: string): boolean => {
+    if (!url) return false;
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname === 'www.youtube.com' || 
+             urlObj.hostname === 'youtube.com' || 
+             urlObj.hostname === 'youtu.be' ||
+             urlObj.hostname === 'm.youtube.com';
+    } catch {
+      return false;
+    }
+  };
+
+  const isVimeoUrl = (url: string): boolean => {
+    if (!url) return false;
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname === 'www.vimeo.com' || 
+             urlObj.hostname === 'vimeo.com';
+    } catch {
+      return false;
+    }
+  };
+
+  const isDirectVideoUrl = (url: string): boolean => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+    const lowerUrl = url.toLowerCase();
+    return videoExtensions.some(ext => lowerUrl.includes(ext));
+  };
+
   const handleUrlSubmit = () => {
     if (!urlInput.trim()) {
       setError('Please enter a valid URL');
@@ -153,11 +185,17 @@ export default function VideoUploader({
 
     // Basic URL validation
     try {
-      new URL(urlInput);
-      onVideoChange(urlInput);
-      setShowUrlInput(false);
-      setUrlInput('');
-      setError('');
+      const url = new URL(urlInput);
+      
+      // Check if it's a supported video URL
+      if (isYouTubeUrl(urlInput) || isVimeoUrl(urlInput) || isDirectVideoUrl(urlInput)) {
+        onVideoChange(urlInput);
+        setShowUrlInput(false);
+        setUrlInput('');
+        setError('');
+      } else {
+        setError('Please enter a valid video URL (YouTube, Vimeo, or direct video file URL ending in .mp4, .webm, etc.)');
+      }
     } catch {
       setError('Please enter a valid URL');
     }
@@ -170,64 +208,171 @@ export default function VideoUploader({
     }
   };
 
+  // Render video based on URL type
+  const renderVideoPreview = () => {
+    if (!videoUrl) return null;
+
+    // YouTube URL - use iframe embed
+    if (isYouTubeUrl(videoUrl)) {
+      const getYouTubeEmbedUrl = (url: string): string | null => {
+        try {
+          const urlObj = new URL(url);
+          let videoId: string | null = null;
+          
+          // Handle youtu.be format
+          if (urlObj.hostname === 'youtu.be') {
+            videoId = urlObj.pathname.slice(1);
+          }
+          // Handle youtube.com/watch?v= format
+          else if (urlObj.hostname.includes('youtube.com')) {
+            videoId = urlObj.searchParams.get('v');
+          }
+          
+          if (videoId) {
+            return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`;
+          }
+        } catch {
+          return null;
+        }
+        return null;
+      };
+
+      const embedUrl = getYouTubeEmbedUrl(videoUrl);
+      if (embedUrl) {
+        return (
+          <iframe
+            src={embedUrl}
+            className="w-full h-64"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title="Video preview"
+            onError={() => {
+              setError('Failed to load YouTube video. Please check the URL.');
+            }}
+          />
+        );
+      } else {
+        return (
+          <div className="w-full h-64 flex items-center justify-center bg-gray-800 text-white">
+            <p className="text-center p-4">Invalid YouTube URL format. Please use: youtube.com/watch?v=... or youtu.be/...</p>
+          </div>
+        );
+      }
+    }
+
+    // Vimeo URL - use iframe embed
+    if (isVimeoUrl(videoUrl)) {
+      const getVimeoEmbedUrl = (url: string): string | null => {
+        try {
+          const urlObj = new URL(url);
+          const videoId = urlObj.pathname.split('/').pop();
+          if (videoId) {
+            return `https://player.vimeo.com/video/${videoId}`;
+          }
+        } catch {
+          return null;
+        }
+        return null;
+      };
+
+      const embedUrl = getVimeoEmbedUrl(videoUrl);
+      if (embedUrl) {
+        return (
+          <iframe
+            src={embedUrl}
+            className="w-full h-64"
+            frameBorder="0"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+            title="Video preview"
+            onError={() => {
+              setError('Failed to load Vimeo video. Please check the URL.');
+            }}
+          />
+        );
+      } else {
+        return (
+          <div className="w-full h-64 flex items-center justify-center bg-gray-800 text-white">
+            <p className="text-center p-4">Invalid Vimeo URL format. Please use: vimeo.com/...</p>
+          </div>
+        );
+      }
+    }
+
+    // Direct video file URL - use video element
+    return (
+      <video
+        ref={videoRef}
+        src={videoUrl}
+        className="w-full h-64 object-contain"
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => setIsPlaying(false)}
+        onError={(e) => {
+          console.error('Video load error:', e);
+          setError('Failed to load video. Please check the URL and ensure it\'s a valid video file.');
+        }}
+        controls
+      />
+    );
+  };
+
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Video Preview */}
       {videoUrl && (
         <div className="relative bg-black rounded-lg overflow-hidden">
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            className="w-full h-64 object-contain"
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={handleLoadedMetadata}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onEnded={() => setIsPlaying(false)}
-          />
+          {renderVideoPreview()}
           
-          {/* Video Controls Overlay */}
-          <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
-            <div className="opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center space-x-4">
-              <button
-                onClick={handlePlayPause}
-                className="bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-3 transition-all"
-              >
-                {isPlaying ? (
-                  <PauseIcon className="h-6 w-6 text-gray-800" />
-                ) : (
-                  <PlayIcon className="h-6 w-6 text-gray-800" />
-                )}
-              </button>
-              
-              <button
-                onClick={handleMuteToggle}
-                className="bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-3 transition-all"
-              >
-                {isMuted ? (
-                  <span className="text-gray-800 text-sm">🔇</span>
-                ) : (
-                  <span className="text-gray-800 text-sm">🔊</span>
-                )}
-              </button>
-            </div>
-          </div>
+          {/* Video Controls Overlay - Only show for direct video files */}
+          {!isYouTubeUrl(videoUrl) && !isVimeoUrl(videoUrl) && (
+            <>
+              <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
+                <div className="opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center space-x-4">
+                  <button
+                    onClick={handlePlayPause}
+                    className="bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-3 transition-all"
+                  >
+                    {isPlaying ? (
+                      <PauseIcon className="h-6 w-6 text-gray-800" />
+                    ) : (
+                      <PlayIcon className="h-6 w-6 text-gray-800" />
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={handleMuteToggle}
+                    className="bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full p-3 transition-all"
+                  >
+                    {isMuted ? (
+                      <span className="text-gray-800 text-sm">🔇</span>
+                    ) : (
+                      <span className="text-gray-800 text-sm">🔊</span>
+                    )}
+                  </button>
+                </div>
+              </div>
 
-          {/* Progress Bar */}
-          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-4">
-            <div className="flex items-center space-x-2 text-white text-sm">
-              <span>{formatTime(currentTime)}</span>
-              <input
-                type="range"
-                min="0"
-                max={duration || 0}
-                value={currentTime}
-                onChange={handleSeek}
-                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-              />
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
+              {/* Progress Bar */}
+              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 p-4">
+                <div className="flex items-center space-x-2 text-white text-sm">
+                  <span>{formatTime(currentTime)}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max={duration || 0}
+                    value={currentTime}
+                    onChange={handleSeek}
+                    className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span>{formatTime(duration)}</span>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Remove Button */}
           <button
@@ -271,7 +416,7 @@ export default function VideoUploader({
             <LinkIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <div className="space-y-2">
               <p className="text-lg font-medium text-gray-900">Add Video URL</p>
-              <p className="text-sm text-gray-500">Paste a video URL from YouTube, Vimeo, or S3</p>
+              <p className="text-sm text-gray-500">Paste a video URL from YouTube, Vimeo, or direct video file (e.g., .mp4, .webm)</p>
               <button
                 onClick={() => setShowUrlInput(true)}
                 className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
@@ -291,8 +436,16 @@ export default function VideoUploader({
             <input
               type="url"
               value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://example.com/video.mp4"
+              onChange={(e) => {
+                setUrlInput(e.target.value);
+                setError(''); // Clear error when user types
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleUrlSubmit();
+                }
+              }}
+              placeholder="https://youtube.com/watch?v=... or https://example.com/video.mp4"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
             />
             {error && (
