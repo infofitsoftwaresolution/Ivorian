@@ -406,7 +406,6 @@ export default function CourseLearningPage() {
       } finally {
         setLoading(false);
       }
-    }
   }, [courseId, authLoading, isAuthenticated, router]);
 
   // Initial fetch when component mounts or dependencies change
