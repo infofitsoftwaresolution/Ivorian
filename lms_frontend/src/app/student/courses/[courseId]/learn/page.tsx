@@ -223,13 +223,16 @@ export default function CourseLearningPage() {
           });
         }
         
-        // Ensure video_url is preserved in all lessons
+        // Ensure video_url is preserved in all lessons and sort lessons by order
         const topicsWithVideoUrl = topicsData.map((topic: any) => ({
           ...topic,
-          lessons: (topic.lessons || []).map((lesson: any) => ({
-            ...lesson,
-            video_url: lesson.video_url || null // Explicitly preserve video_url
-          }))
+          lessons: (topic.lessons || [])
+            .map((lesson: any) => ({
+              ...lesson,
+              video_url: lesson.video_url || null, // Explicitly preserve video_url
+              order: lesson.order || 0 // Ensure order is a number
+            }))
+            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) // Sort lessons by order
         }));
         
         console.log('📹 Topics with lessons (checking video_url):', topicsWithVideoUrl.map((t: any) => ({
@@ -324,22 +327,26 @@ export default function CourseLearningPage() {
             // Use topicsWithVideoUrl to ensure video_url is preserved
             let lessonCounter = 0;
             const updatedTopics = topicsWithVideoUrl.map((topic: any) => {
-              const updatedLessons = (topic.lessons || []).map((lesson: any) => {
-                // Keep existing is_completed status if it's already set
-                // Otherwise, estimate based on completed_lessons count
-                const currentIndex = lessonCounter;
-                lessonCounter++;
-                const estimatedCompleted = currentIndex < completedLessons;
-                
-                // Preserve ALL lesson fields including video_url
-                return {
-                  ...lesson,
-                  // Preserve existing completion status, or use estimated if not set
-                  is_completed: lesson.is_completed === true ? true : (lesson.is_completed === false ? false : estimatedCompleted),
-                  // Explicitly preserve video_url to ensure it's not lost
-                  video_url: lesson.video_url || null
-                };
-              });
+              const updatedLessons = (topic.lessons || [])
+                .slice() // Create a copy to avoid mutating
+                .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) // Sort by order first
+                .map((lesson: any) => {
+                  // Keep existing is_completed status if it's already set
+                  // Otherwise, estimate based on completed_lessons count
+                  const currentIndex = lessonCounter;
+                  lessonCounter++;
+                  const estimatedCompleted = currentIndex < completedLessons;
+                  
+                  // Preserve ALL lesson fields including video_url
+                  return {
+                    ...lesson,
+                    // Preserve existing completion status, or use estimated if not set
+                    is_completed: lesson.is_completed === true ? true : (lesson.is_completed === false ? false : estimatedCompleted),
+                    // Explicitly preserve video_url to ensure it's not lost
+                    video_url: lesson.video_url || null,
+                    order: lesson.order || 0 // Ensure order is preserved
+                  };
+                });
               
               return {
                 ...topic,
@@ -1449,7 +1456,10 @@ export default function CourseLearningPage() {
                   </div>
                   
                   <div className="space-y-1">
-                    {(topic.lessons || []).map((lesson, lessonIndex) => (
+                    {(topic.lessons || [])
+                      .slice() // Create a copy to avoid mutating the original array
+                      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0)) // Sort lessons by order
+                      .map((lesson, lessonIndex) => (
                       <button
                         key={lesson.id}
                         onClick={() => selectLesson(lesson)}

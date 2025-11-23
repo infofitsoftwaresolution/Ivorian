@@ -684,7 +684,14 @@ class TopicService:
         topics = result.scalars().all()
         print(f"📚 TopicService: Found {len(topics)} topics for course {course_id}")
         for topic in topics:
+            # Sort lessons by order to ensure consistent ordering
+            # Note: selectinload doesn't support order_by directly, so we sort manually
+            if topic.lessons:
+                topic.lessons.sort(key=lambda l: l.order if l.order is not None else 999999)
             print(f"  - Topic {topic.id}: {topic.title} with {len(topic.lessons)} lessons")
+            if topic.lessons:
+                for lesson in topic.lessons:
+                    print(f"    - Lesson {lesson.id}: {lesson.title} (order: {lesson.order})")
         return topics
     
     @staticmethod
