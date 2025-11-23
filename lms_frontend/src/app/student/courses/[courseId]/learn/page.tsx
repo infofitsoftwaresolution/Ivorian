@@ -204,14 +204,46 @@ export default function CourseLearningPage() {
           console.log('📖 First lesson structure:', {
             id: firstLesson.id,
             title: firstLesson.title,
+            video_url: firstLesson.video_url,
             video_duration: firstLesson.video_duration,
             estimated_duration: firstLesson.estimated_duration,
             duration: firstLesson.duration,
             content_type: firstLesson.content_type
           });
+          
+          // Log all lessons with video URLs for debugging
+          topicsData.forEach((topic: any, topicIdx: number) => {
+            if (topic.lessons && Array.isArray(topic.lessons)) {
+              topic.lessons.forEach((lesson: any, lessonIdx: number) => {
+                if (lesson.content_type === 'video') {
+                  console.log(`📹 Lesson ${lesson.id} (${lesson.title}): video_url =`, lesson.video_url);
+                }
+              });
+            }
+          });
         }
         
-        setTopics(topicsData);
+        // Ensure video_url is preserved in all lessons
+        const topicsWithVideoUrl = topicsData.map((topic: any) => ({
+          ...topic,
+          lessons: (topic.lessons || []).map((lesson: any) => ({
+            ...lesson,
+            video_url: lesson.video_url || null // Explicitly preserve video_url
+          }))
+        }));
+        
+        console.log('📹 Topics with lessons (checking video_url):', topicsWithVideoUrl.map((t: any) => ({
+          topicId: t.id,
+          title: t.title,
+          lessons: (t.lessons || []).map((l: any) => ({
+            id: l.id,
+            title: l.title,
+            content_type: l.content_type,
+            video_url: l.video_url
+          }))
+        })));
+        
+        setTopics(topicsWithVideoUrl);
 
         // Fetch enrollment data to get progress
         try {
@@ -257,7 +289,8 @@ export default function CourseLearningPage() {
             setEnrollmentId(courseEnrollment.id);
             
             // Always calculate total_lessons from actual topics data (most accurate)
-            const totalLessons = topicsData.reduce((acc: number, topic: any) => {
+            // Use topicsWithVideoUrl instead of topicsData to ensure video_url is preserved
+            const totalLessons = topicsWithVideoUrl.reduce((acc: number, topic: any) => {
               return acc + (Array.isArray(topic.lessons) ? topic.lessons.length : 0);
             }, 0);
 
@@ -288,8 +321,9 @@ export default function CourseLearningPage() {
             // Mark lessons as completed based on enrollment progress
             // First, try to fetch actual lesson progress from backend if available
             // Otherwise, estimate from completed_lessons count
+            // Use topicsWithVideoUrl to ensure video_url is preserved
             let lessonCounter = 0;
-            const updatedTopics = topicsData.map((topic: any) => {
+            const updatedTopics = topicsWithVideoUrl.map((topic: any) => {
               const updatedLessons = (topic.lessons || []).map((lesson: any) => {
                 // Keep existing is_completed status if it's already set
                 // Otherwise, estimate based on completed_lessons count
@@ -297,10 +331,13 @@ export default function CourseLearningPage() {
                 lessonCounter++;
                 const estimatedCompleted = currentIndex < completedLessons;
                 
+                // Preserve ALL lesson fields including video_url
                 return {
                   ...lesson,
                   // Preserve existing completion status, or use estimated if not set
-                  is_completed: lesson.is_completed === true ? true : (lesson.is_completed === false ? false : estimatedCompleted)
+                  is_completed: lesson.is_completed === true ? true : (lesson.is_completed === false ? false : estimatedCompleted),
+                  // Explicitly preserve video_url to ensure it's not lost
+                  video_url: lesson.video_url || null
                 };
               });
               
@@ -348,7 +385,8 @@ export default function CourseLearningPage() {
               course: e.course?.id 
             })));
             
-            const totalLessons = topicsData.reduce((acc: number, topic: any) => {
+            // Use topicsWithVideoUrl to ensure video_url is preserved
+            const totalLessons = topicsWithVideoUrl.reduce((acc: number, topic: any) => {
               return acc + (Array.isArray(topic.lessons) ? topic.lessons.length : 0);
             }, 0);
 
@@ -360,14 +398,15 @@ export default function CourseLearningPage() {
             });
 
             // Set first lesson as current if available
-            if (topicsData.length > 0 && topicsData[0].lessons && topicsData[0].lessons.length > 0) {
-              setCurrentLesson(topicsData[0].lessons[0]);
+            if (topicsWithVideoUrl.length > 0 && topicsWithVideoUrl[0].lessons && topicsWithVideoUrl[0].lessons.length > 0) {
+              setCurrentLesson(topicsWithVideoUrl[0].lessons[0]);
             }
           }
         } catch (enrollmentError) {
           console.error('Error fetching enrollment data:', enrollmentError);
           // Continue without enrollment data - set default progress
-          const totalLessons = topicsData.reduce((acc: number, topic: any) => {
+          // Use topicsWithVideoUrl to ensure video_url is preserved
+          const totalLessons = topicsWithVideoUrl.reduce((acc: number, topic: any) => {
             return acc + (Array.isArray(topic.lessons) ? topic.lessons.length : 0);
           }, 0);
 
@@ -379,8 +418,8 @@ export default function CourseLearningPage() {
           });
 
           // Set first lesson as current if available
-          if (topicsData.length > 0 && topicsData[0].lessons && topicsData[0].lessons.length > 0) {
-            setCurrentLesson(topicsData[0].lessons[0]);
+          if (topicsWithVideoUrl.length > 0 && topicsWithVideoUrl[0].lessons && topicsWithVideoUrl[0].lessons.length > 0) {
+            setCurrentLesson(topicsWithVideoUrl[0].lessons[0]);
           }
         }
 
@@ -1115,7 +1154,7 @@ export default function CourseLearningPage() {
   };
 
   const selectLesson = (lesson: Lesson) => {
-    // Find the full lesson data from topics to ensure we have all fields including duration
+    // Find the full lesson data from topics to ensure we have all fields including video_url
     let fullLesson = lesson;
     for (const topic of topics) {
       const foundLesson = topic.lessons?.find((l: any) => l.id === lesson.id);
@@ -1124,6 +1163,16 @@ export default function CourseLearningPage() {
         break;
       }
     }
+    
+    // Debug logging
+    console.log('🎯 Selecting lesson:', {
+      lessonId: fullLesson.id,
+      title: fullLesson.title,
+      content_type: fullLesson.content_type,
+      video_url: fullLesson.video_url,
+      hasVideoUrl: !!fullLesson.video_url
+    });
+    
     setCurrentLesson(fullLesson);
     setIsPlaying(false);
     
@@ -1463,10 +1512,21 @@ export default function CourseLearningPage() {
                 // Validate video_url before rendering
                 const videoUrl = currentLesson.video_url ? String(currentLesson.video_url).trim() : '';
                 
+                // Debug logging
+                console.log('🎬 Rendering video player for lesson:', {
+                  lessonId: currentLesson.id,
+                  title: currentLesson.title,
+                  video_url: currentLesson.video_url,
+                  videoUrl_processed: videoUrl,
+                  hasVideoUrl: !!videoUrl && videoUrl.length > 0
+                });
+                
                 if (!videoUrl || videoUrl.length === 0) {
+                  console.warn('⚠️ No video URL found for lesson:', currentLesson.id, currentLesson.title);
                   return (
                     <div className="bg-gray-100 rounded-lg p-8 text-center">
                       <p className="text-gray-600">Video URL is not available for this lesson.</p>
+                      <p className="text-sm text-gray-500 mt-2">Lesson ID: {currentLesson.id}</p>
                     </div>
                   );
                 }
