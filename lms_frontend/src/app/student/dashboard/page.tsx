@@ -171,6 +171,72 @@ export default function StudentDashboard() {
     }
   }, [user]);
 
+  // Reload data when page becomes visible (e.g., after tutor adds new content)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user?.role === 'student' && !loadingData) {
+        // Refetch data when page becomes visible to get latest course updates
+        const fetchStudentData = async () => {
+          try {
+            const enrollmentsResponse = await apiClient.getMyEnrollments();
+            let enrollments = [];
+            if (Array.isArray(enrollmentsResponse.data)) {
+              enrollments = enrollmentsResponse.data;
+            } else if (enrollmentsResponse.data && Array.isArray(enrollmentsResponse.data.enrollments)) {
+              enrollments = enrollmentsResponse.data.enrollments;
+            }
+            
+            setEnrolledCourses(enrollments);
+            
+            // Recalculate stats
+            const totalCourses = enrollments.length;
+            const totalLessons = enrollments.reduce((acc: number, enrollment: any) => {
+              const total = enrollment.total_lessons || enrollment.course?.total_lessons || 0;
+              return acc + total;
+            }, 0);
+            const completedLessons = enrollments.reduce((acc: number, enrollment: any) => {
+              if (enrollment.completed_lessons !== undefined && enrollment.completed_lessons !== null) {
+                return acc + (parseInt(String(enrollment.completed_lessons)) || 0);
+              }
+              const total = enrollment.total_lessons || enrollment.course?.total_lessons || 0;
+              return acc + Math.floor((enrollment.progress_percentage || 0) * total / 100);
+            }, 0);
+            const averageProgress = enrollments.length > 0 
+              ? enrollments.reduce((acc: number, enrollment: any) => acc + (enrollment.progress_percentage || 0), 0) / enrollments.length
+              : 0;
+            
+            setStats({
+              enrolledCourses: totalCourses,
+              completedLessons: completedLessons,
+              totalLessons: totalLessons,
+              averageScore: Math.round(averageProgress),
+              certificatesEarned: enrollments.filter((e: any) => e.status === 'completed').length,
+              studyTime: 0
+            });
+          } catch (error) {
+            console.error('Error refreshing student data:', error);
+          }
+        };
+        fetchStudentData();
+      }
+    };
+
+    const handleFocus = () => {
+      if (user?.role === 'student' && !loadingData) {
+        // Refetch on window focus as well
+        handleVisibilityChange();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user, loadingData]);
+
   // Show loading while checking authentication or fetching data
   if (isLoading || loadingData) {
     return (

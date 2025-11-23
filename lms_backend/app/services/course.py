@@ -26,6 +26,52 @@ class CourseService:
     """Service class for course management"""
     
     @staticmethod
+    async def update_course_stats(db: AsyncSession, course_id: int) -> Course:
+        """Recalculate and update course statistics (total_lessons, total_topics, total_duration)"""
+        from app.models.course import Topic, Lesson
+        
+        # Get actual counts from database
+        lessons_result = await db.execute(
+            select(func.count(Lesson.id))
+            .select_from(Lesson)
+            .join(Topic)
+            .where(Topic.course_id == course_id)
+        )
+        total_lessons = lessons_result.scalar() or 0
+        
+        topics_result = await db.execute(
+            select(func.count(Topic.id)).where(Topic.course_id == course_id)
+        )
+        total_topics = topics_result.scalar() or 0
+        
+        # Calculate total duration (sum of all lesson estimated_duration in minutes)
+        duration_result = await db.execute(
+            select(func.coalesce(func.sum(Lesson.estimated_duration), 0))
+            .select_from(Lesson)
+            .join(Topic)
+            .where(Topic.course_id == course_id)
+        )
+        total_duration = int(duration_result.scalar() or 0)
+        
+        # Update course
+        course = await CourseService.get_course(db, course_id)
+        if course:
+            course.total_lessons = total_lessons
+            course.total_topics = total_topics
+            course.total_duration = total_duration
+            await db.commit()
+            await db.refresh(course)
+            
+            # Update all enrollments' total_lessons for this course
+            await db.execute(
+                text("UPDATE enrollments SET total_lessons = :total_lessons WHERE course_id = :course_id"),
+                {"total_lessons": total_lessons, "course_id": course_id}
+            )
+            await db.commit()
+        
+        return course
+    
+    @staticmethod
     async def create_course(db: AsyncSession, course_data: CourseCreate, created_by: int) -> Course:
         """Create a new course"""
         # Verify organization exists and user has access
@@ -606,6 +652,9 @@ class TopicService:
             await db.commit()
             await db.refresh(topic)
             
+            # Update course statistics after creating topic
+            await CourseService.update_course_stats(db, course_id)
+            
             print(f"✅ TopicService: Topic created successfully with ID: {topic.id}")
             return topic
             
@@ -808,6 +857,9 @@ class TopicService:
             )
             await db.commit()
             
+            # Update course statistics after deleting topic
+            await CourseService.update_course_stats(db, topic.course_id)
+            
             return True
             
         except Exception as e:
@@ -856,6 +908,9 @@ class LessonService:
         db.add(lesson)
         await db.commit()
         await db.refresh(lesson)
+        
+        # Update course statistics after creating lesson
+        await CourseService.update_course_stats(db, topic.course_id)
         
         return lesson
     
@@ -991,6 +1046,9 @@ class LessonService:
                 delete(Lesson).where(Lesson.id == lesson_id)
             )
             await db.commit()
+            
+            # Update course statistics after deleting lesson
+            await CourseService.update_course_stats(db, topic.course_id)
             
             return True
             
