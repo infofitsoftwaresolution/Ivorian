@@ -1201,6 +1201,7 @@ function TopicEditor({ topic, course, onUpdate, onRefresh, onSelectLesson, onDel
 // Lesson Editor
 function LessonEditor({ lesson, course, onUpdate, onRefresh, onDelete }: { lesson: Lesson; course: Course; onUpdate: (course: Course) => void; onRefresh?: () => void; onDelete?: () => void }) {
   const [localLesson, setLocalLesson] = useState(lesson);
+  const [originalLesson, setOriginalLesson] = useState(lesson); // Store original lesson for comparison
   const [activeTab, setActiveTab] = useState<'content' | 'video' | 'attachments' | 'knowledge-checks'>('content');
   const [showKnowledgeCheckBuilder, setShowKnowledgeCheckBuilder] = useState(false);
   const [showStudentPreview, setShowStudentPreview] = useState(false);
@@ -1211,6 +1212,7 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh, onDelete }: { lesso
   // Update local lesson state when lesson prop changes (when clicking different lesson)
   useEffect(() => {
     setLocalLesson(lesson);
+    setOriginalLesson(lesson); // Also update original when switching lessons
     setActiveTab('content'); // Reset to content tab when switching lessons
   }, [lesson.id]);
 
@@ -1252,34 +1254,51 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh, onDelete }: { lesso
       setSaving(true);
       
       // Prepare update data - only send changed fields
+      // Compare against originalLesson, not lesson prop (which might be updated by onUpdate)
       const updateData: any = {};
-      if (localLesson.title !== lesson.title) {
+      
+      // Handle string comparisons with null/undefined safety
+      const compareString = (a: any, b: any) => {
+        const strA = a || '';
+        const strB = b || '';
+        return strA.trim() !== strB.trim();
+      };
+      
+      if (compareString(localLesson.title, originalLesson.title)) {
         updateData.title = localLesson.title;
       }
-      if (localLesson.description !== lesson.description) {
+      if (compareString(localLesson.description, originalLesson.description)) {
         updateData.description = localLesson.description;
       }
-      if (localLesson.content !== lesson.content) {
+      if (compareString(localLesson.content, originalLesson.content)) {
         updateData.content = localLesson.content;
       }
-      if (localLesson.video_url !== lesson.video_url) {
-        updateData.video_url = localLesson.video_url;
+      if (compareString(localLesson.video_url, originalLesson.video_url)) {
+        updateData.video_url = localLesson.video_url || '';
       }
-      if (localLesson.content_type !== lesson.content_type) {
+      if (localLesson.content_type !== originalLesson.content_type) {
         updateData.content_type = localLesson.content_type;
       }
-      if (localLesson.order !== lesson.order) {
+      if (localLesson.order !== originalLesson.order) {
         updateData.order = localLesson.order;
       }
-      if (localLesson.estimated_duration !== lesson.estimated_duration) {
+      if (localLesson.estimated_duration !== originalLesson.estimated_duration) {
         updateData.estimated_duration = localLesson.estimated_duration;
       }
-      if (localLesson.is_free_preview !== lesson.is_free_preview) {
+      if (localLesson.is_free_preview !== originalLesson.is_free_preview) {
         updateData.is_free_preview = localLesson.is_free_preview;
       }
       
+      console.log('Save comparison:', {
+        localVideoUrl: localLesson.video_url,
+        originalVideoUrl: originalLesson.video_url,
+        areEqual: !compareString(localLesson.video_url, originalLesson.video_url),
+        updateData
+      });
+      
       if (Object.keys(updateData).length === 0) {
         showToast('No changes to save', 'info', 2000);
+        setSaving(false);
         return;
       }
       
@@ -1293,6 +1312,7 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh, onDelete }: { lesso
         ...response.data
       };
       setLocalLesson(updatedLesson);
+      setOriginalLesson(updatedLesson); // Update original lesson after successful save
       
       const updatedCourse = {
         ...course,
