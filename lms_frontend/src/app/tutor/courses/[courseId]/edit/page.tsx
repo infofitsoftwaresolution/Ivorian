@@ -1416,6 +1416,9 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh, onDelete }: { lesso
       if (compareString(localLesson.video_url, originalLesson.video_url)) {
         updateData.video_url = localLesson.video_url || '';
       }
+      if (localLesson.video_duration !== originalLesson.video_duration) {
+        updateData.video_duration = localLesson.video_duration;
+      }
       if (localLesson.content_type !== originalLesson.content_type) {
         updateData.content_type = localLesson.content_type;
       }
@@ -1706,7 +1709,13 @@ function LessonEditor({ lesson, course, onUpdate, onRefresh, onDelete }: { lesso
             </label>
             <VideoUploader
               videoUrl={localLesson.video_url}
-              onVideoChange={(url) => handleUpdate('video_url', url)}
+              onVideoChange={(url, duration) => {
+                handleUpdate('video_url', url);
+                // If duration is provided, update video_duration (in seconds)
+                if (duration !== undefined && duration > 0) {
+                  handleUpdate('video_duration', Math.round(duration));
+                }
+              }}
               className="min-h-[300px]"
             />
           </div>

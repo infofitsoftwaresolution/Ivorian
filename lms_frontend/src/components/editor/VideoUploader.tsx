@@ -19,7 +19,7 @@ import { apiClient } from '@/lib/api/client';
 
 interface VideoUploaderProps {
   videoUrl?: string;
-  onVideoChange: (url: string) => void;
+  onVideoChange: (url: string, duration?: number) => void;
   onRemove?: () => void;
   className?: string;
 }
@@ -69,7 +69,15 @@ export default function VideoUploader({
 
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
-      setDuration(videoRef.current.duration);
+      const videoDuration = videoRef.current.duration;
+      setDuration(videoDuration);
+      // If we have a valid duration and video URL, notify parent about the duration
+      if (videoDuration > 0 && !isNaN(videoDuration) && videoUrl) {
+        const roundedDuration = Math.round(videoDuration);
+        // Call onVideoChange with both URL and duration
+        // This allows the parent to update video_duration in the lesson
+        onVideoChange(videoUrl, roundedDuration);
+      }
     }
   };
 

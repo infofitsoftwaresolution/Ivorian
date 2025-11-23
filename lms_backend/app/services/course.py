@@ -44,14 +44,25 @@ class CourseService:
         )
         total_topics = topics_result.scalar() or 0
         
-        # Calculate total duration (sum of all lesson estimated_duration in minutes)
-        duration_result = await db.execute(
-            select(func.coalesce(func.sum(Lesson.estimated_duration), 0))
-            .select_from(Lesson)
+        # Calculate total duration
+        # Priority: video_duration (in seconds, convert to minutes) > estimated_duration (in minutes)
+        # Get all lessons for this course
+        lessons_result = await db.execute(
+            select(Lesson)
             .join(Topic)
             .where(Topic.course_id == course_id)
         )
-        total_duration = int(duration_result.scalar() or 0)
+        lessons = lessons_result.scalars().all()
+        
+        # Sum up durations: prefer video_duration (convert from seconds to minutes), fallback to estimated_duration
+        total_duration = 0
+        for lesson in lessons:
+            if lesson.video_duration and lesson.video_duration > 0:
+                # video_duration is in seconds, convert to minutes
+                total_duration += int(lesson.video_duration / 60)
+            elif lesson.estimated_duration and lesson.estimated_duration > 0:
+                # estimated_duration is already in minutes
+                total_duration += lesson.estimated_duration
         
         # Update course
         course = await CourseService.get_course(db, course_id)
@@ -965,6 +976,9 @@ class LessonService:
         
         await db.commit()
         await db.refresh(lesson)
+        
+        # Update course statistics after updating lesson (in case video_duration changed)
+        await CourseService.update_course_stats(db, topic.course_id)
         
         return lesson
     
